@@ -1,0 +1,144 @@
+// Vehicles: the prison truck, the escape car, German trucks. They follow a route, slow for
+// sharp turns (the S-bend at Bielańska–Długa–Nalewki is why the ambush worked), brake for
+// people in the road, and stop when the driver is hit or they catch fire. The crew bails
+// out alerted. A vehicle blocks the cells it stands on.
+import type { Sim } from "./sim";
+import type { Vehicle } from "./types";
+import { F_VEH } from "./grid";
+import { angDiff, setVehicleState } from "./combat";
+import { SPEED } from "./tuning";
+
+const cellsOf = new Map<number, number[]>();
+
+export function stepVehicles(sim: Sim, dt: number): void {
+  let moved = false;
+  for (const v of sim.state.vehicles) {
+    if (v.state === "burning") {
+      v.burnT += dt;
+      bailOut(sim, v);
+      if (v.burnT > 10) setVehicleState(sim, v, "wreck");
+    }
+    const disabled = v.state === "burning" || v.state === "wreck" || v.driverDead;
+    if (disabled || v.stopped || !v.route.length) {
+      if (v.speed > 0) {
+        v.speed = Math.max(0, v.speed - 7 * dt);
+        v.x += Math.cos(v.heading) * v.speed * dt;
+        v.y += Math.sin(v.heading) * v.speed * dt;
+        moved = true;
+        if (v.speed === 0) {
+          sim.emit({ t: "brake", id: v.id });
+          if (disabled) { v.stopped = true; bailOut(sim, v); }
+        }
+      }
+      continue;
+    }
+    drive(sim, v, dt);
+    moved = true;
+  }
+  if (moved) rebuildVehicleCells(sim);
+}
+
+function drive(sim: Sim, v: Vehicle, dt: number): void {
+  let target = v.route[v.routeI];
+  while (target && Math.hypot(target.x - v.x, target.y - v.y) < Math.max(1.6, v.speed * 0.35)) {
+    v.routeI++;
+    target = v.route[v.routeI];
+  }
+  if (!target) {
+    v.speed = Math.max(0, v.speed - 6 * dt);
+    if (v.speed === 0) { v.stopped = true; sim.emit({ t: "brake", id: v.id }); }
+    v.x += Math.cos(v.heading) * v.speed * dt;
+    v.y += Math.sin(v.heading) * v.speed * dt;
+    return;
+  }
+  const want = Math.atan2(target.y - v.y, target.x - v.x);
+  const turn = angDiff(want, v.heading);
+  const maxTurn = (0.9 + v.speed * 0.12) * dt;
+  v.heading += Math.max(-maxTurn, Math.min(maxTurn, turn));
+  // slow down for the corner ahead
+  const next = v.route[v.routeI + 1];
+  let cap = v.maxSpeed;
+  if (next) {
+    const seg = Math.atan2(next.y - target.y, next.x - target.x);
+    const bend = Math.abs(angDiff(seg, want));
+    const dist = Math.hypot(target.x - v.x, target.y - v.y);
+    if (bend > 0.5 && dist < 14) cap = Math.min(cap, v.maxSpeed * (bend > 1.2 ? 0.28 : 0.5));
+  }
+  if (Math.abs(turn) > 0.6) cap = Math.min(cap, v.maxSpeed * 0.3);
+  if (v.holdAt >= 0 && v.routeI >= v.holdAt) cap = 0;
+  if (someoneInFront(sim, v)) cap = 0;
+  const acc = cap > v.speed ? 2.6 : 7;
+  v.speed += Math.max(-acc * dt, Math.min(acc * dt, cap - v.speed));
+  if (v.speed < 0) v.speed = 0;
+  v.x += Math.cos(v.heading) * v.speed * dt;
+  v.y += Math.sin(v.heading) * v.speed * dt;
+}
+
+function someoneInFront(sim: Sim, v: Vehicle): boolean {
+  const c = Math.cos(v.heading), s = Math.sin(v.heading);
+  for (const u of sim.state.units) {
+    if (u.state === "dead" || u.hidden) continue;
+    const ox = u.x - v.x, oy = u.y - v.y;
+    const along = ox * c + oy * s;
+    const side = -ox * s + oy * c;
+    if (along > v.len / 2 && along < v.len / 2 + 2.2 + v.speed * 0.25 && Math.abs(side) < v.wid / 2 + 0.3) return true;
+  }
+  return false;
+}
+
+/** The crew gets out: escorts come out shooting. */
+export function bailOut(sim: Sim, v: Vehicle): void {
+  if (!v.crew.length) return;
+  const c = Math.cos(v.heading), s = Math.sin(v.heading);
+  const spots: [number, number][] = [[-v.len / 2 - 0.9, 0], [-v.len / 2 - 0.9, 0.9], [0.3, v.wid / 2 + 0.8], [0.3, -v.wid / 2 - 0.8], [-1.2, v.wid / 2 + 0.8], [-1.2, -v.wid / 2 - 0.8]];
+  let i = 0;
+  for (const id of v.crew) {
+    const u = sim.unit(id);
+    if (!u || u.state === "dead") continue;
+    const [a, b] = spots[i++ % spots.length];
+    let x = v.x + a * c - b * s, y = v.y + a * s + b * c;
+    const w = sim.grid.nearestWalkable(x, y, 4);
+    if (w) { x = w.x; y = w.y; }
+    u.hidden = false;
+    u.x = u.px = x;
+    u.y = u.py = y;
+    if (u.ai) {
+      u.ai.blind = false;
+      u.ai.mode = "alert";
+      u.ai.react = 0.9 + sim.rand() * 0.6;
+      u.ai.lastX = v.x;
+      u.ai.lastY = v.y;
+      u.ai.lastT = sim.state.time;
+      u.speed = SPEED.guardRun;
+      u.glyph = "alert";
+      sim.emit({ t: "glyph", unit: u.id, glyph: "alert" });
+    }
+    if (u.side === "de" && v.state === "burning" && sim.rand() < 0.35) sim.hurt(u, -1, "fire");
+  }
+  v.crew = [];
+}
+
+export function rebuildVehicleCells(sim: Sim): void {
+  const G = sim.grid;
+  for (const cells of cellsOf.values()) for (const i of cells) G.flags[i] &= ~F_VEH;
+  cellsOf.clear();
+  for (const v of sim.state.vehicles) {
+    const cells: number[] = [];
+    const c = Math.cos(v.heading), s = Math.sin(v.heading);
+    const hx = v.len / 2 + 0.1, hy = v.wid / 2 + 0.1;
+    const r = Math.ceil(Math.hypot(hx, hy));
+    for (let cy = Math.floor(v.y) - r; cy <= Math.floor(v.y) + r; cy++) {
+      for (let cx = Math.floor(v.x) - r; cx <= Math.floor(v.x) + r; cx++) {
+        if (!G.inBounds(cx, cy)) continue;
+        const ox = cx + 0.5 - v.x, oy = cy + 0.5 - v.y;
+        const lx = ox * c + oy * s, ly = -ox * s + oy * c;
+        if (Math.abs(lx) <= hx && Math.abs(ly) <= hy) {
+          const i = cy * G.w + cx;
+          G.flags[i] |= F_VEH;
+          cells.push(i);
+        }
+      }
+    }
+    cellsOf.set(v.id, cells);
+  }
+}

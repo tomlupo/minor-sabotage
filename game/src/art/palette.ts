@@ -74,6 +74,36 @@ export const PAL = raw as unknown as {
   };
 };
 
+/**
+ * Generic access for groups added to palette.json after this file was written (for example
+ * "city_signs"). Throws on a missing key, so a typo never silently becomes black.
+ */
+export function colour(group: string, key: string): RGB {
+  const g = (raw as unknown as Record<string, Record<string, unknown>>)[group];
+  const v = g?.[key];
+  if (!Array.isArray(v) || typeof v[0] !== "number") throw new Error(`palette: no colour ${group}.${key}`);
+  return v as unknown as RGB;
+}
+export function ramp(group: string, key: string): Ramp {
+  const g = (raw as unknown as Record<string, Record<string, unknown>>)[group];
+  const v = g?.[key];
+  if (!Array.isArray(v) || !Array.isArray(v[0])) throw new Error(`palette: no ramp ${group}.${key}`);
+  return v as unknown as Ramp;
+}
+
+/** Every RGB triple in the palette, as "r,g,b" strings (for tests and checks). */
+export function paletteColours(): Set<string> {
+  const out = new Set<string>();
+  const walk = (v: unknown) => {
+    if (Array.isArray(v)) {
+      if (v.length === 3 && v.every((n) => typeof n === "number" && Number.isInteger(n))) out.add(v.join(","));
+      else v.forEach(walk);
+    } else if (v && typeof v === "object") Object.values(v).forEach(walk);
+  };
+  walk(raw);
+  return out;
+}
+
 export const hex = (c: RGB): number => (c[0] << 16) | (c[1] << 8) | c[2];
 export const css = (c: RGB, a = 1): string =>
   a >= 1 ? `rgb(${c[0]},${c[1]},${c[2]})` : `rgba(${c[0]},${c[1]},${c[2]},${a})`;
