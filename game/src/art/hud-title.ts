@@ -143,11 +143,11 @@ const TURTLE_16 = maskFrom([
 /**
  * The minor-sabotage turtle ("Pracuj powoli", work slowly) as a wall stencil seen from above:
  * a shell cut into plates, and head, legs and tail standing apart from it the way a stencil
- * needs bridges. `size` is the turtle's height in px (12 and up); the image is size x size,
- * taller by a caption line when asked.
+ * needs bridges. `size` is the turtle's height in px (16 and up; below 22 it is drawn by hand);
+ * the image is size x size, taller by a caption line when asked.
  */
 export function buildTurtle(size: number, opts: TurtleOpts = {}): PixelImage {
-  const s = Math.max(12, Math.round(size));
+  const s = Math.max(16, Math.round(size));
   const c = opts.colour ?? HUD.chalk;
   const capFont = s >= 48 ? FONT : FONT_SMALL;
   const capH = opts.caption ? capFont.lineHeight + 2 : 0;
