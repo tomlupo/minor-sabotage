@@ -61,7 +61,7 @@ function colours(): Words {
   return COL;
 }
 
-/** 64 K random bytes (from hash2), looked up per pixel instead of hashing each one. */
+/** 64 K random bytes (from the integer hash), looked up per pixel instead of hashing each one. */
 let RND: Uint8Array | null = null;
 function rnd(): Uint8Array {
   if (RND) return RND;
@@ -98,7 +98,8 @@ const PROF_W = new Uint8Array(PROF_N);
 }
 /** The slush threshold's profile part, for plain road and for the swept tram-track bed:
  *  a pixel is slush when PT[d] + cover noise > its Bayer value (0..15). The noise changes
- *  by about 8 units per pixel, so a slope of 1 keeps patches solid with a 2 px dithered rim. */
+ *  by about 8 units per pixel, so a slope a little over 1 keeps patches solid with a 1-2 px
+ *  dithered rim. */
 const SLOPE = 1.2;
 const PT = new Float32Array(PROF_N).map((_, i) => (PROF_S[i] - 128) * SLOPE + 8);
 const PT_CLEAR = new Float32Array(PROF_N).map((_, i) => (PROF_S[i] / 2 - 128) * SLOPE + 8);
@@ -298,13 +299,12 @@ function roadRun(c: Ctx, Y: number, v: number, cy: number, cx0: number, cx1: num
 
 /** Pavement slabs, kerbs, wet patches and old snow along the walls. */
 function walkRun(c: Ctx, Y: number, v: number, cy: number, cx0: number, cx1: number): void {
-  const buf = c.buf, NT = c.NT, R = c.R, K = c.K, w = c.w, nbA = c.nb;
+  const buf = c.buf, NT = c.NT, K = c.K, w = c.w, nbA = c.nb;
   const byRow = (Y & 3) << 2;
   const oD = c.o[3], oE = c.o[4];
   const nD = (((oD >> 8) + (Y >> 1)) & 255) << 8, oDx = oD & 255;
   const nE = (((oE >> 8) + (Y >> 1)) & 255) << 8, oEx = oE & 255;
   const slab = c.T.slab, slabWet = c.T.slabWet, sRow = (Y % SL_H) * SL_W, sSh = c.slabShift[(Y / SL_H) | 0];
-  const rRow = (Y * 179 + c.rs) & 0xffff;
   const kerb = K.kerb, kerbFace = K.kerbFace;
   const lumpA = c.lump, oL = c.o[6], lRow = (((oL >> 8) + Y) & 255) << 8, lx = oL & 255, old = c.oldSnowW;
   const dry = c.T.settDry, tRow = (Y % ST_H) * ST_W, tSh = c.settShift[(Y / ST_H) | 0];
@@ -327,17 +327,18 @@ function walkRun(c: Ctx, Y: number, v: number, cy: number, cx0: number, cx1: num
         if (r2 > 1) { buf[o] = r2 < 1.2 ? K.mortar : dry[tRow + ((X + tSh) & (ST_W - 1))]; continue; }
         if (r2 > 0.68) { buf[o] = south && r2 > 0.88 && dv > 0.45 ? kerbFace : kerb; continue; }
       } else if (kerbs) {
-        // a light granite kerb where the pavement meets the road, its south face showing
+        // a light granite kerb where the pavement meets the road, its south face showing, the
+        // joints between the metre-long kerbstones (k: 1 along x, 3 along y, 2 the face)
         let k = 0;
         if (b & 2) { if (v === 8) k = 2; else if (v >= 6) k = 1; }
         if (!k && b & 1 && v <= 1) k = 1;
-        if (!k && b & 4 && u <= 1) k = 1;
-        if (!k && b & 8 && u >= 10) k = 1;
+        if (!k && b & 4 && u <= 1) k = 3;
+        if (!k && b & 8 && u >= 10) k = 3;
         if (!k && b & 256 && u <= 1 && v <= 1) k = 1;
         if (!k && b & 512 && u >= 10 && v <= 1) k = 1;
         if (!k && b & 1024 && u <= 1 && v >= 6) k = v === 8 ? 2 : 1;
         if (!k && b & 2048 && u >= 10 && v >= 6) k = v === 8 ? 2 : 1;
-        if (k) { buf[o] = k === 2 ? kerbFace : kerb; continue; }
+        if (k) { buf[o] = k === 2 || (k === 1 && u === 0) || (k === 3 && v === 0) ? kerbFace : kerb; continue; }
       }
       const bay = BAYER16[byRow | (X & 3)];
       if (walls) {
@@ -407,13 +408,12 @@ function yardRun(c: Ctx, Y: number, v: number, cy: number, cx0: number, cx1: num
 
 /** Dead grass, snow patches, trodden earth paths and a stone edging at the street. */
 function squareRun(c: Ctx, Y: number, v: number, cy: number, cx0: number, cx1: number): void {
-  const buf = c.buf, NT = c.NT, R = c.R, K = c.K, w = c.w, nbA = c.nb;
+  const buf = c.buf, NT = c.NT, K = c.K, w = c.w, nbA = c.nb;
   const byRow = (Y & 3) << 2;
   const oD = c.o[3], oE = c.o[4];
   const nD = (((oD >> 8) + (Y >> 1)) & 255) << 8, oDx = oD & 255;
   const nE = (((oE >> 8) + (Y >> 2)) & 255) << 8, oEx = oE & 255;
   const grass = c.T.grass, gRow = (Y % GR_H) * GR_W;
-  const rRow = (Y * 179 + c.rs) & 0xffff;
   let o = Y * c.W + cx0 * 12;
   for (let cx = cx0; cx < cx1; cx++) {
     const b = nbA[cy * w + cx];
@@ -678,7 +678,7 @@ export const paintGround: GroundPainter = (grid: GroundGrid, seed: number): Pixe
       const ew = Math.min(dN[ci], dS[ci]) <= Math.min(dW[ci], dE[ci]);
       const dd = ew ? Math.min(dN[ci], dS[ci]) + 0.5 : Math.min(dW[ci], dE[ci]) + 0.5;
       if (dd < 3.5) {
-        p = 0.3;
+        p = 0.17;
         const track = hash2(bx, by, s0 + 38) < 0.5 ? 1.35 : 2.75;
         const fromN = ew ? dN[ci] <= dS[ci] : dW[ci] <= dE[ci];
         if (ew) Y = Math.round(((fromN ? cy - dN[ci] : cy + 1 + dS[ci]) + (fromN ? track : -track)) * 9);

@@ -291,8 +291,12 @@ export class WorldView {
       if (cut && (a.tag === cutAt || b.tag === cutAt)) continue;
       const va = this.props.get(a.id), vb = this.props.get(b.id);
       if (!va || !vb) continue;
-      const ha = pt ? va.img.displayOriginY - pt[1] : 20, hb = pt ? vb.img.displayOriginY - pt[1] : 20;
-      const x0 = sx(a.x), y0 = sy(a.y) - ha, x1 = sx(b.x), y1 = sy(b.y) - hb;
+      // hang the wire from the insulator (POLE_WIRE_POINT) on a pole, from the roof of the box
+      const at = (p: Prop, v: { img: Phaser.GameObjects.Image }) => p.kind === "phone_pole" && pt
+        ? { x: sx(p.x) + (pt[0] - v.img.displayOriginX), y: sy(p.y) - (v.img.displayOriginY - pt[1]) }
+        : { x: sx(p.x), y: sy(p.y) - v.img.displayOriginY + 2 };
+      const A = at(a, va), Bp = at(b, vb);
+      const x0 = A.x, y0 = A.y, x1 = Bp.x, y1 = Bp.y;
       // a sagging wire
       let px0 = x0, py0 = y0;
       for (let k = 1; k <= 12; k++) {

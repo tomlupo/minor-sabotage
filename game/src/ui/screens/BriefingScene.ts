@@ -85,7 +85,7 @@ export class BriefingScene extends Phaser.Scene {
       const sqi = c.assign[t];
       const card = this.add.rectangle(cx, y, cw, cardH, hex(PAL.hud.paper[1])).setOrigin(0).setStrokeStyle(selected ? 2 : 1, hex(selected ? PAL.shared.select_gold : PAL.hud.paper_ink));
       card.setInteractive({ useHandCursor: true }).on("pointerup", () => { if (!res) { this.sel = t; sound.ui("ui_tap"); this.draw(); } });
-      this.add.rectangle(cx + 1, y + 1, 5, cardH - 2, hex(SQUAD_COLOURS[SQUADS[sqi].colour]));
+      this.add.rectangle(cx + 1, y + 1, 5, cardH - 2, hex(SQUAD_COLOURS[SQUADS[sqi].colour])).setOrigin(0);
       txt(this, cx + 10, y + 3, `${info.letter}. ${info.title}`, { color: PAL.hud.paper_ink });
       txt(this, cx + cw - 4, y + 3, SQUADS[sqi].name, { color: PAL.hud.paper_ink, align: 1, font: PXS });
       if (res) {

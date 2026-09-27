@@ -61,7 +61,7 @@ export class DecisionScene extends Phaser.Scene {
       const y = T + 34 + k * 46;
       const sqi = SQUADS.findIndex((s) => s.people.some((q) => q.key === key));
       this.add.rectangle(L, y, R - L, 42, hex(PAL.hud.paper[1])).setOrigin(0).setStrokeStyle(1, hex(PAL.hud.paper_ink));
-      this.add.rectangle(L + 1, y + 1, 4, 40, hex(SQUAD_COLOURS[SQUADS[sqi].colour]));
+      this.add.rectangle(L + 1, y + 1, 4, 40, hex(SQUAD_COLOURS[SQUADS[sqi].colour])).setOrigin(0);
       const tex = buildPortraitTexture(this, key, p.look, p.look.seed ?? 1);
       this.add.image(L + 8, y + 7, tex).setOrigin(0);
       txt(this, L + 38, y + 5, `${p.pseudonym}, ${p.name}`, { color: PAL.hud.paper_ink });

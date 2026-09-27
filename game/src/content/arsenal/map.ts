@@ -176,6 +176,8 @@ export function buildArsenalMap(): MapData {
     md.building[i] = pillar ? md.building[i] : -1;
     md.street[i] = STREET.arcade;
   });
+  // behind the Arsenal to the north: houses, never entered
+  row(ARSENAL.x, NAL.w, 0, ARSENAL.y, -1, { cuttable: false, storeys: [3, 4] });
   // behind the wall on Przejazd: the ghetto side, never entered
   row(PRZEJAZD.e, ARSENAL.x, 0, DLUGA.n, -1, { cuttable: false, storeys: [3, 4] });
   // Pasaż Simonsa: the newer block up Nalewki; the corner is a ruin

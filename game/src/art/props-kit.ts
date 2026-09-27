@@ -4,9 +4,9 @@
 // sandbag tops, and small 2D helpers for hand-placed pixels in the game's projection.
 import type { PropArt, PropState } from "./types";
 import { PAL, ramp, type RGB, type Ramp } from "./palette";
-import { hash2, img, px, type PixelImage } from "./pixel";
+import { hash2, px, type PixelImage } from "./pixel";
 import { vnoise } from "./fx-noise";
-import { bounds, fitCell, render, silhouette, toneOf, type Cell, type Hit, type Mat, type Mesh, type Shadow, type Tex } from "./vehicles-3d";
+import { bounds, fitCell, render, toneOf, type Cell, type Hit, type Mat, type Mesh, type Shadow, type Tex } from "./vehicles-3d";
 
 export const C = PAL.city_1943, S = PAL.shared, F = PAL.forest;
 export const EMBER: Ramp = ramp("props_extra", "ember");
@@ -128,19 +128,6 @@ export function line3(im: PixelImage, a: { ax: number; ay: number }, p: [number,
     if (e2 >= dy) { err += dy; x += sx; }
     if (e2 <= dx) { err += dx; y += sy; }
   }
-}
-
-/** Grow an image by a margin on each side (moving the anchor with it). */
-export function pad(a: PropArt, l: number, t: number, r: number, b: number): PropArt {
-  const out = img(a.image.w + l + r, a.image.h + t + b);
-  const s = a.image.data, d = out.data;
-  for (let y = 0; y < a.image.h; y++) d.set(s.subarray(y * a.image.w * 4, (y + 1) * a.image.w * 4), ((y + t) * out.w + l) * 4);
-  return { image: out, ax: a.ax + l, ay: a.ay + t };
-}
-
-/** Outline what was hand-painted into an image (bottom and right, like the renderer's props). */
-export function outlineBR(im: PixelImage): void {
-  silhouette(im.data, im.w, im.h, "br");
 }
 
 /** The shadow colour at the prop shadow's alpha, for hand-painted shadows. */

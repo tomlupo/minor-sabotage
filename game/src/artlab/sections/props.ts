@@ -66,7 +66,7 @@ function propsSection(): LabSection[] {
 function headingGrid(sheet: Sheet, cols: number, box: { x0: number; y0: number; x1: number; y1: number }): PixelImage {
   const w = box.x1 - box.x0, h = box.y1 - box.y0, rows = Math.ceil(sheet.frames.length / cols);
   const out = img(cols * (w + 1) - 1, rows * (h + 1) - 1);
-  sheet.frames.forEach((f, i) => {
+  sheet.frames.forEach((f) => {
     const n = Number(f.name.slice(1));
     blit(out, crop(sheet.image, f.x + box.x0, f.y + box.y0, w, h), (n % cols) * (w + 1), Math.floor(n / cols) * (h + 1));
   });
@@ -110,11 +110,17 @@ function fxSection(): LabSection[] {
 function sceneSection(): LabSection[] {
   const W = 400, H = 200;
   const im = img(W, H);
+  // a quiet stand-in for the ground painter: slabs on the pavements, cobbles in rows on the road
   for (let y = 0; y < H; y++) for (let x = 0; x < W; x++) {
     const walk = y < 44 || y > 170;
-    const r = walk ? C.pavement : C.cobble;
-    const k = hash2(x >> (walk ? 2 : 1), y >> 1, 7);
-    px(im, x, y, walk ? (((x >> 3) + (y >> 2)) % 5 === 0 ? C.mortar : r[k < 0.5 ? 0 : 1]) : r[k < 0.3 ? 0 : k < 0.8 ? 1 : 2]);
+    if (walk) {
+      const joint = x % 12 === 0 || y % 9 === 0;
+      px(im, x, y, joint ? C.pavement[0] : hash2(x / 12 | 0, y / 9 | 0, 3) < 0.3 ? C.pavement[0] : C.pavement[1]);
+    } else {
+      const row = y >> 1, off = row % 2 ? 1 : 0, col = (x + off) >> 1;
+      const edge = y % 2 === 1 || (x + off) % 2 === 1;
+      px(im, x, y, edge ? C.cobble[0] : hash2(col, row, 9) < 0.25 ? C.cobble[2] : C.cobble[1]);
+    }
   }
   const put = (a: { image: PixelImage; ax: number; ay: number }, x: number, y: number) => blit(im, a.image, x - a.ax, y - a.ay);
   const fx = buildFxSheet();
@@ -146,8 +152,15 @@ function sceneSection(): LabSection[] {
   put({ image: frameOf(car, "h8"), ax: car.frames[8].ax, ay: car.frames[8].ay }, 120, 100);
   const tram = buildVehicleSheet("tram", "intact");
   put({ image: frameOf(tram, "h0"), ax: tram.frames[0].ax, ay: tram.frames[0].ay }, 330, 144);
-  fxAt("muzzle_e_0", 60, 120);
-  fxAt("explosion_3", 60, 150);
+  const blitz = buildVehicleSheet("german_truck", "wreck");
+  put({ image: frameOf(blitz, "h13"), ax: blitz.frames[13].ax, ay: blitz.frames[13].ay }, 36, 88);
+  put(buildProp("phone_box", "destroyed"), 150, 40);
+  put(buildProp("bench", "intact", 0), 100, 186);
+  put(buildProp("barrier", "intact", 0), 270, 186);
+  fxAt("fire_4", 210, 184);
+  fxAt("muzzle_e_0", 180, 150);
+  fxAt("spark_1", 230, 140);
+  fxAt("explosion_3", 60, 160);
   return [{ title: "a stretch of Długa at 1x (and 2x)", items: [{ label: "scene", image: im, scale: 2 }] }];
 }
 

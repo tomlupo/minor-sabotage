@@ -6,7 +6,8 @@
 //
 // Anchors: muzzle flashes at the muzzle (the flash points away from it); explosion, fire, smoke,
 // dust, slush, glass and sparks at the effect's centre on the ground; decals at their centre.
-// West-side muzzle facings are the east-side frames flipped, like the troopers.
+// West-side muzzle facings are the east-side frames flipped, like the troopers: each muzzle frame
+// is padded so the muzzle is its exact horizontal middle, and a flip keeps it on the gun.
 import type { FxBuilder } from "./types";
 import { PAL, ramp, type RGB } from "./palette";
 import { bayer, hash2, img, px, rng, type Frame, type PixelImage, type Sheet } from "./pixel";
@@ -91,7 +92,20 @@ function transform(im: PixelImage, f: (x: number, y: number) => [number, number]
   return out;
 }
 
+/** Pad a frame sideways so its anchor is the exact horizontal middle (w = 2 * ax): flipped for a
+ *  west facing about the frame's middle, the flash still starts at the muzzle. */
+function centreX(c: Cell): Cell {
+  const w = Math.max(c.ax, c.im.w - c.ax) * 2, left = w / 2 - c.ax;
+  const im = img(w, c.im.h);
+  for (let y = 0; y < c.im.h; y++) im.data.set(c.im.data.subarray(y * c.im.w * 4, (y + 1) * c.im.w * 4), (y * w + left) * 4);
+  return { name: c.name, im, ax: w / 2, ay: c.ay };
+}
+
 function muzzles(): Cell[] {
+  return muzzleCells().map(centreX);
+}
+
+function muzzleCells(): Cell[] {
   const out: Cell[] = [];
   for (let f = 0; f < 2; f++) {
     const e = paintTemplate(FLASH_E[f]);
@@ -138,14 +152,16 @@ function explosion(): Cell[] {
       out.push({ name: "explosion_0", im, ax, ay });
       continue;
     }
-    const grow = Math.min(1, 0.45 + t * 1.3);
-    const lift = t * 16;
-    const heatFall = Math.max(0, 1.05 - t * 1.25);
+    // the fireball swells and stays white-hot for three frames, then cools from the top into smoke
+    const grow = [0, 0.55, 0.82, 1.0, 1.1, 1.18, 1.25, 1.3][f];
+    const heatFall = [0, 1.4, 1.3, 1.08, 0.8, 0.52, 0.3, 0.12][f];
+    const lift = [0, 1, 3, 6, 9, 12, 15, 18][f];
     // this frame's puffs and the box they fill
     const pc = puffs.map((p) => {
-      const rr = p.r * grow * (1 + t * 0.35);
+      const rr = p.r * grow;
       return { cx: ax + Math.cos(p.a) * p.d * grow * 1.3, cy: ay - 9 - lift * p.rise + Math.sin(p.a) * p.d * grow * 0.7, rr, r2: rr * rr };
     });
+    const cloudTop = Math.min(...pc.map((p) => p.cy - p.rr)), cloudH = ay - cloudTop;
     const bx0 = Math.max(0, Math.floor(Math.min(...pc.map((p) => p.cx - p.rr)))), bx1 = Math.min(W, Math.ceil(Math.max(...pc.map((p) => p.cx + p.rr))) + 1);
     const by0 = Math.max(0, Math.floor(Math.min(...pc.map((p) => p.cy - p.rr)))), by1 = Math.min(H, Math.ceil(Math.max(...pc.map((p) => p.cy + p.rr))) + 1);
     for (let y = by0; y < by1; y++) {
@@ -162,11 +178,13 @@ function explosion(): Cell[] {
         }
         if (dens <= 0) continue;
         const n = vnoise(x * 0.35, y * 0.35, f * 0.7, 3);
-        const heat = (dens * 1.1 + (n - 0.5) * 0.35) * heatFall;
+        // the top of the cloud cools first
+        const up = (ay - y) / cloudH;
+        const heat = (dens * 1.1 + (n - 0.5) * 0.35) * heatFall * (1.15 - up * 0.45);
         const c = heatColour(heat);
         if (c) { px(im, x, y, c); continue; }
         // smoke, thinning with time through a dither
-        const keep = dens * 1.4 - t * 0.55 + (n - 0.5) * 0.3;
+        const keep = dens * 1.5 - Math.max(0, t - 0.4) * 1.1 + (n - 0.5) * 0.3;
         if (keep <= 0) continue;
         if (f >= 5 && bayer(x, y) > keep * 2.2) continue;
         const lit = core * (1 + n * 0.4);
@@ -279,7 +297,7 @@ function smoke(): Cell[] {
 function dust(): Cell[] {
   const out: Cell[] = [];
   const W = 16, H = 14, ax = 8, ay = 12;
-  const tones: RGB[] = [C.stone_grey[0], C.stone_grey[1], C.pavement[0], C.pavement[1]];
+  const tones: RGB[] = [C.cobble[0], C.stone_grey[1], C.pavement[1], C.dirty_snow[0]];
   for (let f = 0; f < 4; f++) {
     const t = f / 3;
     const lumps = [
@@ -287,7 +305,10 @@ function dust(): Cell[] {
       { x: -2.5 - t * 1.5, y: -1 - t, r: 1.8 + t * 2.2 },
       { x: 2.5 + t * 1.5, y: -1.2 - t, r: 1.8 + t * 2.2 },
     ];
-    out.push({ name: `dust_${f}`, im: billow(W, H, ax, ay, lumps, t * 0.85, tones, 31 + f), ax, ay });
+    const im = billow(W, H, ax, ay, lumps, t * 0.85, tones, 31 + f);
+    // grit thrown up with the first puff
+    if (f < 2) for (const [dx, dy] of [[-3, -5], [2, -6], [4, -3], [-5, -2], [0, -7]]) px(im, ax + dx * (f + 1) * 0.7 | 0, ay + dy * (f + 1) * 0.6 | 0, C.cobble[0]);
+    out.push({ name: `dust_${f}`, im, ax, ay });
   }
   return out;
 }
@@ -300,14 +321,23 @@ function snow(): Cell[] {
   const clods = Array.from({ length: 12 }, () => ({ a: -Math.PI * (0.1 + r() * 0.8), v: 2 + r() * 3.5, c: [C.dirty_snow[2], C.dirty_snow[1], C.slush[1], C.slush[0]][Math.floor(r() * 4)] }));
   for (let f = 0; f < 4; f++) {
     const im = img(W, H);
-    if (f === 0) {
-      for (let y = -3; y <= 0; y++) for (let x = -3; x <= 3; x++) if (Math.hypot(x, y * 1.6) < 3.2) px(im, ax + x, ay + y - 1, Math.hypot(x, y) < 1.5 ? C.dirty_snow[2] : C.dirty_snow[1]);
+    if (f <= 1) {
+      // the burst, then a crown of slush around the hole
+      const rr = f === 0 ? 3.2 : 4.6;
+      for (let y = -4; y <= 0; y++) for (let x = -5; x <= 5; x++) {
+        const d = Math.sqrt(x * x + y * y * 2.6);
+        if (d < rr && (f === 0 || d > rr - 1.6)) px(im, ax + x, ay + y - 1, d < 1.6 && f === 0 ? C.dirty_snow[2] : y > -1 ? C.slush[1] : C.dirty_snow[1]);
+      }
+    } else {
+      // what fell back: a grey splat of slush
+      for (let x = -3 - f; x <= 3 + f; x++) if (hash2(x, f, 4) < 0.7) px(im, ax + x, ay - (Math.abs(x) < 2 ? 1 : 0), hash2(x, f, 6) < 0.5 ? C.slush[0] : C.slush[1]);
     }
     for (const c of clods) {
       const tt = 0.6 + f * 1.1;
-      const x = ax + Math.cos(c.a) * c.v * tt;
-      const y = ay - 1 + Math.sin(c.a) * c.v * tt + tt * tt * 0.55;
-      if (y < ay + 1) px(im, Math.round(x), Math.round(Math.min(y, ay)), c.c);
+      const x = Math.round(ax + Math.cos(c.a) * c.v * tt);
+      const y = Math.round(Math.min(ay, ay - 1 + Math.sin(c.a) * c.v * tt + tt * tt * 0.55));
+      px(im, x, y, c.c);
+      if (f < 3 && y < ay) px(im, x, y + 1, C.slush[0]); // clods, not specks: a lit top over a dirty belly
     }
     out.push({ name: `snow_${f}`, im, ax, ay });
   }

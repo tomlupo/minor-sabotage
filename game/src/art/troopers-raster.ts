@@ -33,10 +33,6 @@ export class Cel {
     this.bx0 = CW; this.by0 = CH; this.bx1 = -1; this.by1 = -1;
   }
 
-  get(x: number, y: number): number {
-    return x < 0 || y < 0 || x >= CW || y >= CH ? 0 : this.d[y * CW + x];
-  }
-
   set(x: number, y: number, c: number): void {
     if (!c || x < 0 || y < 0 || x >= CW || y >= CH) return;
     const i = y * CW + x;
@@ -46,11 +42,6 @@ export class Cel {
     if (x > this.bx1) this.bx1 = x;
     if (y < this.by0) this.by0 = y;
     if (y > this.by1) this.by1 = y;
-  }
-
-  /** Paint only where nothing is drawn yet: the part goes behind what is there. */
-  under(x: number, y: number, c: number): void {
-    if (x >= 0 && y >= 0 && x < CW && y < CH && !this.d[y * CW + x]) this.set(x, y, c);
   }
 
   /**
@@ -114,28 +105,6 @@ export class Cel {
       const e2 = 2 * err;
       if (e2 >= dy) { err += dy; ax += sx; }
       if (e2 <= dx) { err += dx; ay += sy; }
-    }
-  }
-
-  /** Even-odd scanline fill of a polygon given as flat [x0, y0, x1, y1, ...]. */
-  poly(pts: number[], c: number): void {
-    let minY = Infinity, maxY = -Infinity;
-    for (let i = 1; i < pts.length; i += 2) { minY = Math.min(minY, pts[i]); maxY = Math.max(maxY, pts[i]); }
-    const n = pts.length >> 1;
-    const xs: number[] = [];
-    for (let y = Math.max(0, Math.floor(minY)); y <= Math.min(CH - 1, Math.ceil(maxY)); y++) {
-      const sy = y + 0.5;
-      xs.length = 0;
-      for (let i = 0; i < n; i++) {
-        const ax = pts[i * 2], ay = pts[i * 2 + 1];
-        const j = (i + 1) % n;
-        const bx = pts[j * 2], by = pts[j * 2 + 1];
-        if ((ay <= sy && by > sy) || (by <= sy && ay > sy)) xs.push(ax + ((sy - ay) / (by - ay)) * (bx - ax));
-      }
-      xs.sort((p, q) => p - q);
-      for (let k = 0; k + 1 < xs.length; k += 2) {
-        for (let x = Math.ceil(xs[k] - 0.5); x < Math.ceil(xs[k + 1] - 0.5); x++) this.set(x, y, c);
-      }
     }
   }
 
@@ -234,12 +203,6 @@ export class Cel {
     return x1 < 0 ? null : [x0, y0, x1, y1];
   }
 
-  /** Is anything drawn? (tests, empty-frame guards) */
-  count(): number {
-    let n = 0;
-    for (let i = 0; i < this.d.length; i++) if (this.d[i]) n++;
-    return n;
-  }
 }
 
 const MARK = new Int32Array(CW * CH * 4);

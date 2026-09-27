@@ -32,7 +32,7 @@ const B0 = 19, B1 = 20, BELT = 21, BUCKLE = 22; // boots, belt
 const M0 = 23, M1 = 24; // gun metal
 const W0 = 25, W1 = 26, W2 = 46; // gun wood
 const AW = 27, AR = 28; // armband
-const P0 = 29, P1 = 30, P2 = 31; // pack, bag, pouch
+const P0 = 29, P1 = 30; // pack, bag, pouch
 const RED = 32; // the sapper's charge
 const G0 = 33, G1 = 34, WICK = 35; // petrol bottles
 const BN0 = 36, BN1 = 37, BR0 = 38, BR1 = 39, BLOOD = 40; // Rudy
@@ -41,7 +41,7 @@ const TAG = 43, STEEL = 44, SHIRT = 45; // driver tag, knife blade, shirt collar
 const NSLOT = 47;
 
 /** What an inner line may darken: cloth and legs, never a gun, a hand or a face. */
-const CLOTH = slotSet([J0, J1, J2, T0, T1, T2, SHIRT, BELT, BUCKLE, B0, B1, P0, P1, P2]);
+const CLOTH = slotSet([J0, J1, J2, T0, T1, T2, SHIRT, BELT, BUCKLE, B0, B1, P0, P1]);
 
 const HEAD_MAP = charMap({
   o: OUTLINE, r: R1, R: R0, q: R2, s: K1, S: K0, e: EYE, h: H1, D: H0, H: H2, k: HK, K: HV,
@@ -112,7 +112,6 @@ function resolveLook(look: TrooperLook): Look {
   L[AR] = tr.armband.red;
   L[P0] = tr.belt;
   L[P1] = tr.pack;
-  L[P2] = PAL.forest.dirt[1];
   L[RED] = PAL.shared.poppy_red;
   L[G0] = PAL.forest.pine[1];
   L[G1] = PAL.forest.pine[3];
@@ -392,8 +391,8 @@ function makePose(anim: Anim, i: number, lk: Look): Pose {
       // down on the right knee, the left foot planted, both hands at work on the ground ahead
       const legs: [Leg, Leg] = [{ f: 2.6, u: 0, knee: [2.8, 3.4] }, { f: -3.2, u: 0.1, knee: [-0.2, 0.3] }];
       return i === 0
-        ? { hf: 0, hu: 3.2, tilt: 30, legs, gun: sl, hands: [[5.2, -1.4, -1.4], [5.6, 1.4, -0.8]], head: [0.6, -0.4] }
-        : { hf: 0, hu: 3.2, tilt: 34, legs, gun: sl, hands: [[5.8, -1.4, -0.8], [5, 1.4, -1.6]], head: [0.8, -0.7] };
+        ? { hf: 0, hu: 3.2, tilt: 30, legs, gun: sl, hands: [[3.8, -2.6, -0.4], [4.2, 2.6, 0.2]], head: [0.6, -0.4] }
+        : { hf: 0, hu: 3.2, tilt: 34, legs, gun: sl, hands: [[4.4, -2.6, 0.2], [3.6, 2.6, -0.6]], head: [0.8, -1.1] };
     }
     case "death": {
       // hit, twist, fall, lie. The body ends across the cell, centred on the anchor: the feet
@@ -581,6 +580,9 @@ function drawAt(cel: Cel, lk: Look, facing: Facing, anim: Anim, i: number, ox: n
   // upright frames jerk forward, and his lying frames are the east ones face down, mirrored.
   const fallFwd = facing === "n" && (anim === "death" || anim === "prone");
   if (fallFwd && !pose.lie) pose = mirrorFwd(pose);
+  // Seen from behind, leaning away cancels sinking down (the head goes up the screen as it
+  // drops): kneel lower and more upright there, or he reads as standing.
+  if (anim === "kneel" && (facing === "n" || facing === "ne")) pose = { ...pose, hu: 2.4, tilt: pose.tilt - 18 };
   const lying = !!pose.lie;
   const faceDown = fallFwd && lying;
   // lying bodies are drawn across the screen: they read far better than foreshortened ones

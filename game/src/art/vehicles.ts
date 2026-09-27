@@ -50,9 +50,10 @@ export function vehicleCell(kind: VehicleKind): Cell {
     handOver.set(`${kind}|${st}`, m);
     for (let i = 0; i < HEADINGS; i++) bounds(m, headingYaw(i), VEHICLE_SHADOW, b);
   }
-  // symmetric about the anchor, so a frame mirrored by the game keeps its anchor
+  // symmetric about the anchor (w = 2 * ax), so a frame mirrored by the game keeps its anchor
   const hx = Math.max(-b.x0, b.x1);
   c = fitCell({ x0: -hx, x1: hx, y0: b.y0, y1: b.y1 }, 1);
+  c.w = 2 * c.ax;
   cells.set(kind, c);
   return c;
 }

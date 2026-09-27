@@ -6,6 +6,7 @@ import { TitleScene } from "./ui/screens/TitleScene";
 import { BriefingScene } from "./ui/screens/BriefingScene";
 import { DecisionScene } from "./ui/screens/DecisionScene";
 import { NoteScene } from "./ui/screens/NoteScene";
+import { IntroScene } from "./ui/screens/IntroScene";
 import { Flow, fakeResults } from "./game/flow";
 import { registerFonts } from "./ui/text";
 
@@ -25,6 +26,10 @@ class Boot extends Phaser.Scene {
     const ms = (window as unknown as { __ms: Record<string, unknown> }).__ms;
     ms.flow = flow;
     if (q.get("tasks") !== null) fakeResults(flow.campaign, q.get("tasks")!);
+    // ?hurt=alek&taken=hubert&dead=buzdygan&rudy=escaped: a campaign with losses (screens)
+    const mark = (k: string, st: "wounded" | "captured" | "dead") => { for (const key of (q.get(k) ?? "").split(",").filter(Boolean)) if (flow.campaign.soldiers[key]) flow.campaign.soldiers[key].state = st; };
+    mark("hurt", "wounded"); mark("taken", "captured"); mark("dead", "dead");
+    if (q.get("rudy")) flow.campaign.finale = { outcome: q.get("rudy") === "escaped" ? "success" : "fail", rudy: q.get("rudy") as "escaped" | "lost" | "killed", freed: 14, prisonersKilled: 3, fallen: (q.get("dead") ?? "").split(",").filter(Boolean), germansKilled: 9, seconds: 400 };
     const phase = q.get("phase");
     const screen = q.get("screen");
     if (phase) flow.play(phase);
@@ -46,7 +51,7 @@ const game = new Phaser.Game({
   audio: { noAudio: true },
   disableContextMenu: true,
   banner: false,
-  scene: [Boot, TitleScene, BriefingScene, DecisionScene, NoteScene, GameScene, HudScene],
+  scene: [Boot, TitleScene, IntroScene, BriefingScene, DecisionScene, NoteScene, GameScene, HudScene],
 });
 
 let pending = 0;

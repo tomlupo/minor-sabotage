@@ -6,10 +6,9 @@ import { type RGB, type Ramp } from "./palette";
 import { hash2, img, px, rng, vline, type PixelImage } from "./pixel";
 import { Mesh, render, toneOf, type Mat, type Prof } from "./vehicles-3d";
 import { vnoise } from "./fx-noise";
-import { C, S, F, IRON, CHAR, EMBER, GREY, RUST, PROP_SHADOW, flat, line3, mat, mound, P, renderProp, shadowPx } from "./props-kit";
+import { C, S, F, IRON, CHAR, GREY, RUST, flat, line3, mat, mound, P, renderProp, shadowPx } from "./props-kit";
 
 const BAG: Ramp = F.sandbag;
-const BARK: Ramp = [S.outline, C.bark[0], C.bark[1]];
 
 // ---------------------------------------------------------------- sandbags
 
@@ -355,11 +354,12 @@ export function snowHeap(seed: number): PropArt {
   const W = Math.ceil(rx * 24) + 8, Hh = Math.ceil(ry * 18 + H * 7.5) + 10;
   const im = img(W, Hh);
   const ax = W >> 1, ay = Math.ceil(ry * 9) + Math.ceil(H * 7.5) + 3;
-  // melt water around the foot
-  for (let y = -ry * 1.2; y <= ry * 1.2; y += 1 / 18) {
-    for (let x = -rx * 1.15; x <= rx * 1.15; x += 1 / 24) {
-      const d = (x / (rx * 1.12)) ** 2 + (y / (ry * 1.18)) ** 2;
-      if (d < 1 && d > 0.72) px(im, Math.floor(ax + x * 12), Math.floor(ay + y * 9), d > 0.9 ? C.puddle[0] : C.puddle[1]);
+  // melt water seeping out at the foot, mostly on the sunny south side, slush at its rim
+  for (let y = -ry * 1.3; y <= ry * 1.3; y += 1 / 18) {
+    for (let x = -rx * 1.25; x <= rx * 1.25; x += 1 / 24) {
+      const d = (x / (rx * 1.2)) ** 2 + (y / (ry * 1.3)) ** 2 + (vnoise(x * 5, y * 5, 1, seed) - 0.5) * 0.35;
+      if (d >= 1 || d < 0.6 || y < -ry * 0.4) continue;
+      px(im, Math.floor(ax + x * 12), Math.floor(ay + y * 9), d > 0.9 ? C.slush[0] : d > 0.78 ? C.puddle[0] : C.puddle[1]);
     }
   }
   const height = (x: number, y: number) => {
@@ -429,7 +429,7 @@ export function tree(seed: number): PropArt {
   const shape = [
     { fork: 15, limbs: 3, spread: 0.6, len: 14 },
     { fork: 11, limbs: 4, spread: 0.52, len: 13 },
-    { fork: 19, limbs: 3, spread: 0.3, len: 15 },
+    { fork: 18, limbs: 3, spread: 0.3, len: 13 },
   ][kind];
   const lean = (r() - 0.5) * 0.12;
   // shadow at the foot, a little to the south-east
@@ -457,6 +457,3 @@ export function tree(seed: number): PropArt {
   for (const [dx, c] of [[-3, C.dirty_snow[1]], [-2, C.dirty_snow[2]], [3, C.dirty_snow[1]], [4, C.dirty_snow[0]]] as [number, RGB][]) px(im, ax + dx, ay, c);
   return { image: im, ax, ay };
 }
-
-export { BARK, EMBER, PROP_SHADOW, render };
-export type { PixelImage };

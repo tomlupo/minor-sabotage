@@ -41,7 +41,7 @@ export class NoteScene extends Phaser.Scene {
     const f = c.finale;
     const lines: string[] = [];
     if (!f) return "";
-    lines.push(f.rudy === "escaped" ? "In your operation Rudy was got away in the DKW." : f.rudy === "killed" ? "In your operation Rudy was killed." : "In your operation Rudy was not freed.");
+    lines.push(f.rudy === "escaped" ? "In your operation the DKW got Rudy away." : f.rudy === "killed" ? "In your operation Rudy was killed." : "In your operation Rudy was not freed.");
     if (f.freed > 0) lines.push(`${f.freed} of the ${PRISONERS} other prisoners in the van reached safety${f.prisonersKilled ? `, and ${f.prisonersKilled} were killed in the street` : ""}.`);
     const fallen = Object.values(c.soldiers).filter((s) => s.state === "dead").map((s) => PEOPLE[s.key]);
     const taken = Object.values(c.soldiers).filter((s) => s.state === "captured").map((s) => PEOPLE[s.key]);

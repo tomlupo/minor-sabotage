@@ -12,7 +12,7 @@
 import type { RGB, Ramp } from "../palette";
 import { PAL } from "../palette";
 import type { PixelImage } from "../pixel";
-import { alphaAt, clear, hash2, hline, img, outline, px, rect, rng, vline } from "../pixel";
+import { clear, hash2, hline, img, px, rect, vline } from "../pixel";
 import type { BuildingArt, BuildingSpec } from "../types";
 import { lumpTex, noiseTex, trimRamp, wallRamp } from "./common";
 import { drawText, measureText } from "./font";
@@ -27,7 +27,7 @@ export type ArsenalSpec = BuildingSpec & { courtyard?: Courtyard };
 export const ARSENAL_PITCH = 1;
 
 const FACE_S = 0, FACE_N = 1, FACE_W = 2, FACE_E = 3;
-const ID_NONE = 0, ID_ROOF = 1, ID_WALL = 2, ID_INNER = 3, ID_COURT = 4;
+const ID_ROOF = 1, ID_WALL = 2, ID_INNER = 3, ID_COURT = 4; // 0: nothing drawn
 
 interface Geo {
   w: number; d: number; h: number; W: number; RH: number; WH: number; H: number;
@@ -45,23 +45,28 @@ function geometry(spec: ArsenalSpec): Geo {
   let court: Courtyard | null = spec.courtyard ?? null;
   if (court && (court.w <= 0 || court.d <= 0 || court.x < 1 || court.y < 1 || court.x + court.w > w - 1 || court.y + court.d > d - 1)) court = null;
   const inCourt = (xm: number, ym: number) => !!court && xm >= court.x && xm < court.x + court.w && ym >= court.y && ym < court.y + court.d;
+  // one result object, reused: the raster calls this hundreds of thousands of times
+  const out = { rz: 0, face: FACE_S, crease: false, valley: false };
   const roof = (xm: number, ym: number) => {
     // distance to the nearest eave: the outer walls, or the courtyard seen from outside
-    let a = xm, fa = FACE_W, b = Infinity, valley = false;
-    const take = (dist: number, face: number, isValley = false) => {
-      if (dist < a) { b = a; a = dist; fa = face; valley = isValley; } else if (dist < b) b = dist;
-    };
-    take(w - xm, FACE_E);
-    take(ym, FACE_N);
-    take(d - ym, FACE_S);
+    let a = xm, fa = FACE_W, b = Infinity, valley = false, dist = w - xm;
+    if (dist < a) { b = a; a = dist; fa = FACE_E; } else if (dist < b) b = dist;
+    dist = ym;
+    if (dist < a) { b = a; a = dist; fa = FACE_N; } else if (dist < b) b = dist;
+    dist = d - ym;
+    if (dist < a) { b = a; a = dist; fa = FACE_S; } else if (dist < b) b = dist;
     if (court) {
       const dx = xm < court.x ? court.x - xm : xm > court.x + court.w ? xm - court.x - court.w : 0;
       const dy = ym < court.y ? court.y - ym : ym > court.y + court.d ? ym - court.y - court.d : 0;
-      const dc = Math.max(dx, dy);
-      const face = dy >= dx ? (ym < court.y ? FACE_S : FACE_N) : xm < court.x ? FACE_E : FACE_W;
-      take(dc, face, dx > 0 && dy > 0 && Math.abs(dx - dy) < 0.15);
+      dist = dx > dy ? dx : dy;
+      if (dist < a) {
+        b = a; a = dist;
+        fa = dy >= dx ? (ym < court.y ? FACE_S : FACE_N) : xm < court.x ? FACE_E : FACE_W;
+        valley = dx > 0 && dy > 0 && Math.abs(dx - dy) < 0.15;
+      } else if (dist < b) b = dist;
     }
-    return { rz: a * ARSENAL_PITCH, face: fa, crease: b - a < 0.14, valley };
+    out.rz = a * ARSENAL_PITCH; out.face = fa; out.crease = b - a < 0.14; out.valley = valley;
+    return out;
   };
   return { w, d, h, W, RH, WH, H: RH + WH, court, inCourt, roof };
 }
@@ -75,7 +80,7 @@ interface Raster { id: Uint8Array; ym: Float32Array; rz: Float32Array }
 function raster(im: PixelImage, g: Geo, seed: number): Raster {
   const { W, H, RH, WH, d } = g;
   const id = new Uint8Array(W * H), ymA = new Float32Array(W * H), rzA = new Float32Array(W * H);
-  const T = C.brick, NT = noiseTex(), lumps = lumpTex();
+  const T = C.brick, NT = noiseTex(), lumps = lumpTex(), data = im.data;
   const step = 1 / 18;
   for (let x = 0; x < W; x++) {
     const xm = (x + 0.5) / 12;
@@ -128,7 +133,8 @@ function raster(im: PixelImage, g: Geo, seed: number): Raster {
             cc = nv - lim < 6 || nf < 130 ? C.dirty_snow[0] : C.dirty_snow[l === 2 ? 2 : l === 0 ? 0 : 1];
           }
         }
-        px(im, x, y, cc);
+        const o = (y * W + x) * 4;
+        data[o] = cc[0]; data[o + 1] = cc[1]; data[o + 2] = cc[2]; data[o + 3] = 255;
         id[y * W + x] = ID_ROOF; ymA[y * W + x] = ym; rzA[y * W + x] = r.rz;
       }
       top = Math.max(0, row);
@@ -196,7 +202,7 @@ function barredWindow(im: PixelImage, st: Style, cx: number, y0: number, lit: bo
   hline(im, x0 - 1, x0 + 12, y0 + 13, P[0]);
 }
 
-function southFacade(im: PixelImage, g: Geo, st: Style, spec: ArsenalSpec, r: () => number): void {
+function southFacade(im: PixelImage, g: Geo, st: Style, spec: ArsenalSpec): void {
   const { W, RH, WH, H } = g;
   const { P, T, stone } = st;
   const y0 = RH;
@@ -255,7 +261,7 @@ function southFacade(im: PixelImage, g: Geo, st: Style, spec: ArsenalSpec, r: ()
     if (q < 0.12) vline(im, x, y0 + 6, y0 + 7 + Math.floor(q * 50), P[0]);
   }
   // the gate
-  grandGate(im, st, st.gate[0], H - 1, spec, r);
+  grandGate(im, st, st.gate[0], H - 1);
   // east end in shade, outline right and bottom
   vline(im, W - 2, y0, H - 1, P[0]);
   vline(im, W - 1, y0, H - 1, S.outline);
@@ -264,7 +270,7 @@ function southFacade(im: PixelImage, g: Geo, st: Style, spec: ArsenalSpec, r: ()
 
 /** The central gate: a tall round arch of rusticated voussoirs, a keystone, the dark
  *  vaulted passage to the courtyard, and a plaque above. */
-function grandGate(im: PixelImage, st: Style, x0: number, bottom: number, spec: ArsenalSpec, r: () => number): void {
+function grandGate(im: PixelImage, st: Style, x0: number, bottom: number): void {
   const { P, stone } = st;
   const w = st.gate[1] - st.gate[0];
   const spring = bottom - 17, rise = Math.min(14, Math.floor(w / 2) - 2);
@@ -320,7 +326,6 @@ function grandGate(im: PixelImage, st: Style, x0: number, bottom: number, spec: 
   hline(im, pxs, pxs + pw - 1, py + 9, S.outline);
   vline(im, pxs + pw, py, py + 9, S.outline);
   drawText(im, text, pxs + 3, py + 2, C.soot[0]);
-  void r;
 }
 
 /** The inner south wall of the north wing, seen across the courtyard: an arcade below,
@@ -420,7 +425,7 @@ function turret(im: PixelImage, g: Geo, xm: number, ym: number): void {
 
 // ------------------------------------------------------------------ the cut
 
-function paintCut(g: Geo, st: Style, spec: ArsenalSpec, r: () => number): PixelImage {
+function paintCut(g: Geo, st: Style, spec: ArsenalSpec): PixelImage {
   const { W, RH, WH, H, court } = g;
   const im = img(W, H);
   const K = I.KNEE;
@@ -485,15 +490,28 @@ function paintCut(g: Geo, st: Style, spec: ArsenalSpec, r: () => number): PixelI
   } else ewWing(F0 + tE, F1 - tE, (x) => x > st.gate[0] - 30 && x < st.gate[1] + 10);
   I.drawSorted(list);
   I.ghost(im, W, RH, H);
-  void r;
   return im;
+}
+
+/** The outline round the courtyard hole, the full image's only transparent pixels (the same
+ *  result as pixel.outline over the whole image, scanning only the courtyard's columns). */
+function holeOutline(im: PixelImage, g: Geo): void {
+  if (!g.court) return;
+  const { W, H } = g, d = im.data;
+  const x0 = Math.max(0, Math.floor(g.court.x * 12) - 1), x1 = Math.min(W, Math.ceil((g.court.x + g.court.w) * 12) + 1);
+  const op = (x: number, y: number) => x >= 0 && y >= 0 && x < W && y < H && d[(y * W + x) * 4 + 3] > 127;
+  const mark: number[] = [];
+  for (let y = 0; y < H; y++) for (let x = x0; x < x1; x++) {
+    if (d[(y * W + x) * 4 + 3]) continue;
+    if (op(x + 1, y) || op(x - 1, y) || op(x, y + 1) || op(x, y - 1)) mark.push(x, y);
+  }
+  for (let k = 0; k < mark.length; k += 2) px(im, mark[k], mark[k + 1], S.outline);
 }
 
 // ------------------------------------------------------------------ the builder
 
 export function buildArsenal(spec: ArsenalSpec): BuildingArt {
   const g = geometry(spec);
-  const r = rng(spec.seed * 7919 + 1);
   const P = wallRamp(spec.plaster), T = trimRamp(spec.plaster), stone = C.stone_grey;
   // bays about 3.4 m apart, the gate in the middle (or where the spec puts a gateway)
   const gw = 36;
@@ -505,7 +523,7 @@ export function buildArsenal(spec: ArsenalSpec): BuildingArt {
   const st: Style = { P, T, stone, axes, gate };
   const full = img(g.W, g.H);
   const ras = raster(full, g, spec.seed);
-  southFacade(full, g, st, spec, r);
+  southFacade(full, g, st, spec);
   innerFacade(full, g, st, ras, spec);
   // on the roof: dormers along the south slope, chimneys, the turret over the gate
   const southWing = g.court ? g.d - (g.court.y + g.court.d) : g.d;
@@ -516,11 +534,10 @@ export function buildArsenal(spec: ArsenalSpec): BuildingArt {
   if (g.court) chimney(full, g, (g.W * 0.5) / 12 + 3, g.court.y / 2);
   turret(full, g, (gate[0] + gate[1]) / 24, ridgeS);
   // silhouette: the outline round the outside and round the courtyard
-  outline(full, S.outline);
+  holeOutline(full, g);
   hline(full, 0, g.W - 1, 0, S.outline);
   vline(full, g.W - 1, 0, g.H - 1, S.outline);
   const art: BuildingArt = { full, h: g.h };
-  if (spec.cuttable) art.cut = paintCut(g, st, spec, r);
-  void alphaAt;
+  if (spec.cuttable) art.cut = paintCut(g, st, spec);
   return art;
 }

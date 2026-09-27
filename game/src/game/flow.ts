@@ -49,7 +49,7 @@ export function simForMap(md: MapData, seed: number): Sim {
   return sim;
 }
 
-const SCENES = ["game", "hud", "briefing", "decision", "note", "title"];
+const SCENES = ["game", "hud", "intro", "briefing", "decision", "note", "title"];
 
 export class Flow {
   campaign: Campaign;
@@ -101,6 +101,10 @@ export class Flow {
     this.campaign = newCampaign(260343 + Math.floor(Math.random() * 1000));
     this.campaign.started = Date.now();
     void store.saveCampaign(this.campaign);
+    this.start("intro", { flow: this });
+  }
+
+  toBriefing() {
     this.start("briefing", { flow: this });
   }
 

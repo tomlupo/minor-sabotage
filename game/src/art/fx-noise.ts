@@ -33,8 +33,3 @@ export function vnoise(x: number, y: number, z: number, seed = 0): number {
   const y0 = x00 + (x10 - x00) * v, y1 = x01 + (x11 - x01) * v;
   return y0 + (y1 - y0) * w;
 }
-
-/** Two octaves of value noise, roughly in [0, 1). */
-export function fbm(x: number, y: number, z: number, seed = 0): number {
-  return vnoise(x, y, z, seed) * 0.66 + vnoise(x * 2.03, y * 2.03, z * 2.03, seed + 31) * 0.34;
-}

@@ -69,7 +69,7 @@ const POSTERS: Poster[] = [
   // a red concert bill and a green one above it
   {
     s0: 1.4, s1: 1.9, z0: 0.45, z1: 1.55,
-    paint: (u, v, t, pxl, pyl) => (pyl % 3 === 0 && u > 0.12 && u < 0.88 && v > 0.2 && v < 0.8 ? toneOf(C.tram_cream, t) : toneOf(C.tram, t - (v < 0.1 ? 1 : 0)) ),
+    paint: (u, v, t, _pxl, pyl) => (pyl % 3 === 0 && u > 0.12 && u < 0.88 && v > 0.2 && v < 0.8 ? toneOf(C.tram_cream, t) : toneOf(C.tram, t - (v < 0.1 ? 1 : 0))),
   },
   {
     s0: 1.4, s1: 1.9, z0: 1.62, z1: 2.66,
@@ -78,11 +78,11 @@ const POSTERS: Poster[] = [
   // small bills, one torn
   {
     s0: 0.6, s1: 0.96, z0: 0.42, z1: 1.1,
-    paint: (u, v, t, pxl, pyl) => (u + v > 1.55 ? C.soot[1] : pyl % 2 === 0 && u > 0.15 && u < 0.85 && v > 0.2 ? C.slush[0] : toneOf([C.cloth[0], C.cloth[1], C.cloth[2]], t)),
+    paint: (u, v, t, _pxl, pyl) => (u + v > 1.55 ? C.soot[1] : pyl % 2 === 0 && u > 0.15 && u < 0.85 && v > 0.2 ? C.slush[0] : toneOf([C.cloth[0], C.cloth[1], C.cloth[2]], t)),
   },
   {
     s0: 1.0, s1: 1.36, z0: 0.42, z1: 1.1,
-    paint: (u, v, t, pxl, pyl) => (v > 0.7 ? toneOf(C.puddle, t) : pyl % 2 === 0 && u > 0.2 && u < 0.8 ? INK : toneOf(PAPER, t)),
+    paint: (u, v, t, _pxl, pyl) => (v > 0.7 ? toneOf(C.puddle, t) : pyl % 2 === 0 && u > 0.2 && u < 0.8 ? INK : toneOf(PAPER, t)),
   },
 ];
 
@@ -104,7 +104,7 @@ export function adColumn(): PropArt {
   };
   m.cylZ(0, 0, R_COL, 0.26, 2.84, 18, body, null);
   m.newPart();
-  const cap = flat(GREEN);
+  const cap: Mat = { ramp: [S.outline, GREEN[0], GREEN[1], GREEN[1]] };
   m.cylZ(0, 0, 0.7, 2.84, 2.98, 18, cap);
   m.frustumZ(0, 0, 0.66, 0.34, 2.98, 3.3, 16, cap);
   m.frustumZ(0, 0, 0.34, 0.08, 3.3, 3.52, 12, cap);

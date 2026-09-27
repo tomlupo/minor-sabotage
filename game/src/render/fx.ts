@@ -168,7 +168,9 @@ export class Fx {
     const name = `muzzle_${f}_${Math.random() < 0.5 ? 0 : 1}`;
     if (!this.has(name)) return;
     const fr = this.sheet.frames.find((q) => q.name === name)!;
-    const s = this.scene.add.sprite(Math.round(sx(u.x) + ox), Math.round(sy(u.y) + oy), "fx", name).setOrigin(fr.ax / fr.w, fr.ay / fr.h).setFlipX(flip).setDepth(sy(u.y) + 1);
+    // facing away (north, north-east) the gun is behind him: the flash goes under the sprite
+    const behind = f === "n" || f === "ne";
+    const s = this.scene.add.sprite(Math.round(sx(u.x) + ox), Math.round(sy(u.y) + oy), "fx", name).setOrigin(fr.ax / fr.w, fr.ay / fr.h).setFlipX(flip).setDepth(sy(u.y) + (behind ? -0.3 : 1));
     this.scene.time.delayedCall(50, () => s.destroy());
   }
 

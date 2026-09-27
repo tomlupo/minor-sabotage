@@ -222,6 +222,11 @@ describe("art: props, vehicles, effects", () => {
       expectClean("fx", s.image);
     });
 
+    it("centres each muzzle flash on the muzzle, so a flipped west facing still starts at the gun", () => {
+      const s = buildFxSheet();
+      for (const f of s.frames.filter((q) => q.name.startsWith("muzzle_"))) expect(f.w, f.name).toBe(2 * f.ax);
+    });
+
     it("paints blood with dark brick tones, never poppy red", () => {
       const s = buildFxSheet();
       const dark = new Set([...PAL.city_1943.cut_cap, ...PAL.city_1943.brick].map((c) => c.join(",")));

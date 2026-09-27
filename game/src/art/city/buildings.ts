@@ -10,7 +10,7 @@
 import type { RGB, Ramp } from "../palette";
 import { PAL } from "../palette";
 import type { PixelImage } from "../pixel";
-import { alphaAt, hash2, hline, img, px, rect, rng, vline } from "../pixel";
+import { hash2, hline, img, px, rect, rng, vline } from "../pixel";
 import type { BuildingArt, BuildingBuilder, BuildingSpec } from "../types";
 import { lumpTex, noiseTex, roofRamp, trimRamp, wallRamp, X as XTRA } from "./common";
 import { drawText, measureText } from "./font";
@@ -511,6 +511,12 @@ function paintRoof(im: PixelImage, f: Facade): void {
   const { W, RH, R, T, P, spec } = f;
   const lumps = lumpTex(), NT = noiseTex();
   const ridge = f.gable ? Math.round(RH * 0.36) : -1;
+  // per sheet and lap of a tin roof: a paler replaced sheet, or rust at the lap
+  const sheets = (W >> 3) + 1, laps = Math.ceil((RH + 12) / 18) + 1;
+  const sheetKind = new Uint8Array(sheets * laps);
+  if (spec.roof === "tin") for (let s = 0; s < sheets; s++) for (let l = 0; l < laps; l++) {
+    sheetKind[s * laps + l] = (hash2(s, l, spec.seed + 40) < 0.12 ? 1 : 0) | (hash2(s, l, spec.seed + 41) < 0.16 ? 2 : 0);
+  }
   // slopes: the north one faces the light, the south one (towards us) is a tone darker
   for (let y = 0; y < RH; y++) {
     const north = f.gable ? y < ridge : false;
@@ -518,11 +524,10 @@ function paintRoof(im: PixelImage, f: Facade): void {
       let c = north ? R[2] : R[1];
       if (spec.roof === "tin") {
         // standing seams every 8 px, a paler replaced sheet here and there, rust at the laps
-        const seam = x % 8, sheet = x >> 3, lap = Math.floor((y + (sheet % 3) * 6) / 18);
+        const seam = x & 7, sheet = x >> 3, yy = y + (sheet % 3) * 6, kind = sheetKind[sheet * laps + Math.floor(yy / 18)];
         if (seam === 0) c = north ? R[1] : R[2];
-        else if (hash2(sheet, lap, spec.seed + 40) < 0.12) c = north ? R[1] : R[2];
-        const rs = hash2(sheet, lap, spec.seed + 41);
-        if (rs < 0.16 && seam === 1 + (sheet % 5) && ((y + (sheet % 3) * 6) % 18) > 11) c = C.wood[north ? 1 : 0];
+        else if (kind & 1) c = north ? R[1] : R[2];
+        if (kind & 2 && seam === 1 + (sheet % 5) && yy % 18 > 11) c = C.wood[north ? 1 : 0];
       } else if (spec.roof === "tar") {
         // tar paper laid in 1 m strips, the laps catching the light, fresh tar in soft stains
         const strip = y % 9;
@@ -553,7 +558,7 @@ function paintRoof(im: PixelImage, f: Facade): void {
   // chimney stacks on the fire walls and the spine, a hatch, a skylight over the stairs
   const stacks: [number, number, number, number][] = [];
   const depth = spec.d;
-  const along = Math.max(1, Math.floor(depth / 5));
+  const along = Math.min(3, Math.max(1, Math.round(depth / 6)));
   for (let i = 0; i < along; i++) {
     const ry = Math.round(((i + 0.5) / along) * (RH - 30)) + 8;
     if (hashS(i, 20, spec.seed) < 0.8) stacks.push([2, ry, 8, 10]);
@@ -567,7 +572,7 @@ function paintRoof(im: PixelImage, f: Facade): void {
   }
   const gate = f.features.find((ft) => ft.kind === "gate");
   const skyX = gate ? Math.min(W - 20, gate.x1 + 2) : Math.round(W * 0.3);
-  skylight(im, f, skyX, Math.max(6, ridge + 4));
+  skylight(im, skyX, Math.max(6, ridge + 4));
   if (spec.w > 10) hatch(im, f, Math.round(W * 0.66), Math.max(5, ridge - 5));
   // snow: a drift against the parapet, a line along the fire walls, patches left on the
   // shaded northern slope; dark tar paper warms and keeps less
@@ -585,11 +590,13 @@ function paintRoof(im: PixelImage, f: Facade): void {
     if (shade && nv > 150 && nf > 256 - (80 + seamy) * keep) return true;
     return nf > 256 - 10 * keep && nv > 120;
   };
+  const mask = new Uint8Array(W * RH);
+  for (let y = 2; y < RH - 4; y++) for (let x = 4; x < W - 3; x++) if (snowAt(x, y)) mask[y * W + x] = 1;
   for (let y = 2; y < RH - 4; y++) for (let x = 4; x < W - 3; x++) {
-    if (!snowAt(x, y)) continue;
+    if (!mask[y * W + x]) continue;
     const l = lumps[(((y + spec.seed) & 255) << 8) | ((x + spec.seed * 3) & 255)];
     // the melting rim is grey, the lumps lit from the top left
-    const rim = !snowAt(x, y + 1) || !snowAt(x + 1, y);
+    const rim = !mask[(y + 1) * W + x] || !mask[y * W + x + 1];
     px(im, x, y, rim ? C.dirty_snow[0] : C.dirty_snow[l === 2 ? 2 : l === 0 ? 0 : 1]);
   }
   for (const [x, y, w, d] of stacks) chimney(im, f, x, y, w, d);
@@ -620,7 +627,7 @@ function chimney(im: PixelImage, f: Facade, x: number, y: number, w: number, d: 
   hline(im, x, x + w, y + d, S.outline);
 }
 
-function skylight(im: PixelImage, f: Facade, x: number, y: number): void {
+function skylight(im: PixelImage, x: number, y: number): void {
   // a glazed ridge light over the staircase
   I.box(im, x, x + 14, y + 4, y + 12, 3, S.glass, C.soot[1], C.puddle[1]);
   for (let xx = x + 3; xx < x + 13; xx += 4) vline(im, xx, y + 1, y + 8, C.soot[1]);
@@ -635,7 +642,7 @@ function hatch(im: PixelImage, f: Facade, x: number, y: number): void {
 // ------------------------------------------------------------------ the cut
 
 function paintCut(f: Facade): PixelImage {
-  const { W, RH, WH, H, P, spec } = f;
+  const { W, RH, WH, H, spec } = f;
   const im = img(W, H);
   const K = I.KNEE;
   const F0 = WH, F1 = H; // the footprint's ground rows
@@ -810,12 +817,3 @@ export const buildBuilding: BuildingBuilder = (spec: BuildingSpec): BuildingArt 
   if (spec.cuttable) art.cut = paintCut(f);
   return art;
 };
-
-/** Pixel-exact check used by tests: the image rows the south wall occupies. */
-export function wallRows(spec: Pick<BuildingSpec, "d" | "storeys">): [number, number] {
-  const RH = spec.d * 9;
-  return [RH, RH + Math.round(wallHeight(spec.storeys) * 7.5)];
-}
-
-/** True when a pixel of `im` is opaque (for callers checking the cut's knee walls). */
-export const opaque = (im: PixelImage, x: number, y: number): boolean => alphaAt(im, x, y) === 255;
