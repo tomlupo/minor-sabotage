@@ -10,6 +10,8 @@ import { PAL, SQUAD_COLOURS, hex, css } from "../art/palette";
 import { readSafeInsets } from "../render/view";
 import { sound } from "../render/sound";
 import { hudArt, type HudArt } from "./hudart";
+import { registerFonts, PX, PXS } from "./text";
+import type { RGB } from "../art/palette";
 
 type Btn = {
   id: string;
@@ -34,7 +36,7 @@ export class HudScene extends Phaser.Scene {
   g!: GameScene;
   private art!: HudArt;
   private gfx!: Phaser.GameObjects.Graphics;
-  private texts = new Map<string, Phaser.GameObjects.Text>();
+  private texts = new Map<string, Phaser.GameObjects.BitmapText>();
   private images = new Map<string, Phaser.GameObjects.Image>();
   private btns: Btn[] = [];
   private gestures = new Map<number, Gesture>();
@@ -65,6 +67,7 @@ export class HudScene extends Phaser.Scene {
   }
 
   create() {
+    registerFonts(this);
     this.art = hudArt(this);
     this.gfx = this.add.graphics().setDepth(10);
     this.safe = readSafeInsets(this.scale.displayScale.x ? 1 / this.scale.displayScale.x : 1.5);
@@ -308,16 +311,25 @@ export class HudScene extends Phaser.Scene {
     if (this.toast.length > 4) this.toast.shift();
   }
 
-  private text(key: string, x: number, y: number, s: string, o: { size?: number; color?: string; align?: number; bg?: string } = {}) {
+  /** Pixel text (the game's own font), created once per key and reused every frame. */
+  private text(key: string, x: number, y: number, str: string, o: { size?: number; color?: RGB; align?: number; font?: string } = {}) {
     let t = this.texts.get(key);
+    const font = o.font ?? (o.size && o.size <= 6 ? PXS : PX);
     if (!t) {
-      t = this.add.text(0, 0, "", { fontFamily: "ui-monospace, Menlo, monospace", fontSize: `${o.size ?? 8}px`, color: o.color ?? "#e8e4d8", stroke: "#1a1814", strokeThickness: 2 })
-        .setResolution(3).setDepth(20);
+      t = this.add.bitmapText(0, 0, font, "").setDepth(20);
       this.texts.set(key, t);
     }
-    t.setText(s).setPosition(Math.round(x), Math.round(y)).setOrigin(o.align ?? 0, 0).setVisible(true);
-    if (o.color) t.setColor(o.color);
+    const body = font === PXS ? str.toLocaleUpperCase("pl") : str;
+    if (t.text !== body) t.setText(body);
+    t.setPosition(Math.round(x), Math.round(y)).setOrigin(o.align ?? 0, 0).setVisible(true).setAlpha(1);
+    t.setTint(hex(o.color ?? PAL.shared.chalk));
     return t;
+  }
+
+  /** A dark panel behind a text, so it reads over any street. */
+  private panelBehind(t: Phaser.GameObjects.BitmapText, pad = 3, alpha = 0.62) {
+    const b = t.getBounds();
+    this.gfx.fillStyle(hex(PAL.shared.outline), alpha).fillRect(Math.floor(b.x - pad), Math.floor(b.y - pad + 1), Math.ceil(b.width + pad * 2), Math.ceil(b.height + pad * 2 - 2));
   }
 
   private hideTextsExcept(keep: Set<string>) {
@@ -336,35 +348,40 @@ export class HudScene extends Phaser.Scene {
       if (!b.visible()) { img?.setVisible(false); continue; }
       this.drawButton(b, keep);
     }
-    // objectives (top centre)
+    // objectives: top right, under pause and map, on a dark panel
     const objs = s.objectives.filter((o) => o.primary || o.status !== "open");
+    const ox = W - this.safe.right - 6;
     objs.forEach((o, k) => {
-      const mark = o.status === "done" ? "✓" : o.status === "failed" ? "✗" : "·";
-      const col = o.status === "done" ? css(PAL.hud.hp_ok) : o.status === "failed" ? css(PAL.hud.hp_low) : "#e8e4d8";
+      const mark = o.status === "done" ? "+" : o.status === "failed" ? "x" : "-";
+      const col = o.status === "done" ? PAL.hud.hp_ok : o.status === "failed" ? PAL.hud.hp_low : PAL.shared.chalk;
       keep.add(`obj${k}`);
-      this.text(`obj${k}`, W - this.safe.right - 72, this.safe.top + 40 + k * 10, `${mark} ${o.text}`, { color: col, align: 1, size: 7 });
+      const t = this.text(`obj${k}`, ox, this.safe.top + 40 + k * 10, `${o.text} ${mark}`, { color: col, align: 1 });
+      this.panelBehind(t, 2, 0.55);
     });
     const banner = this.g.run.phase.banner?.(sim);
-    if (banner) { keep.add("banner"); this.text("banner", W / 2, this.safe.top + 6, banner, { align: 0.5, size: 9, color: css(PAL.shared.chalk) }); }
+    if (banner && !s.paused) { keep.add("banner"); const t = this.text("banner", W / 2, this.safe.top + 66, banner, { align: 0.5 }); this.panelBehind(t, 3, 0.7); }
     // toasts
     const now = this.time.now;
     this.toast = this.toast.filter((t) => now - t.t < 3800);
     this.toast.forEach((t, k) => {
-      const col = t.tone === "good" ? css(PAL.hud.hp_ok) : t.tone === "bad" ? "#f08a7a" : "#e8e4d8";
+      const col = t.tone === "good" ? PAL.hud.hp_ok : t.tone === "bad" ? PAL.hud.hp_low : PAL.shared.chalk;
       keep.add(`toast${k}`);
-      const tx = this.text(`toast${k}`, W / 2, this.scale.height * 0.62 + k * 11, t.text, { align: 0.5, color: col, size: 8 });
-      tx.setAlpha(Math.min(1, (3800 - (now - t.t)) / 600));
+      const tx = this.text(`toast${k}`, W / 2, this.scale.height * 0.6 + k * 12, t.text, { align: 0.5, color: col });
+      const a = Math.min(1, (3800 - (now - t.t)) / 600);
+      this.panelBehind(tx, 2, 0.6 * a);
+      tx.setAlpha(a);
     });
     // pause banner
     if (s.paused) {
       keep.add("paused");
       const msg = this.pauseReason ? `${this.pauseReason}. Paused: one order per squad, then ▶` : "Paused: one order per squad, then ▶";
-      g.fillStyle(hex(PAL.hud.paper[1]), 0.95).fillRect(W / 2 - 150, this.safe.top + 40, 300, 16);
-      g.lineStyle(1, hex(PAL.shared.outline), 1).strokeRect(W / 2 - 150, this.safe.top + 40, 300, 16);
-      this.text("paused", W / 2, this.safe.top + 43, msg, { align: 0.5, color: css(PAL.hud.paper_ink), size: 8 }).setStroke("#000", 0);
+      const t = this.text("paused", W / 2, this.safe.top + 66, msg, { align: 0.5, color: PAL.hud.paper_ink });
+      const b = t.getBounds();
+      g.fillStyle(hex(PAL.hud.paper[1]), 0.96).fillRect(Math.floor(b.x - 6), Math.floor(b.y - 4), Math.ceil(b.width + 12), Math.ceil(b.height + 7));
+      g.lineStyle(1, hex(PAL.shared.outline), 1).strokeRect(Math.floor(b.x - 6), Math.floor(b.y - 4), Math.ceil(b.width + 12), Math.ceil(b.height + 7));
     }
-    if (this.pendingOrder) { keep.add("pending"); this.text("pending", W / 2, this.scale.height - 20, this.pendingOrder.kind === "cover" ? "Tap where they should cover" : "Tap where they go on the signal", { align: 0.5, color: css(PAL.shared.select_gold) }); }
-    if (this.grenadeArmed) { keep.add("armed"); this.text("armed", W / 2, this.scale.height - 20, "Tap where to throw", { align: 0.5, color: css(PAL.shared.poppy_red) }); }
+    if (this.pendingOrder) { keep.add("pending"); const t = this.text("pending", W / 2, this.scale.height - 22, this.pendingOrder.kind === "cover" ? "Tap where they should cover" : "Tap where they go on the signal", { align: 0.5, color: PAL.shared.select_gold }); this.panelBehind(t); }
+    if (this.grenadeArmed) { keep.add("armed"); const t = this.text("armed", W / 2, this.scale.height - 22, "Tap where to throw", { align: 0.5, color: PAL.shared.chalk }); this.panelBehind(t); }
     this.hideTextsExcept(keep);
   }
 
@@ -378,7 +395,7 @@ export class HudScene extends Phaser.Scene {
       if (!img) { img = this.add.image(0, 0, art).setOrigin(0).setDepth(12); this.images.set(b.id, img); }
       img.setTexture(art).setPosition(b.x, b.y).setVisible(true);
       const label = this.art.label(b, sim);
-      if (label) { keep.add(`lb_${b.id}`); this.text(`lb_${b.id}`, b.x + label.x, b.y + label.y, label.text, { size: label.size ?? 7, align: label.align ?? 0, color: label.color }); }
+      if (label) { keep.add(`lb_${b.id}`); this.text(`lb_${b.id}`, b.x + label.x, b.y + label.y, label.text, { size: label.size ?? 7, align: label.align ?? 0, color: label.color }).setDepth(13); }
       return;
     }
   }

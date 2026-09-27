@@ -2,22 +2,35 @@ import Phaser from "phaser";
 import { computeView } from "./render/view";
 import { GameScene } from "./render/GameScene";
 import { HudScene } from "./ui/HudScene";
+import { TitleScene } from "./ui/screens/TitleScene";
+import { BriefingScene } from "./ui/screens/BriefingScene";
+import { DecisionScene } from "./ui/screens/DecisionScene";
+import { NoteScene } from "./ui/screens/NoteScene";
 import { Flow, fakeResults } from "./game/flow";
+import { registerFonts } from "./ui/text";
 
 const parent = document.getElementById("game")!;
 const v0 = computeView(window.innerWidth, window.innerHeight);
 
+// Debug entry points (the headless playtest harness uses them):
+//   ?phase=signal|ghetto|oldtown|finale   straight into a phase
+//   ?tasks=signal,line,post,gate,truck    pretend the tasks went so (with ?phase=finale)
+//   ?screen=briefing|decision|note        straight to a screen
 class Boot extends Phaser.Scene {
   constructor() { super("boot"); }
   create() {
+    registerFonts(this);
     const q = new URLSearchParams(location.search);
     const flow = new Flow(this.game);
-    (window as unknown as { __ms: Record<string, unknown> }).__ms.flow = flow;
-    const phase = q.get("phase");
+    const ms = (window as unknown as { __ms: Record<string, unknown> }).__ms;
+    ms.flow = flow;
     if (q.get("tasks") !== null) fakeResults(flow.campaign, q.get("tasks")!);
+    const phase = q.get("phase");
+    const screen = q.get("screen");
     if (phase) flow.play(phase);
-    else flow.play("signal");
-    (window as unknown as { __ms: { ready: boolean } }).__ms.ready = true;
+    else if (screen) this.game.scene.start(screen, { flow });
+    else flow.toTitle();
+    ms.ready = true;
   }
 }
 
@@ -33,7 +46,7 @@ const game = new Phaser.Game({
   audio: { noAudio: true },
   disableContextMenu: true,
   banner: false,
-  scene: [Boot, GameScene, HudScene],
+  scene: [Boot, TitleScene, BriefingScene, DecisionScene, NoteScene, GameScene, HudScene],
 });
 
 let pending = 0;
@@ -48,5 +61,4 @@ function relayout() {
 window.addEventListener("resize", relayout);
 window.addEventListener("orientationchange", relayout);
 
-// Debug handle for the headless playtest harness (tools/shot.mjs).
 (window as unknown as { __ms: unknown }).__ms = { game, ready: false };

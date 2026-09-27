@@ -39,13 +39,14 @@ export const sound = {
       case "shot": {
         const name = e.weapon === "sten" ? "sten" : e.weapon === "mp40" ? "mp40" : e.weapon === "rifle" ? "rifle" : "pistol";
         api.play(name, { x: e.x0, y: e.y0 });
-        if (e.hit === -1 && sim.rand() < 0.15) api.play("ricochet", { x: e.x1, y: e.y1, gain: 0.5 });
+        // presentation randomness only: the rules' seeded RNG must not be touched from here
+        if (e.hit === -1 && Math.random() < 0.15) api.play("ricochet", { x: e.x1, y: e.y1, gain: 0.5 });
         break;
       }
       case "hit": if (e.unit >= 0) api.play("hit", { x: e.x, y: e.y, gain: 0.7 }); break;
       case "death": api.play(e.silent ? "knife" : "body_fall", { x: e.x, y: e.y }); break;
       case "explosion": api.play("explosion", { x: e.x, y: e.y }); api.duck(0.5, 0.6); break;
-      case "bottle": api.play("bottle_smash", { x: e.x, y: e.y }); api.play("fire_whoosh", { x: e.x, y: e.y }); break;
+      case "bottle": api.play("bottle_smash", { x: e.x, y: e.y }); break; // the smash carries its own whoosh
       case "throw": {
         const u = sim.unit(e.unit);
         api.play(e.kind === "grenade" ? "grenade_throw" : "bottle_throw", { x: u?.x, y: u?.y });

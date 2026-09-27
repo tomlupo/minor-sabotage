@@ -23,6 +23,17 @@ const FORBIDDEN: [RegExp, string][] = [
   [/\bDate\.now\s*\(|\bperformance\.now\s*\(/, "reads the wall clock (the sim runs on its own tick)"],
 ];
 
+describe("presentation never touches the rules' random numbers", () => {
+  // a render or UI call to sim.rand() shifts the seeded RNG, so a resumed or replayed phase
+  // would diverge from the one that was locked or recorded
+  const PRES = ["render", "ui", "game", "audio"].flatMap((d) => files(join(SIM, d)));
+  for (const f of PRES) {
+    it(f.slice(SIM.length + 1), () => {
+      expect(/\bsim\.rand\s*\(|\bstate\.rng\b/.test(readFileSync(f, "utf8")), `${f} calls the rules' RNG`).toBe(false);
+    });
+  }
+});
+
 describe("sim purity (ADR-0001)", () => {
   const list = RULE_DIRS.flatMap((d) => files(join(SIM, d)));
   it("has sim files to check", () => {

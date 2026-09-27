@@ -13,6 +13,8 @@ import { Overlay } from "./overlay";
 import { Fx } from "./fx";
 import { sx, sy, wx, wy } from "./iso";
 import { sound } from "./sound";
+import { store } from "../game/store";
+import type { Flow } from "../game/flow";
 
 export interface PhaseRun {
   sim: Sim;
@@ -37,11 +39,26 @@ export class GameScene extends Phaser.Scene {
     super("game");
   }
 
-  init(data: { run: PhaseRun }) {
+  flow: Flow | null = null;
+
+  init(data: { run: PhaseRun; flow?: Flow }) {
     this.run = data.run;
+    this.flow = data.flow ?? null;
     this.ended = 0;
     this.mapView = false;
   }
+
+  /** Locked phone: pause, and leave a bookmark for one resume if iOS kills the tab. */
+  private onVisibility = () => {
+    const { sim, phase } = this.run;
+    if (document.hidden) {
+      if (sim.state.outcome) return;
+      sim.state.paused = true;
+      if (this.flow) void store.saveBookmark({ phase: phase.id, campaign: this.flow.campaign, sim: sim.snapshot(), at: Date.now() });
+    } else {
+      void store.takeBookmark();
+    }
+  };
 
   create() {
     const { sim, md, phase } = this.run;
@@ -64,8 +81,12 @@ export class GameScene extends Phaser.Scene {
     const col = (Math.round(amb[0] * 255) << 16) | (Math.round(amb[1] * 255) << 8) | Math.round(amb[2] * 255);
     this.light = this.add.rectangle(0, 0, this.scale.width, this.scale.height, col).setOrigin(0).setScrollFactor(0).setDepth(3e6).setBlendMode(Phaser.BlendModes.MULTIPLY);
     this.scale.on("resize", this.onResize, this);
-    this.events.once("shutdown", () => this.scale.off("resize", this.onResize, this));
-    sound.music(phase.music === "finale" ? "action" : "stealth");
+    document.addEventListener("visibilitychange", this.onVisibility);
+    this.events.once("shutdown", () => {
+      this.scale.off("resize", this.onResize, this);
+      document.removeEventListener("visibilitychange", this.onVisibility);
+    });
+    sound.music(phase.music === "finale" ? "finale" : "stealth");
     sound.ambience(true);
     this.scene.launch("hud", { game: this });
     this.scene.bringToTop("hud");

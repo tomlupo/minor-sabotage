@@ -12,7 +12,7 @@ import { signalTask } from "../missions/signal";
 import { ghettoTask } from "../missions/ghetto";
 import { oldtownTask } from "../missions/oldtown";
 import { finale } from "../missions/finale";
-import { store } from "./store";
+import { store, type Bookmark } from "./store";
 
 const PHASES: Record<string, (md: MapData, c: Campaign) => Phase> = {
   signal: signalTask,
@@ -29,15 +29,27 @@ export function fakeResults(c: Campaign, spec: string) {
   c.results.oldtown = { outcome: has("gate") && has("truck") ? "success" : "partial", silent: true, flags: { gateSilenced: has("gate"), truckDisabled: has("truck") }, seconds: 0 };
 }
 
-export function registerPhase(id: string, f: (md: MapData, c: Campaign) => Phase) {
-  PHASES[id] = f;
-}
-
 let MD: MapData | null = null;
 export function mapData(): MapData {
   if (!MD) MD = mapFromTiled(JSON.parse(tmjText) as TiledMap);
   return MD;
 }
+
+/** A Sim on the map with its props and street names (no people yet). */
+export function simForMap(md: MapData, seed: number): Sim {
+  const sim = new Sim(gridFromMap(md), seed);
+  sim.streetNames = md.streets.map((s) => s.name);
+  for (const p of md.props) {
+    sim.addProp(p.kind, p.x, p.y, {
+      variant: p.variant ?? "", tag: p.tag ?? "",
+      blocks: !!p.block, bx: p.block ? p.x + p.block.dx : 0, by: p.block ? p.y + p.block.dy : 0, bw: p.block?.w ?? 0, bh: p.block?.h ?? 0,
+      hp: p.kind === "barrel" ? 1 : 3,
+    });
+  }
+  return sim;
+}
+
+const SCENES = ["game", "hud", "briefing", "decision", "note", "title"];
 
 export class Flow {
   campaign: Campaign;
@@ -45,52 +57,74 @@ export class Flow {
     this.campaign = newCampaign();
   }
 
-  /** Build a phase's rules. */
-  makeRun(id: string) {
+  private makeRun(id: string, restore?: string) {
     const md = mapData();
-    const G = gridFromMap(md);
-    const sim = new Sim(G, this.campaign.seed + Object.keys(this.campaign.results).length * 7919);
-    sim.streetNames = md.streets.map((s) => s.name);
-    // the map's props join the rules (the phone line can be cut, a kiosk can burn)
-    for (const p of md.props) {
-      sim.addProp(p.kind, p.x, p.y, {
-        variant: p.variant ?? "", tag: p.tag ?? "",
-        blocks: !!p.block, bx: p.block ? p.x + p.block.dx : 0, by: p.block ? p.y + p.block.dy : 0, bw: p.block?.w ?? 0, bh: p.block?.h ?? 0,
-        hp: p.kind === "barrel" ? 1 : 3,
-      });
-    }
+    const sim = simForMap(md, this.campaign.seed + Object.keys(this.campaign.results).length * 7919);
     const make = PHASES[id];
     if (!make) throw new Error(`no phase ${id}`);
     const phase = make(md, this.campaign);
     sim.mission = phase;
-    phase.setup(sim);
+    if (restore) sim.restore(restore);
+    else phase.setup(sim);
     return { sim, md, phase };
   }
 
-  /** Start a phase in the game scene. */
-  play(id: string) {
-    const run = this.makeRun(id);
+  private start(key: string, data: object) {
+    this.stopAll();
+    this.game.scene.start(key, data);
+  }
+
+  /** Start a phase in the game scene (or resume one from a bookmark's snapshot). */
+  play(id: string, restore?: string) {
+    const run = this.makeRun(id, restore);
     const onEnd = (sim: Sim) => {
       const res = run.phase.finish(sim, this.campaign);
       if (run.phase.kind === "task") this.campaign.results[id as TaskId] = res as TaskResult;
       else this.campaign.finale = res as FinaleResult;
+      void store.takeBookmark();
       void store.saveCampaign(this.campaign);
-      this.afterPhase(id);
+      if (id === "finale") this.start("note", { flow: this });
+      else this.start("briefing", { flow: this });
     };
-    this.stopAll();
-    this.game.scene.start("game", { run: { ...run, onEnd } });
+    this.start("game", { run: { ...run, onEnd }, flow: this });
   }
 
-  afterPhase(id: string) {
-    this.stopAll();
-    if (id !== "finale" && tasksLeft(this.campaign).length) this.game.scene.start("briefing", { flow: this });
-    else if (id !== "finale") this.game.scene.start("decision", { flow: this });
-    else this.game.scene.start("note", { flow: this });
+  /** After the three tasks: settle the wounded and the taken, then the Arsenal. */
+  toFinale() {
+    const cases = Object.values(this.campaign.soldiers).some((s) => s.state === "wounded" || s.state === "captured");
+    void store.saveCampaign(this.campaign);
+    if (cases) this.start("decision", { flow: this });
+    else this.play("finale");
+  }
+
+  newOperation() {
+    this.campaign = newCampaign(260343 + Math.floor(Math.random() * 1000));
+    this.campaign.started = Date.now();
+    void store.saveCampaign(this.campaign);
+    this.start("briefing", { flow: this });
+  }
+
+  async continueSaved() {
+    const c = await store.loadCampaign();
+    if (!c) return this.newOperation();
+    this.campaign = c;
+    if (tasksLeft(c).length) this.start("briefing", { flow: this });
+    else if (!c.finale) this.toFinale();
+    else this.start("note", { flow: this });
+  }
+
+  resume(b: Bookmark) {
+    this.campaign = b.campaign;
+    this.play(b.phase, b.sim);
+  }
+
+  toTitle() {
+    this.start("title", { flow: this });
   }
 
   stopAll() {
-    for (const k of ["game", "hud", "briefing", "decision", "note", "title"]) {
-      if (this.game.scene.isActive(k) || this.game.scene.isPaused(k)) this.game.scene.stop(k);
+    for (const k of SCENES) {
+      if (this.game.scene.isActive(k) || this.game.scene.isPaused(k) || this.game.scene.isSleeping(k)) this.game.scene.stop(k);
     }
   }
 }

@@ -18,7 +18,7 @@ type BuildTag = (o: { name: string; rank: number; face: PixelImage; hp: "ok" | "
 type BuildSquadTag = (o: { leader: string; colour: 1 | 2 | 3; selected: boolean; order?: "hold" | "follow" | "cover" | "signal" | null; alive: number; total: number }) => PixelImage;
 type BuildButton = (kind: string, pressed: boolean, extra?: unknown) => PixelImage;
 
-export interface Label { text: string; x: number; y: number; size?: number; align?: number; color?: string }
+export interface Label { text: string; x: number; y: number; size?: number; align?: number; color?: RGB }
 export interface HudArt {
   button(b: { id: string; w: number; h: number }, pressed: boolean, sim: Sim): string | null;
   label(b: { id: string; w: number; h: number }, sim: Sim): Label | null;
@@ -155,20 +155,20 @@ export function hudArt(scene: Phaser.Scene): HudArt {
       if (b.id.startsWith("squad") && !hasOwnLabels) {
         const sq = squadOf(Number(b.id.slice(5)), sim);
         if (!sq) return null;
-        return { text: sq.name, x: 10, y: 6, size: 8, color: css(PAL.hud.button_ink) };
+        return { text: sq.name, x: 10, y: 6, size: 8, color: PAL.hud.button_ink };
       }
       if (b.id.startsWith("chip") && !buildTag) {
         const sq = sim.controlledSquad;
         const u = sq ? sim.unit(sq.members[Number(b.id.slice(4))]) : undefined;
         if (!u) return null;
-        return { text: u.name.slice(0, 7), x: 14, y: 12, size: 6, color: css(PAL.hud.tag_ink) };
+        return { text: u.name.slice(0, 7), x: 14, y: 12, size: 6, color: PAL.hud.tag_ink };
       }
       if (b.id === "grenade") {
         const sq = sim.controlledSquad;
         const n = sq ? sim.membersOf(sq).reduce((a, u) => a + (u.state === "ok" ? u.grenades + u.bottles : 0), 0) : 0;
-        return { text: String(n), x: b.w - 7, y: b.h - 11, size: 8, color: css(PAL.hud.button_ink) };
+        return { text: String(n), x: b.w - 7, y: b.h - 11, size: 8, color: PAL.hud.button_ink };
       }
-      if (b.id === "go" && !buildButton) return { text: "GO", x: 22, y: 9, size: 10, color: css(PAL.hud.button_ink) };
+      if (b.id === "go" && !buildButton) return { text: "GO", x: 22, y: 9, size: 10, color: PAL.hud.button_ink };
       return null;
     },
   };
