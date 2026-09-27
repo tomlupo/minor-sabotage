@@ -5,7 +5,8 @@ import { readdirSync, readFileSync, statSync } from "node:fs";
 import { join, resolve } from "node:path";
 import { describe, expect, it } from "vitest";
 
-const SIM = resolve(__dirname, "../src/sim");
+const SIM = resolve(__dirname, "../src");
+const RULE_DIRS = ["sim", "missions"];
 
 function files(dir: string): string[] {
   return readdirSync(dir).flatMap((n) => {
@@ -23,7 +24,7 @@ const FORBIDDEN: [RegExp, string][] = [
 ];
 
 describe("sim purity (ADR-0001)", () => {
-  const list = files(SIM);
+  const list = RULE_DIRS.flatMap((d) => files(join(SIM, d)));
   it("has sim files to check", () => {
     expect(list.length).toBeGreaterThan(0);
   });

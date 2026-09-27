@@ -1,9 +1,24 @@
 import Phaser from "phaser";
 import { computeView } from "./render/view";
-import { BootScene } from "./render/BootScene";
+import { GameScene } from "./render/GameScene";
+import { HudScene } from "./ui/HudScene";
+import { Flow } from "./game/flow";
 
 const parent = document.getElementById("game")!;
 const v0 = computeView(window.innerWidth, window.innerHeight);
+
+class Boot extends Phaser.Scene {
+  constructor() { super("boot"); }
+  create() {
+    const q = new URLSearchParams(location.search);
+    const flow = new Flow(this.game);
+    (window as unknown as { __ms: Record<string, unknown> }).__ms.flow = flow;
+    const phase = q.get("phase");
+    if (phase) flow.play(phase);
+    else flow.play("signal");
+    (window as unknown as { __ms: { ready: boolean } }).__ms.ready = true;
+  }
+}
 
 const game = new Phaser.Game({
   type: Phaser.WEBGL,
@@ -17,7 +32,7 @@ const game = new Phaser.Game({
   audio: { noAudio: true },
   disableContextMenu: true,
   banner: false,
-  scene: [BootScene],
+  scene: [Boot, GameScene, HudScene],
 });
 
 let pending = 0;
@@ -27,11 +42,10 @@ function relayout() {
     const v = computeView(window.innerWidth, window.innerHeight);
     game.scale.resize(v.w, v.h);
     game.scale.setZoom(v.zoom);
-    game.events.emit("relayout", v);
   });
 }
 window.addEventListener("resize", relayout);
 window.addEventListener("orientationchange", relayout);
 
-// Debug handle for the headless playtest harness (tools/shot.mjs). Harmless in play.
+// Debug handle for the headless playtest harness (tools/shot.mjs).
 (window as unknown as { __ms: unknown }).__ms = { game, ready: false };
