@@ -1,3 +1,23 @@
+# Minor Sabotage
+
+A squad game of the Polish underground in the Second World War, inspired by
+[Cannon Fodder](https://en.wikipedia.org/wiki/Cannon_Fodder_(video_game)) and
+[Commandos](https://en.wikipedia.org/wiki/Commandos_(series)), and named after the
+[minor sabotage](https://en.wikipedia.org/wiki/Minor_sabotage) of the Polish resistance.
+
+This is an early prototype. It started on 2026-09-27 as a copy of
+[tomlupo/openfodder](https://github.com/tomlupo/openfodder), the Open Fodder engine
+ported to the iPhone browser. Its code and assets are being replaced with our own, piece
+by piece. The tag `imported-from-openfodder` marks the imported base. Until nothing
+imported is left, the whole repository is GPL-3.0 (see `COPYING`). The demo campaigns in
+`Run/` are Cannon Fodder's, © Sensible Software, as distributed by the Open Fodder project.
+
+Play the prototype: https://tomlupo.github.io/minor-sabotage/
+
+The original Open Fodder README follows.
+
+---
+
 # Open Fodder
 [![windows-build](https://github.com/OpenFodder/openfodder/actions/workflows/windows-build.yml/badge.svg)](https://github.com/OpenFodder/openfodder/actions/workflows/windows-build.yml)
 [![linux-build](https://github.com/OpenFodder/openfodder/actions/workflows/linux-build.yml/badge.svg)](https://github.com/OpenFodder/openfodder/actions/workflows/linux-build.yml)

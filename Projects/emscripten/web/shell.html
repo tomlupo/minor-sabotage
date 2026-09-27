@@ -6,13 +6,13 @@
 <meta name="apple-mobile-web-app-capable" content="yes">
 <meta name="mobile-web-app-capable" content="yes">
 <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-<meta name="apple-mobile-web-app-title" content="Open Fodder">
+<meta name="apple-mobile-web-app-title" content="Minor Sabotage">
 <meta name="theme-color" content="#0b0e09">
-<meta name="description" content="Cannon Fodder on the open-source Open Fodder engine: the Amiga magazine demo campaigns, playable in the browser and on a phone.">
+<meta name="description" content="Minor Sabotage, a squad game of the Polish underground inspired by Cannon Fodder and Commandos. An early prototype on the open-source Open Fodder engine, playable in the browser and on a phone.">
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="icon-180.png">
 <link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
-<title>Open Fodder</title>
+<title>Minor Sabotage</title>
 <style>
   :root {
     --bg: #0b0e09;
@@ -267,10 +267,10 @@
       <p class="install" id="install-ios" hidden>Play it full screen: tap <strong>Share</strong>, then <strong>Add to Home Screen</strong>.</p>
       <p class="links">
         <button id="install-app" hidden>Install the app</button>
-        <a href="https://github.com/tomlupo/openfodder" target="_blank" rel="noopener">Source code (GPL-3.0)</a>
+        <a href="https://github.com/tomlupo/minor-sabotage" target="_blank" rel="noopener">Source code (GPL-3.0)</a>
         <a href="https://openfodder.com/" target="_blank" rel="noopener">openfodder.com</a>
       </p>
-      <p class="fine">The Open Fodder engine is free software by the Open Fodder contributors. Cannon Fodder is © Sensible Software. The campaigns here are the Amiga magazine cover-disk demos that the Open Fodder project distributes.</p>
+      <p class="fine">Minor Sabotage is inspired by Cannon Fodder and Commandos, and this prototype runs on the Open Fodder engine while it is replaced piece by piece. The Open Fodder engine is free software by the Open Fodder contributors. Cannon Fodder is © Sensible Software. The campaigns here are the Amiga magazine cover-disk demos that the Open Fodder project distributes.</p>
     </div>
   </div>
 </section>
@@ -284,7 +284,7 @@
 
 <div class="overlay" id="sheet" hidden>
   <div class="panel" role="dialog" aria-label="Menu">
-    <h2><span>Open Fodder</span><button class="close" id="sheet-close" aria-label="Close">×</button></h2>
+    <h2><span>Minor Sabotage</span><button class="close" id="sheet-close" aria-label="Close">×</button></h2>
     <div class="items" id="items">
       <button class="item" id="item-resume">Back to the game</button>
       <button class="item" id="item-sound">Sound <small id="sound-state">On</small></button>
@@ -294,7 +294,7 @@
       <button class="item" id="item-fullscreen" hidden>Full screen</button>
       <button class="item" id="item-install" hidden>Install the app</button>
       <button class="item danger mission-only" id="item-quit">Quit to campaign select</button>
-      <a class="item" href="https://github.com/tomlupo/openfodder" target="_blank" rel="noopener">Source code <small>GPL-3.0</small></a>
+      <a class="item" href="https://github.com/tomlupo/minor-sabotage" target="_blank" rel="noopener">Source code <small>GPL-3.0</small></a>
     </div>
     <div id="help" hidden>
       <ul class="legend touch-only">
@@ -339,8 +339,8 @@
     const canvas = $('canvas');
     const params = new URLSearchParams(location.search);
     const store = {
-      get(key) { try { return localStorage.getItem('openfodder.' + key); } catch (e) { return null; } },
-      set(key, value) { try { localStorage.setItem('openfodder.' + key, value); } catch (e) { /* private mode */ } },
+      get(key) { try { return localStorage.getItem('minor-sabotage.' + key); } catch (e) { return null; } },
+      set(key, value) { try { localStorage.setItem('minor-sabotage.' + key, value); } catch (e) { /* private mode */ } },
     };
 
     // SDL scancodes the engine listens for, the finger modes of_touch_mode takes, and the of_state bits
@@ -825,7 +825,7 @@
         if (registration.waiting && navigator.serviceWorker.controller) announce();
         watch(registration.installing);
         registration.addEventListener('updatefound', () => watch(registration.installing));
-      }).catch(e => console.warn('Open Fodder: no offline copy (' + e + ')'));
+      }).catch(e => console.warn('Minor Sabotage: no offline copy (' + e + ')'));
     }
 
     function toast(text) {
