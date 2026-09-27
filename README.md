@@ -7,8 +7,9 @@ A squad game of the Polish underground in the Second World War, inspired by
 
 This is an early prototype. It started on 2026-09-27 as a copy of
 [tomlupo/openfodder](https://github.com/tomlupo/openfodder), the Open Fodder engine
-ported to the iPhone browser. Its code and assets are being replaced with our own, piece
-by piece. The tag `imported-from-openfodder` marks the imported base. Until nothing
+ported to the iPhone browser. That copy is frozen and kept to compare feel against, while the
+game itself is written anew in TypeScript (see `docs/adr/0001-*`). The tag
+`imported-from-openfodder` marks the imported base. Until nothing
 imported is left, the whole repository is GPL-3.0 (see `COPYING`). The demo campaigns in
 `Run/` are Cannon Fodder's, © Sensible Software, as distributed by the Open Fodder project.
 

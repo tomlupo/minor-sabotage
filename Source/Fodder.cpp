@@ -2289,7 +2289,7 @@ void cFodder::WindowTitleBaseSetup()
 {
 
     mWindowTitle.str("");
-    mWindowTitle << "Open Fodder";
+    mWindowTitle << "Minor Sabotage";
 
     if (mVersionCurrent)
     {
@@ -2544,7 +2544,7 @@ void cFodder::Prepare(std::shared_ptr<sFodderParameters> pParams)
     if (!g_ResourceMan->isDataAvailable())
         DataNotFound();
 
-    mWindow->InitWindow("Open Fodder");
+    mWindow->InitWindow("Minor Sabotage");
     mWindow->SetWindowSize((int)mParams->mWindowScale);
 
     mTile_BaseBlk = tSharedBuffer();
