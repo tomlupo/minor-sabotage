@@ -275,13 +275,16 @@ export class WorldView {
     const g = this.wires;
     g.clear();
     const pt = art.poleWire();
-    const poles = sim.state.props.filter((p) => p.kind === "phone_pole").sort((a, b) => a.x - b.x);
+    // the line runs in map order: up Przejazd from the post, then along Długa to the box
+    const poles = sim.state.props.filter((p) => p.tag.startsWith("pole_") || p.tag === "line_box");
     if (poles.length < 2) return;
     const cut = sim.state.vars.lineCut === true;
+    const cutAt = String(sim.state.vars.lineCutAt ?? "");
     g.lineStyle(1, hex(PAL.shared.outline), 1);
     for (let i = 0; i + 1 < poles.length; i++) {
       const a = poles[i], b = poles[i + 1];
-      if (cut && (a.state === "destroyed" || b.state === "destroyed" || i === Number(sim.state.vars.lineCutAt ?? -1))) continue;
+      if (a.state === "destroyed" || b.state === "destroyed") continue;
+      if (cut && (a.tag === cutAt || b.tag === cutAt)) continue;
       const va = this.props.get(a.id), vb = this.props.get(b.id);
       if (!va || !vb) continue;
       const ha = pt ? va.img.displayOriginY - pt[1] : 20, hb = pt ? vb.img.displayOriginY - pt[1] : 20;

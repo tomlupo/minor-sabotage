@@ -19,12 +19,15 @@ export interface WeaponSpec {
 }
 
 export const WEAPONS: Record<WeaponId, WeaponSpec> = {
-  sten: { range: 17, cadence: 0.085, burst: 4, reload: 0.55, spread: 0.13, noise: 38 },
-  pistol: { range: 13, cadence: 0.4, burst: 1, reload: 0.4, spread: 0.1, noise: 28 },
-  rifle: { range: 30, cadence: 1.3, burst: 1, reload: 1.3, spread: 0.055, noise: 55 },
-  mp40: { range: 19, cadence: 0.11, burst: 4, reload: 0.75, spread: 0.14, noise: 40 },
+  sten: { range: 19, cadence: 0.085, burst: 4, reload: 0.55, spread: 0.13, noise: 38 },
+  pistol: { range: 16, cadence: 0.4, burst: 1, reload: 0.4, spread: 0.1, noise: 28 },
+  rifle: { range: 22, cadence: 2.0, burst: 1, reload: 2.0, spread: 0.055, noise: 55 },
+  mp40: { range: 19, cadence: 0.11, burst: 3, reload: 1.1, spread: 0.14, noise: 40 },
   none: { range: 0, cadence: 1, burst: 0, reload: 1, spread: 0, noise: 0 },
 };
+
+/** German fire is wilder: surprised, at dusk, at people who move (a balance choice). */
+export const GERMAN_SPREAD = 2.4;
 
 /** Rank narrows the spread: rank 7 shoots with about half the spread of a rookie. */
 export const spreadForRank = (w: WeaponSpec, rank: number) => w.spread * (1 - Math.min(rank, 7) * 0.07);
@@ -49,8 +52,8 @@ export const DETECT = {
   touch: 1.5,
   touchHalf: 1.75,
   /** Base fill rate per second at the edge of the cone; it grows as you get closer. */
-  rate: 0.75,
-  closeBoost: 3.0,
+  rate: 0.55,
+  closeBoost: 2.6,
   movingMul: 1.35,
   stillMul: 0.7,
   firingMul: 4,

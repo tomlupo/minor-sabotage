@@ -6,6 +6,22 @@ import type { Unit } from "./types";
 import { goTo, setAnim } from "./move";
 import { KNIFE, THROW, WOUND } from "./tuning";
 
+/** A man with a job walks in the column until he is this close to it. */
+export const WORK_DETACH = 7;
+
+function isLeader(sim: Sim, u: Unit): boolean {
+  const sq = sim.squad(u.squad);
+  return !!sq && sim.leaderOf(sq) === u;
+}
+
+/** Busy means out of the column: a job still far off does not take a man out of it. */
+export function outOfColumn(u: Unit): boolean {
+  const t = u.task;
+  if (!t) return false;
+  if (t.kind === "work" && t.phase === "approach" && Math.hypot(t.x - u.x, t.y - u.y) > WORK_DETACH) return false;
+  return true;
+}
+
 export function stepTasks(sim: Sim, dt: number): void {
   for (const u of sim.state.units) {
     if (!u.task) continue;
@@ -82,7 +98,20 @@ function throwTask(sim: Sim, u: Unit): void {
   }
   if (t.t >= THROW.wind) {
     if (t.what === "grenade") u.grenades--; else u.bottles--;
-    const dur = 0.35 + d * THROW.flightPerM;
+    let dur = 0.35 + d * THROW.flightPerM;
+    // thrown at a moving vehicle: lead it, as anyone would
+    for (const v of sim.state.vehicles) {
+      if (v.speed < 0.5 || Math.hypot(v.x - t.x, v.y - t.y) > 5) continue;
+      const ahead = (t.x - v.x) * Math.cos(v.heading) + (t.y - v.y) * Math.sin(v.heading);
+      const lx = v.x + Math.cos(v.heading) * (v.speed * dur + Math.max(0, ahead));
+      const ly = v.y + Math.sin(v.heading) * (v.speed * dur + Math.max(0, ahead));
+      if (Math.hypot(lx - u.x, ly - u.y) <= THROW.range + 3) {
+        t.x = lx;
+        t.y = ly;
+        dur = 0.35 + Math.hypot(t.x - u.x, t.y - u.y) * THROW.flightPerM;
+      }
+      break;
+    }
     sim.state.projectiles.push({ id: sim.state.nextId++, kind: t.what, x0: u.x, y0: u.y, x1: t.x, y1: t.y, t: 0, dur, owner: u.id });
     sim.emit({ t: "throw", unit: u.id, kind: t.what, x: t.x, y: t.y });
     sim.say(u, t.what === "grenade" ? "Granat!" : "Butelka!", 6);
@@ -103,6 +132,8 @@ function work(sim: Sim, u: Unit): void {
       sim.emit({ t: "work", unit: u.id, what: t.what, done: false });
       return;
     }
+    // he walks in the column until the job is close, then goes to it
+    if (d > WORK_DETACH && !isLeader(sim, u)) return;
     if (!u.path.length) goTo(sim, u, t.x, t.y, 6000);
     return;
   }

@@ -263,7 +263,7 @@ export function buildArsenalMap(): MapData {
   // Stare Miasto: barrels by the post, a cart, the Arbeitsamt's sandbags
   for (const [x, y] of [[182, 84], [183.2, 84.6], [181, 85.2]] as const) prop({ kind: "barrel", x, y, block: B1(F_COVER), tag: "barrels" });
   prop({ kind: "cart", x: 170, y: DLUGA.s - 2, block: { dx: -1, dy: -0.5, w: 2, h: 1, flags: F_COVER } });
-  prop({ kind: "sandbags", x: 212, y: DLUGA.n + 2.2, block: { dx: -2, dy: -0.5, w: 4, h: 1, flags: F_COVER }, tag: "arbeitsamt_post" });
+  prop({ kind: "sandbags", x: 202, y: DLUGA.n + 2.2, block: { dx: -2, dy: -0.5, w: 4, h: 1, flags: F_COVER }, tag: "arbeitsamt_post" });
   // courtyards: barrels, crates, bare trees
   for (const [x, y] of [[8, 104], [30, 108], [90, 104], [160, 104], [200, 110], [40, 30], [70, 36]] as const)
     prop({ kind: R() < 0.5 ? "barrel" : "crates", x, y, block: B1(F_COVER) });
@@ -272,7 +272,8 @@ export function buildArsenalMap(): MapData {
 
   // ---- zones and routes ---------------------------------------------------------------------------
   md.zones.push(
-    { name: "task_signal", x: TLOM.x0 + 30, y: DLUGA.s - 2, w: 190 - TLOM.x0 - 30, h: H - DLUGA.s + 2 },
+    // Sygnalizacja reaches up to the corner of Długa, where Jur's telephone is
+    { name: "task_signal", x: TLOM.x0 + 30, y: DLUGA.s - 7, w: 190 - TLOM.x0 - 30, h: H - DLUGA.s + 7 },
     { name: "task_ghetto", x: 0, y: GHETTO_WALL_Y + 1, w: 80, h: 100 - GHETTO_WALL_Y - 1 },
     { name: "task_oldtown", x: 146, y: 30, w: W - 146, h: 90 },
     { name: "finale", x: 0, y: 0, w: W, h: H },
@@ -287,7 +288,7 @@ export function buildArsenalMap(): MapData {
     // up the east half of Bielańska, left into Długa (north half, heading west), right into Nalewki
     { name: "truck", pts: [{ x: cB + 2, y: H + 6 }, { x: cB + 2, y: 81 }, { x: cB - 6, y: 77 }, { x: cN + 3, y: 77 }, { x: cN + 1.5, y: 70 }, { x: cN + 1.5, y: -8 }] },
     // the swerve: straight on west along Długa (what happened on the day)
-    { name: "truck_swerve", pts: [{ x: cN - 10, y: 77 }, { x: 40, y: 77.5 }, { x: 10, y: 78 }] },
+    { name: "truck_swerve", pts: [{ x: cN - 10, y: 77 }, { x: 40, y: 77.5 }, { x: -14, y: 78 }] },
     { name: "patrol_signal", pts: [{ x: BIEL.w + 1, y: 96 }, { x: BIEL.w + 1, y: 160 }, { x: BIEL.e - 1, y: 160 }, { x: BIEL.e - 1, y: 96 }] },
     { name: "patrol_ghetto", pts: [{ x: 4, y: DLUGA.s - 2 }, { x: 64, y: DLUGA.s - 2 }] },
     { name: "patrol_oldtown", pts: [{ x: 150, y: DLUGA.s - 1.5 }, { x: 226, y: DLUGA.s - 1.5 }] },

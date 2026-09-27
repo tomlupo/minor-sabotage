@@ -98,14 +98,24 @@ export function cmdThrow(sim: Sim, x: number, y: number, what: "grenade" | "bott
 export function cmdWork(sim: Sim, x: number, y: number, what: string, ref: string, dur: number, prefer?: (u: Unit) => number): Unit | null {
   const sq = sim.controlledSquad;
   if (!sq) return null;
-  let best: Unit | null = null, bd = Infinity;
-  for (const u of sim.membersOf(sq)) {
-    if (u.state !== "ok" || u.task) continue;
-    const d = Math.hypot(u.x - x, u.y - y) - (prefer ? prefer(u) : 0);
-    if (d < bd) { bd = d; best = u; }
+  // tapped again: the same man keeps the job, the squad sets off again
+  let best: Unit | null = sim.membersOf(sq).find((u) => u.state === "ok" && u.task?.kind === "work" && u.task.what === what) ?? null;
+  if (!best) {
+    let bd = Infinity;
+    for (const u of sim.membersOf(sq)) {
+      if (u.state !== "ok" || u.task) continue;
+      const d = Math.hypot(u.x - x, u.y - y) - (prefer ? prefer(u) : 0);
+      if (d < bd) { bd = d; best = u; }
+    }
+    if (!best) return null;
+    best.task = { kind: "work", what, ref, x, y, t: 0, dur, phase: "approach" };
   }
-  if (!best) return null;
-  best.task = { kind: "work", what, ref, x, y, t: 0, dur, phase: "approach" };
+  // the squad goes with him (it moves as one); he detaches for the last few metres
+  const L = sim.leaderOf(sq);
+  if (L && L !== best) {
+    const d = Math.hypot(x - L.x, y - L.y);
+    if (d > 4) goTo(sim, L, x - ((x - L.x) / d) * 3, y - ((y - L.y) / d) * 3);
+  }
   return best;
 }
 

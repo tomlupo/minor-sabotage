@@ -9,11 +9,25 @@ import { Sim } from "../sim/sim";
 import { newCampaign, tasksLeft, type Campaign, type TaskId, type TaskResult, type FinaleResult } from "../missions/campaign";
 import type { Phase } from "../missions/types";
 import { signalTask } from "../missions/signal";
+import { ghettoTask } from "../missions/ghetto";
+import { oldtownTask } from "../missions/oldtown";
+import { finale } from "../missions/finale";
 import { store } from "./store";
 
 const PHASES: Record<string, (md: MapData, c: Campaign) => Phase> = {
   signal: signalTask,
+  ghetto: ghettoTask,
+  oldtown: oldtownTask,
+  finale,
 };
+
+/** Debug: pretend the tasks went a certain way (?tasks=signal,line,post,gate,truck). */
+export function fakeResults(c: Campaign, spec: string) {
+  const has = (k: string) => spec.split(",").includes(k);
+  c.results.signal = { outcome: has("signal") ? "success" : "fail", silent: true, flags: { signal: has("signal"), bielanskaAlert: has("loud") }, seconds: 0 };
+  c.results.ghetto = { outcome: has("line") ? "success" : "fail", silent: true, flags: { lineCut: has("line"), postSilenced: has("post") }, seconds: 0 };
+  c.results.oldtown = { outcome: has("gate") && has("truck") ? "success" : "partial", silent: true, flags: { gateSilenced: has("gate"), truckDisabled: has("truck") }, seconds: 0 };
+}
 
 export function registerPhase(id: string, f: (md: MapData, c: Campaign) => Phase) {
   PHASES[id] = f;
@@ -37,6 +51,14 @@ export class Flow {
     const G = gridFromMap(md);
     const sim = new Sim(G, this.campaign.seed + Object.keys(this.campaign.results).length * 7919);
     sim.streetNames = md.streets.map((s) => s.name);
+    // the map's props join the rules (the phone line can be cut, a kiosk can burn)
+    for (const p of md.props) {
+      sim.addProp(p.kind, p.x, p.y, {
+        variant: p.variant ?? "", tag: p.tag ?? "",
+        blocks: !!p.block, bx: p.block ? p.x + p.block.dx : 0, by: p.block ? p.y + p.block.dy : 0, bw: p.block?.w ?? 0, bh: p.block?.h ?? 0,
+        hp: p.kind === "barrel" ? 1 : 3,
+      });
+    }
     const make = PHASES[id];
     if (!make) throw new Error(`no phase ${id}`);
     const phase = make(md, this.campaign);

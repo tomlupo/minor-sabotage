@@ -42,6 +42,8 @@ export interface GuardAI {
   repath: number;
   /** Cannot see (crew inside a vehicle). */
   blind: boolean;
+  /** Fights where he stands and never advances (the guards at the tailgate). */
+  stay?: boolean;
 }
 
 export interface Unit {

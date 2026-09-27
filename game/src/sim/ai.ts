@@ -106,7 +106,7 @@ export function goAlert(sim: Sim, u: Unit, x: number, y: number): void {
   ai.lastX = x;
   ai.lastY = y;
   ai.lastT = sim.state.time;
-  ai.react = 0.45 + sim.rand() * 0.5;
+  ai.react = 0.9 + sim.rand() * 0.7;
   u.speed = SPEED.guardRun;
   setGlyph(sim, u, "alert");
   sim.say(u, GERMAN_ALERT[(u.id + sim.state.tick) % GERMAN_ALERT.length], 5);
@@ -194,6 +194,7 @@ function alert(sim: Sim, u: Unit, dt: number): void {
   const ai = u.ai!;
   u.speed = SPEED.guardRun;
   ai.repath -= dt;
+  if (ai.stay) { u.path = []; if (!u.aiming) u.dir = Math.atan2(ai.lastY - u.y, ai.lastX - u.x); return; }
   if (u.aiming) {
     // most stand and shoot; every third one keeps pushing in, Fodder style
     const d = Math.hypot(u.aimX - u.x, u.aimY - u.y);

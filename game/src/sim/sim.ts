@@ -122,11 +122,27 @@ export class Sim {
     processNoises(this);
     stepSpawners(this, dt);
     this.stepWounds(dt);
+    this.ensureControl();
     this.mission?.tick(this, dt);
     if (this.mission?.onEvent) {
       // events emitted by the mission itself are not re-fed to avoid loops
       const evs = s.events.slice();
       for (const e of evs) this.mission.onEvent(this, e);
+    }
+  }
+
+  /** If the squad you lead has nobody left standing, you take over one that has. */
+  private ensureControl() {
+    const s = this.state;
+    const cur = s.squads[s.controlled];
+    if (cur && this.leaderOf(cur)) return;
+    for (const sq of s.squads) {
+      if (!sq || !sq.inPlay || !this.leaderOf(sq)) continue;
+      s.controlled = sq.id;
+      sq.order = "follow";
+      sq.signalRoute = null;
+      this.message(`You lead ${sq.name}'s squad now.`, "info");
+      return;
     }
   }
 

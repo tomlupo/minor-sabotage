@@ -21,7 +21,8 @@ export function stepVehicles(sim: Sim, dt: number): void {
     const disabled = v.state === "burning" || v.state === "wreck" || v.driverDead;
     if (disabled || v.stopped || !v.route.length) {
       if (v.speed > 0) {
-        v.speed = Math.max(0, v.speed - 7 * dt);
+        // a vehicle whose driver is hit or whose engine died rolls on a while (the van did)
+        v.speed = Math.max(0, v.speed - (disabled ? 2.2 : 7) * dt);
         v.x += Math.cos(v.heading) * v.speed * dt;
         v.y += Math.sin(v.heading) * v.speed * dt;
         moved = true;
@@ -66,7 +67,7 @@ function drive(sim: Sim, v: Vehicle, dt: number): void {
   }
   if (Math.abs(turn) > 0.6) cap = Math.min(cap, v.maxSpeed * 0.3);
   if (v.holdAt >= 0 && v.routeI >= v.holdAt) cap = 0;
-  if (someoneInFront(sim, v)) cap = 0;
+  if (someoneInFront(sim, v) || vehicleInFront(sim, v)) cap = 0;
   const acc = cap > v.speed ? 2.6 : 7;
   v.speed += Math.max(-acc * dt, Math.min(acc * dt, cap - v.speed));
   if (v.speed < 0) v.speed = 0;
@@ -86,16 +87,37 @@ function someoneInFront(sim: Sim, v: Vehicle): boolean {
   return false;
 }
 
-/** The crew gets out: escorts come out shooting. */
+/** Another intact vehicle across the way (a burning wreck can be squeezed past on the pavement). */
+function vehicleInFront(sim: Sim, v: Vehicle): boolean {
+  const c = Math.cos(v.heading), s = Math.sin(v.heading);
+  for (const o of sim.state.vehicles) {
+    if (o === v || (o.state !== "intact" && o.state !== "doors_open")) continue;
+    const ox = o.x - v.x, oy = o.y - v.y;
+    const along = ox * c + oy * s;
+    const side = Math.abs(-ox * s + oy * c);
+    const reach = v.len / 2 + Math.max(o.len, o.wid) / 2 + 1.5 + v.speed * 0.3;
+    if (along > 0 && along < reach && side < (v.wid + Math.max(o.wid, o.len * Math.abs(Math.sin(o.heading - v.heading)))) / 2 + 0.3) return true;
+  }
+  return false;
+}
+
+/** The crew gets out: escorts come out shooting. The men in the cab jump out a step clear
+ *  beside it (burning, if the cab is); the men in the back ("rear") get down at the
+ *  tailgate once the vehicle has stopped. */
 export function bailOut(sim: Sim, v: Vehicle): void {
   if (!v.crew.length) return;
   const c = Math.cos(v.heading), s = Math.sin(v.heading);
-  const spots: [number, number][] = [[-v.len / 2 - 0.9, 0], [-v.len / 2 - 0.9, 0.9], [0.3, v.wid / 2 + 0.8], [0.3, -v.wid / 2 - 0.8], [-1.2, v.wid / 2 + 0.8], [-1.2, -v.wid / 2 - 0.8]];
-  let i = 0;
+  const cabSpots: [number, number][] = [[v.len * 0.25, v.wid / 2 + 1.7], [v.len * 0.25, -v.wid / 2 - 1.7], [v.len * 0.05, v.wid / 2 + 2.2], [v.len * 0.05, -v.wid / 2 - 2.2]];
+  const rearSpots: [number, number][] = [[-v.len / 2 - 1.0, v.wid / 2 - 0.2], [-v.len / 2 - 1.0, -v.wid / 2 + 0.2], [-v.len / 2 - 1.8, 0]];
+  const stopped = v.speed < 0.2;
+  let ci = 0, ri = 0;
+  const staying: number[] = [];
   for (const id of v.crew) {
     const u = sim.unit(id);
     if (!u || u.state === "dead") continue;
-    const [a, b] = spots[i++ % spots.length];
+    const rear = u.tag === "rear";
+    if (rear && !stopped) { staying.push(id); continue; }
+    const [a, b] = rear ? rearSpots[ri++ % rearSpots.length] : cabSpots[ci++ % cabSpots.length];
     let x = v.x + a * c - b * s, y = v.y + a * s + b * c;
     const w = sim.grid.nearestWalkable(x, y, 4);
     if (w) { x = w.x; y = w.y; }
@@ -113,9 +135,9 @@ export function bailOut(sim: Sim, v: Vehicle): void {
       u.glyph = "alert";
       sim.emit({ t: "glyph", unit: u.id, glyph: "alert" });
     }
-    if (u.side === "de" && v.state === "burning" && sim.rand() < 0.35) sim.hurt(u, -1, "fire");
+    if (!rear && u.side === "de" && v.state === "burning" && sim.rand() < 0.3) sim.hurt(u, -1, "fire");
   }
-  v.crew = [];
+  v.crew = staying;
 }
 
 export function rebuildVehicleCells(sim: Sim): void {

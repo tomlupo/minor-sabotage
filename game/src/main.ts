@@ -2,7 +2,7 @@ import Phaser from "phaser";
 import { computeView } from "./render/view";
 import { GameScene } from "./render/GameScene";
 import { HudScene } from "./ui/HudScene";
-import { Flow } from "./game/flow";
+import { Flow, fakeResults } from "./game/flow";
 
 const parent = document.getElementById("game")!;
 const v0 = computeView(window.innerWidth, window.innerHeight);
@@ -14,6 +14,7 @@ class Boot extends Phaser.Scene {
     const flow = new Flow(this.game);
     (window as unknown as { __ms: Record<string, unknown> }).__ms.flow = flow;
     const phase = q.get("phase");
+    if (q.get("tasks") !== null) fakeResults(flow.campaign, q.get("tasks")!);
     if (phase) flow.play(phase);
     else flow.play("signal");
     (window as unknown as { __ms: { ready: boolean } }).__ms.ready = true;

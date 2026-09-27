@@ -5,6 +5,7 @@ import type { Sim } from "./sim";
 import type { Squad, Unit } from "./types";
 import type { Pt } from "./path";
 import { SPEED, SQUAD, UNIT_RADIUS } from "./tuning";
+import { outOfColumn } from "./tasks";
 
 const TRAIL_MAX = 80;
 
@@ -152,7 +153,7 @@ export function restSlots(sim: Sim, x: number, y: number, dir: number, n: number
 }
 
 function busy(u: Unit): boolean {
-  return !!u.task;
+  return outOfColumn(u);
 }
 
 export function stepSquads(sim: Sim, dt: number): void {

@@ -3,11 +3,12 @@
 // on orders fire into their cover cone, and return fire at whoever shoots at them (rung 2,
 // decided 2026-09-28). Guards shoot once alerted.
 import type { Sim } from "./sim";
-import type { Unit, Vehicle } from "./types";
+import type { Squad, Unit, Vehicle } from "./types";
 import { F_COVER } from "./grid";
 import { gauss } from "./rng";
-import { setAnim } from "./move";
-import { THROW, UNIT_RADIUS, WEAPONS, spreadForRank } from "./tuning";
+import { goTo, setAnim } from "./move";
+import { outOfColumn } from "./tasks";
+import { GERMAN_SPREAD, THROW, UNIT_RADIUS, WEAPONS, spreadForRank } from "./tuning";
 
 interface Aim {
   x: number;
@@ -22,7 +23,7 @@ export function stepCombat(sim: Sim, dt: number): void {
   for (const u of s.units) {
     if (u.state !== "ok" || u.hidden || u.weapon === "none") continue;
     u.fireCd -= dt;
-    if (u.task) { u.aiming = false; continue; }
+    if (outOfColumn(u)) { u.aiming = false; continue; }
     const aim = u.side === "pl" ? partisanAim(sim, u) : u.side === "de" ? guardAim(sim, u) : null;
     if (!aim) { u.aiming = false; u.burst = 0; continue; }
     u.aiming = true;
@@ -53,6 +54,7 @@ function partisanAim(sim: Sim, u: Unit): Aim | null {
     if (v) return { x: v.x, y: v.y, target: v.id };
     const t = sim.unit(sq.target);
     if (!t || t.state === "dead" || t.hidden) sq.target = -1;
+    else if (s.controlled === sq.id) closeIn(sim, sq, t, W.range);
   }
   // 2. FIRE held on a point
   if (sq.fireUntil > s.time) {
@@ -87,6 +89,18 @@ function partisanAim(sim: Sim, u: Unit): Aim | null {
   return null;
 }
 
+/** The target you tapped is out of reach: the leader closes to firing range (unless you have
+ *  sent the squad somewhere), and the column follows. */
+function closeIn(sim: Sim, sq: Squad, t: Unit, range: number) {
+  const L = sim.leaderOf(sq);
+  if (!L || L.path.length || L.task) return;
+  const d = Math.hypot(t.x - L.x, t.y - L.y);
+  const los = sim.grid.los(L.x, L.y, t.x, t.y);
+  if (d <= range * 0.85 && los) return;
+  const k = los ? Math.max(0, d - range * 0.7) / d : Math.max(0, d - 4) / d;
+  goTo(sim, L, L.x + (t.x - L.x) * k, L.y + (t.y - L.y) * k, 4000);
+}
+
 function guardAim(sim: Sim, u: Unit): Aim | null {
   const ai = u.ai;
   if (!ai || ai.mode !== "alert" || ai.blind) return null;
@@ -94,7 +108,9 @@ function guardAim(sim: Sim, u: Unit): Aim | null {
   let best: Unit | null = null, bd = Infinity;
   for (const v of sim.state.units) {
     if (v.side !== "pl" || v.state === "dead" || v.hidden) continue;
-    const d = Math.hypot(v.x - u.x, v.y - u.y) - (v.id === u.shotBy ? 4 : 0) + (v.state === "down" ? 6 : 0);
+    // a man already down is left alone while others are fighting, unless he is close
+    if (v.state === "down" && Math.hypot(v.x - u.x, v.y - u.y) > 5) continue;
+    const d = Math.hypot(v.x - u.x, v.y - u.y) - (v.id === u.shotBy ? 4 : 0);
     if (d > W.range || d >= bd) continue;
     if (!sim.grid.los(u.x, u.y, v.x, v.y)) continue;
     best = v; bd = d;
@@ -116,7 +132,9 @@ function fireRound(sim: Sim, u: Unit, aim: Aim): void {
   const W = WEAPONS[u.weapon];
   const G = sim.grid;
   const base = Math.atan2(aim.y - u.y, aim.x - u.x);
-  const spread = spreadForRank(W, u.rank) * (u.moving ? 1.35 : 1) * (u.wounded ? 1.25 : 1);
+  // the ambushed shoot wilder than the ambushers (the escort hit none of the scouts outright)
+  const sideMul = u.side === "de" ? GERMAN_SPREAD : 1;
+  const spread = spreadForRank(W, u.rank) * sideMul * (u.moving ? 1.35 : 1) * (u.wounded ? 1.25 : 1);
   const ang = base + gauss(sim.state.rng) * spread * 0.5;
   const cos = Math.cos(ang), sin = Math.sin(ang);
   const x0 = u.x + Math.cos(base) * 0.35, y0 = u.y + Math.sin(base) * 0.35;
@@ -190,7 +208,7 @@ export function vehicleHit(sim: Sim, v: Vehicle, hx: number, hy: number, by: num
   v.hp -= dmg;
   sim.emit({ t: "hit", unit: -1, x: hx, y: hy, vehicle: v.id });
   const along = (hx - v.x) * Math.cos(v.heading) + (hy - v.y) * Math.sin(v.heading);
-  if (along > v.len * 0.18 && !v.driverDead && v.crew.length && v.speed > 0.1 && sim.rand() < 0.22 * dmg) {
+  if (along > v.len * 0.18 && !v.driverDead && v.crew.length && v.speed > 0.1 && sim.rand() < 0.3 * dmg) {
     killDriver(sim, v, by);
   }
   if (v.hp <= 0 && v.state !== "wreck" && v.state !== "burning") setVehicleState(sim, v, "burning");
