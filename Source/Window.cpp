@@ -33,6 +33,12 @@
  * thumb buttons, which sit outside the canvas so SDL never sees them as touches:
  * nothing held moves the squad (left button), FIRE shoots (right button), and THROW
  * throws the squad's grenade or rocket (right button, then left while right is held).
+ *
+ * The engine has one pointer and one of each button, and it samples them once per frame:
+ * - fingers share the buttons, which go down with the first finger and up with the last
+ * - the newest finger steers the pointer
+ * - a lifted finger lets go only once the engine has sampled its latest press twice, so a
+ *   quick tap isn't pressed and released inside one frame (menus act on the second sample)
  */
 enum eTouchMode {
 	eTouchMode_Move = 0,
@@ -42,20 +48,46 @@ enum eTouchMode {
 
 static const unsigned int TOUCH_LEFT = 1;
 static const unsigned int TOUCH_RIGHT = 2;
+static const int16 TOUCH_MIN_SAMPLES = 2;
 
 struct sTouchFinger {
-	unsigned int	mButtons = 0;		// Buttons this finger holds down
+	unsigned int	mButtons = 0;			// Buttons this finger holds down
 	bool			mLeftPending = false;	// A throw's left press, sent once the engine has seen the right button
-	cPosition		mPosition;
+	bool			mLifted = false;		// Up, and letting go once the engine has seen its press
+	int16			mPressTick = 0;			// The engine's interrupt tick when this finger last pressed
+	uint64			mOrder = 0;				// Higher went down later; the newest finger steers
 };
 
 static int sTouchMode = eTouchMode_Move;
 static std::map<SDL_FingerID, sTouchFinger> sTouchFingers;
+static int sTouchHolds[2];					// Fingers holding the left and right buttons
+static uint64 sTouchOrder = 0;
+static cPosition sTouchPointer;				// Where the fingers have put the pointer
 static std::vector<cEvent> sPageEvents;	// Queued by the page shell between frames
 
-static cEvent Touch_ButtonEvent(unsigned int pButton, bool pDown, const cPosition& pPosition) {
-	cEvent Event;
+// Engine samples of the mouse since pTick; a press sent at pTick is first seen at pTick + 1
+static int16 Touch_SamplesSince(int16 pTick) {
+	return (int16)(g_Fodder->mInterruptTick - pTick);
+}
 
+static void Touch_Button(sTouchFinger& pFinger, unsigned int pButton, bool pDown, std::vector<cEvent>& pEvents) {
+	int& Holds = sTouchHolds[pButton == TOUCH_LEFT ? 0 : 1];
+
+	if (pDown == !!(pFinger.mButtons & pButton))
+		return;
+
+	if (pDown) {
+		pFinger.mButtons |= pButton;
+		pFinger.mPressTick = g_Fodder->mInterruptTick;
+		if (Holds++)
+			return;
+	} else {
+		pFinger.mButtons &= ~pButton;
+		if (--Holds)
+			return;
+	}
+
+	cEvent Event;
 	if (pButton == TOUCH_LEFT) {
 		Event.mType = pDown ? eEvent_MouseLeftDown : eEvent_MouseLeftUp;
 		Event.mButton = 1;
@@ -64,8 +96,8 @@ static cEvent Touch_ButtonEvent(unsigned int pButton, bool pDown, const cPositio
 		Event.mButton = 3;
 	}
 	Event.mButtonCount = 1;
-	Event.mPosition = pPosition;
-	return Event;
+	Event.mPosition = sTouchPointer;
+	pEvents.push_back(Event);
 }
 
 /**
@@ -75,8 +107,11 @@ static cEvent Touch_ButtonEvent(unsigned int pButton, bool pDown, const cPositio
  * returning to Move, so lifting FIRE while aiming doesn't send the squad to the aim point.
  */
 static void Touch_Apply(sTouchFinger& pFinger, int pMode, bool pStarting, std::vector<cEvent>& pEvents) {
+	if (pFinger.mLifted)
+		return;
+
 	unsigned int Wanted = 0;
-	bool LeftPending = false;
+	bool Throw = false;
 
 	switch (pMode) {
 	case eTouchMode_Fire:
@@ -84,7 +119,7 @@ static void Touch_Apply(sTouchFinger& pFinger, int pMode, bool pStarting, std::v
 		break;
 	case eTouchMode_Throw:
 		Wanted = TOUCH_RIGHT;
-		LeftPending = true;
+		Throw = true;
 		break;
 	default:
 		Wanted = pStarting ? TOUCH_LEFT : 0;
@@ -92,47 +127,60 @@ static void Touch_Apply(sTouchFinger& pFinger, int pMode, bool pStarting, std::v
 	}
 
 	for (unsigned int Button : { TOUCH_LEFT, TOUCH_RIGHT }) {
-		if ((pFinger.mButtons & Button) && !(Wanted & Button))
-			pEvents.push_back(Touch_ButtonEvent(Button, false, pFinger.mPosition));
+		if (!(Wanted & Button))
+			Touch_Button(pFinger, Button, false, pEvents);
 	}
 	for (unsigned int Button : { TOUCH_RIGHT, TOUCH_LEFT }) {
-		if (!(pFinger.mButtons & Button) && (Wanted & Button))
-			pEvents.push_back(Touch_ButtonEvent(Button, true, pFinger.mPosition));
+		if (Wanted & Button)
+			Touch_Button(pFinger, Button, true, pEvents);
 	}
-
-	pFinger.mButtons = Wanted;
-	pFinger.mLeftPending = LeftPending;
+	pFinger.mLeftPending = Throw;
 }
 
-static void Touch_Release(sTouchFinger& pFinger, std::vector<cEvent>& pEvents) {
-	for (unsigned int Button : { TOUCH_LEFT, TOUCH_RIGHT }) {
-		if (pFinger.mButtons & Button)
-			pEvents.push_back(Touch_ButtonEvent(Button, false, pFinger.mPosition));
+static bool Touch_Steers(SDL_FingerID pFinger) {
+	uint64 Newest = 0;
+	SDL_FingerID Steering = 0;
+
+	for (auto& Finger : sTouchFingers) {
+		if (!Finger.second.mLifted && Finger.second.mOrder > Newest) {
+			Newest = Finger.second.mOrder;
+			Steering = Finger.first;
+		}
 	}
-	pFinger.mButtons = 0;
-	pFinger.mLeftPending = false;
+	return Newest && Steering == pFinger;
 }
 
-// A throw is right held then left pressed; press left only once the engine has registered right
+// Events the page queued, a throw's left press, and lifted fingers whose press the engine has now seen
 static void Touch_Deliver(std::vector<cEvent>& pEvents) {
 	pEvents.insert(pEvents.end(), sPageEvents.begin(), sPageEvents.end());
 	sPageEvents.clear();
 
-	if (!g_Fodder || !g_Fodder->mButtonPressRight)
+	if (!g_Fodder)
 		return;
 
-	for (auto& Finger : sTouchFingers) {
-		if (Finger.second.mLeftPending) {
-			Finger.second.mLeftPending = false;
-			Finger.second.mButtons |= TOUCH_LEFT;
-			pEvents.push_back(Touch_ButtonEvent(TOUCH_LEFT, true, Finger.second.mPosition));
+	for (auto Finger = sTouchFingers.begin(); Finger != sTouchFingers.end();) {
+		auto& Touch = Finger->second;
+
+		if (Touch.mLeftPending && g_Fodder->mButtonPressRight) {
+			Touch.mLeftPending = false;
+			Touch_Button(Touch, TOUCH_LEFT, true, pEvents);
 		}
+
+		// A throw lifted before the engine saw its right button gives up after a few frames
+		const bool GiveUp = Touch.mLeftPending && Touch_SamplesSince(Touch.mPressTick) > TOUCH_MIN_SAMPLES * 3;
+		if (Touch.mLifted && (GiveUp || (!Touch.mLeftPending && Touch_SamplesSince(Touch.mPressTick) >= TOUCH_MIN_SAMPLES))) {
+			Touch_Button(Touch, TOUCH_LEFT, false, pEvents);
+			Touch_Button(Touch, TOUCH_RIGHT, false, pEvents);
+			Finger = sTouchFingers.erase(Finger);
+			continue;
+		}
+		++Finger;
 	}
 }
 
 // Called by the page shell while a thumb button is held
 extern "C" EMSCRIPTEN_KEEPALIVE void of_touch_mode(int pMode) {
-	if (pMode < eTouchMode_Move || pMode > eTouchMode_Throw || pMode == sTouchMode)
+	if (pMode < eTouchMode_Move || pMode > eTouchMode_Throw || pMode == sTouchMode || !g_Fodder)
 		return;
 
 	sTouchMode = pMode;
@@ -326,9 +374,15 @@ void cWindow::EventCheck() {
 
 			if (SysEvent.type == SDL_EVENT_FINGER_DOWN) {
 				auto& Finger = sTouchFingers[SysEvent.tfinger.fingerID];
-				Finger.mPosition = Position;
 
-				// Put the pointer on the finger before pressing
+				// A reused id whose last touch is still letting go: let go now
+				Touch_Button(Finger, TOUCH_LEFT, false, mEvents);
+				Touch_Button(Finger, TOUCH_RIGHT, false, mEvents);
+				Finger = sTouchFinger();
+				Finger.mOrder = ++sTouchOrder;
+
+				// The newest finger takes the pointer before pressing
+				sTouchPointer = Position;
 				Event.mType = eEvent_MouseMove;
 				Event.mPosition = Position;
 				mEvents.push_back(Event);
@@ -339,19 +393,20 @@ void cWindow::EventCheck() {
 			}
 
 			auto Finger = sTouchFingers.find(SysEvent.tfinger.fingerID);
-			if (Finger == sTouchFingers.end())
+			if (Finger == sTouchFingers.end() || Finger->second.mLifted)
 				break;
-			Finger->second.mPosition = Position;
 
 			if (SysEvent.type == SDL_EVENT_FINGER_MOTION) {
-				Event.mType = eEvent_MouseMove;
-				Event.mPosition = Position;
+				if (Touch_Steers(Finger->first)) {
+					sTouchPointer = Position;
+					Event.mType = eEvent_MouseMove;
+					Event.mPosition = Position;
+				}
 				break;
 			}
 
-			// Up or cancelled: let go of whatever this finger pressed
-			Touch_Release(Finger->second, mEvents);
-			sTouchFingers.erase(Finger);
+			// Up or cancelled: Touch_Deliver lets go once the engine has seen the press
+			Finger->second.mLifted = true;
 			break;
 		}
 #else
