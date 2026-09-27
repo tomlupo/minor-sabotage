@@ -1,7 +1,7 @@
 {
-  "name": "Open Fodder",
-  "short_name": "Open Fodder",
-  "description": "Cannon Fodder on the open-source Open Fodder engine, with the Amiga magazine demo campaigns.",
+  "name": "Minor Sabotage",
+  "short_name": "Minor Sabotage",
+  "description": "Minor Sabotage, a squad game of the Polish underground, in early prototype on the Open Fodder engine with its Amiga demo campaigns.",
   "start_url": "./",
   "scope": "./",
   "display": "fullscreen",

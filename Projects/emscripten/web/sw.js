@@ -1,9 +1,11 @@
-// Open Fodder service worker: keeps the game on the device after the first visit, so it starts
+// Minor Sabotage service worker: keeps the game on the device after the first visit, so it starts
 // at once and plays offline. install.cmake stamps BUILD with a hash of the files below, so each
 // build gets its own cache. A new build installs in the background and waits: it takes over only
 // once no page of the old build is open, so a running page never mixes two builds' files.
 const BUILD = '@OPENFODDER_BUILD@';
-const CACHE = 'openfodder-' + BUILD;
+// The prefix is this game's own: the Open Fodder port shares the tomlupo.github.io origin,
+// and each game deletes only older caches with its own prefix.
+const CACHE = 'minor-sabotage-' + BUILD;
 const FILES = [
   './', 'index.html', 'OpenFodder.js', 'OpenFodder.wasm', 'OpenFodder.data',
   'manifest.webmanifest', 'icon-180.png', 'icon-192.png', 'icon-512.png', 'icon-maskable-512.png',
@@ -22,7 +24,7 @@ self.addEventListener('activate', event => {
   event.waitUntil(
     caches.keys()
       .then(keys => Promise.all(keys
-        .filter(key => key.startsWith('openfodder-') && key !== CACHE)
+        .filter(key => key.startsWith('minor-sabotage-') && key !== CACHE)
         .map(key => caches.delete(key))))
       .then(() => self.clients.claim())
   );
