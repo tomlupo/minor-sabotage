@@ -165,7 +165,7 @@ if(EMSCRIPTEN)
         "-sUSE_SDL=3"
         "-sALLOW_MEMORY_GROWTH=1"
         "-sINVOKE_RUN=0"
-        "-sEXPORTED_FUNCTIONS=_main,_of_state,_of_arm,_of_touch_mode,_of_key"
+        "-sEXPORTED_FUNCTIONS=_main,_of_state,_of_map,_of_arm,_of_touch_mode,_of_key"
         "-sEXPORTED_RUNTIME_METHODS=callMain,FS"
         "-lidbfs.js"
         "SHELL:--shell-file ${OPENFODDER_WEB}/shell.html"

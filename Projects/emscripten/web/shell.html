@@ -333,6 +333,7 @@
     const STATE = { MISSION: 1, PAUSED: 2, ROCKETS_ARMED: 4, GRENADES_ARMED: 8, HAS_GRENADES: 16, HAS_ROCKETS: 32, SQUAD2: 128, SQUAD3: 256, ABOUT: 512 };
     const ROWS = 14;          // 224 px: the height of the original Amiga screen
     const MENU_WIDTH = 320;   // menus are laid out for the original screen width
+    const SIDEBAR = 48;       // the in-game sidebar, left of the map
 
     const isIOS = /iP(hone|od|ad)/.test(navigator.userAgent) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1);
     const standalone = navigator.standalone === true || matchMedia('(display-mode: standalone), (display-mode: fullscreen)').matches;
@@ -342,6 +343,7 @@
     let runtimeReady = false, wantStart = false, started = false;
     let scale = 1;            // the engine's integer window scale
     let state = 0;            // last of_state()
+    let map = 0;              // last of_map(): the mission map's size in tiles
     let muted = store.get('muted') === '1';
     let lefty = store.get('hand') === 'left';
     let pausedBySheet = false;
@@ -479,7 +481,7 @@
 
     // The canvas box must be exactly the picture: SDL maps touches and clicks to the element's box.
     // Menus only use the left 320 pixels, so there the canvas slides right and is clipped to them;
-    // missions and the About screen use the full width.
+    // missions use the full width, clipped the same way to a map smaller than the view.
     function layout() {
       const portrait = needsRotate();
       // Turning the phone upright mid-mission hides the game behind the prompt, so pause it
@@ -489,14 +491,22 @@
 
       const area = playArea();
       const gameW = canvas.width / scale, gameH = canvas.height / scale;
-      const shownW = (state & (STATE.MISSION | STATE.ABOUT)) ? gameW : Math.min(MENU_WIDTH, gameW);
-      const k = Math.min(area.w / shownW, area.h / gameH);
+      let shownW = gameW, shownH = gameH;
+      if (!(state & (STATE.MISSION | STATE.ABOUT))) {
+        shownW = Math.min(MENU_WIDTH, gameW);
+      } else if ((state & STATE.MISSION) && map) {
+        // A map smaller than the view leaves black beyond its edge: show the sidebar and the map only
+        shownW = Math.min(gameW, SIDEBAR + (map & 0xffff) * 16);
+        shownH = Math.min(gameH, (map >>> 16) * 16);
+      }
+      const k = Math.min(area.w / shownW, area.h / shownH);
 
       canvas.style.width = (gameW * k) + 'px';
       canvas.style.height = (gameH * k) + 'px';
       canvas.style.left = (area.x + (area.w - shownW * k) / 2) + 'px';
-      canvas.style.top = (area.y + (area.h - gameH * k) / 2) + 'px';
-      canvas.style.clipPath = shownW < gameW ? 'inset(0 ' + ((gameW - shownW) * k) + 'px 0 0)' : 'none';
+      canvas.style.top = (area.y + (area.h - shownH * k) / 2) + 'px';
+      canvas.style.clipPath = (shownW < gameW || shownH < gameH)
+        ? 'inset(0 ' + ((gameW - shownW) * k) + 'px ' + ((gameH - shownH) * k) + 'px 0)' : 'none';
     }
 
     window.addEventListener('resize', layout);
@@ -526,6 +536,11 @@
           layout();
           releaseThumbs();
         }
+      }
+      const nextMap = (state & STATE.MISSION) && Module._of_map ? Module._of_map() : 0;
+      if (nextMap !== map) {
+        map = nextMap;
+        layout();
       }
       if (canvas.width !== lastWidth || canvas.height !== lastHeight) {
         lastWidth = canvas.width;

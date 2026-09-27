@@ -65,6 +65,19 @@ extern "C" EMSCRIPTEN_KEEPALIVE int of_state() {
 }
 
 /**
+ * The loaded map's size in tiles, height << 16 | width, or 0 outside a mission
+ *
+ * A phone's wide view can be wider than a small map, which leaves black beyond its edge;
+ * the page crops the picture to the map.
+ */
+extern "C" EMSCRIPTEN_KEEPALIVE int of_map() {
+	if (!g_Fodder || !sInMission || !g_Fodder->mMapLoaded)
+		return 0;
+
+	return ((g_Fodder->mMapLoaded->getHeight() & 0x7FFF) << 16) | (g_Fodder->mMapLoaded->getWidth() & 0xFFFF);
+}
+
+/**
  * Called as the page's grenade button goes down
  *
  * Each phase starts with no grenade or rocket chosen: a mouse player clicks one in the
