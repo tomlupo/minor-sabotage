@@ -225,6 +225,9 @@ static bool Walk_Ready(bool pOnFoot) {
  *
  * pQueue adds the point to the path the squad is walking, as the engine does with an order
  * given while the squad is still taking the last; otherwise it replaces the path.
+ * The engine adds only within 8 ticks of the last order, so a finger that rested longer
+ * would start a new path from where the squad stands; pQueue adds anyway, because a finger
+ * still down is still drawing the same path.
  */
 static bool Walk_Order(int16 pX, int16 pY, bool pQueue) {
 	if (!Walk_Ready(true))
@@ -234,7 +237,7 @@ static bool Walk_Order(int16 pX, int16 pY, bool pQueue) {
 	const int16 Squad = Fodder.mSquad_Selected;
 
 	// Squad_Walk_Target_Set writes past the end of the squad's walk list once it is full
-	if (pQueue && Fodder.mSquad_Walk_Target_Steps[Squad] && Fodder.mSquad_Walk_Target_Indexes[Squad] >= 28)
+	if (pQueue && Fodder.mSquad_Walk_Target_Indexes[Squad] >= 28)
 		return false;
 
 	if (Fodder.mMapLoaded) {
@@ -246,6 +249,8 @@ static bool Walk_Order(int16 pX, int16 pY, bool pQueue) {
 		Fodder.mSquad_Walk_Target_Steps[Squad] = 0;
 		Fodder.mSquad_WalkTargetX = 0;
 		Fodder.mSquad_WalkTargetY = 0;
+	} else if (!Fodder.mSquad_Walk_Target_Steps[Squad]) {
+		Fodder.mSquad_Walk_Target_Steps[Squad] = 1;	// reopen the window, see above
 	}
 
 	Fodder.mCamera_PanTargetX = pX;
@@ -351,10 +356,11 @@ static void Stick_Update(std::vector<cEvent>& pEvents) {
 		Aim->second.mLifted = true;
 	}
 
-	// The grenade button: throw at the pointer, which the sticks keep ahead of the squad
+	// The grenade button: throw at the pointer, which the sticks keep ahead of the squad. Not
+	// from a vehicle, where right then left is a click that drives it or gets the squad out
 	if (sStickThrow) {
 		sStickThrow = false;
-		if (Ready) {
+		if (Walk_Ready(true)) {
 			auto& Finger = sTouchFingers[STICK_THROW_FINGER];
 			Touch_Button(Finger, TOUCH_LEFT, false, pEvents);
 			Touch_Button(Finger, TOUCH_RIGHT, false, pEvents);
