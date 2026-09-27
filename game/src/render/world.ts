@@ -151,13 +151,17 @@ export class WorldView {
     return here;
   }
 
+  /** A second street to keep open (where the van is), set by the scene each frame. */
+  focusStreet = -1;
+
   private updateCut(sim: Sim, dt: number) {
     const s = this.streetFor(sim);
     if (s !== this.pendingStreet) { this.pendingStreet = s; this.pendingT = 0; }
     this.pendingT += dt;
     if (this.pendingT > 0.15 && s >= 0) this.activeStreet = s;
     for (const v of this.buildings) {
-      const want = v.cut && v.b.cuttable && v.b.street === this.activeStreet ? 1 : 0;
+      const open = v.b.street === this.activeStreet || (this.focusStreet >= 0 && v.b.street === this.focusStreet);
+      const want = v.cut && v.b.cuttable && open ? 1 : 0;
       if (v.cutT === want) continue;
       v.cutT = want > v.cutT ? Math.min(1, v.cutT + dt / 0.3) : Math.max(0, v.cutT - dt / 0.3);
       if (!v.cut) continue;

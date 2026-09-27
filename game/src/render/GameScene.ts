@@ -107,6 +107,8 @@ export class GameScene extends Phaser.Scene {
       if (e.t === "explosion") this.cameras.main.shake(180, 0.006);
     }
     if (events.length) this.events.emit("sim-events", events);
+    const f = phase.focus?.(sim);
+    this.world.focusStreet = f ? sim.grid.streetAt(f.x, f.y) : -1;
     this.world.update(sim, dt);
     this.fx.update(sim, dt);
     this.overlay.marks = phase.interactables(sim).filter((i) => i.ready(sim)).map((i) => ({ x: i.x, y: i.y, r: i.r, on: true }));
@@ -129,7 +131,12 @@ export class GameScene extends Phaser.Scene {
     if (L) {
       // look ahead to where the squad is heading, then settle on it (the "calmer camera")
       let tx = sx(L.x), ty = sy(L.y) - 12;
-      if (L.path.length) {
+      const f = this.run.phase.focus?.(sim);
+      if (f && Math.hypot(f.x - L.x, f.y - L.y) < 46) {
+        // keep the thing that matters (the van) in frame with the squad
+        tx += (sx(f.x) - tx) * 0.5;
+        ty += (sy(f.y) - 8 - ty) * 0.5;
+      } else if (L.path.length) {
         const p = L.path[L.path.length - 1];
         const d = Math.hypot(p.x - L.x, p.y - L.y);
         const k = Math.min(1, d / 14) * 0.45;

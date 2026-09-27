@@ -34,7 +34,8 @@ if (args.steps) steps = JSON.parse(existsSync(args.steps) ? readFileSync(args.st
 if (!steps.some((s) => s.shot)) steps.push({ wait: Number(args.wait || 1200) }, { shot: args.out || "shot" });
 
 mkdirSync(resolve(root, "shots"), { recursive: true });
-const server = await createServer({ root, logLevel: "error", server: { port: 0, host: "127.0.0.1" } });
+// no hot reload and no file watching: other sessions editing files must not reload the page mid-run
+const server = await createServer({ root, logLevel: "error", server: { port: 0, host: "127.0.0.1", hmr: false, watch: { ignored: ["**/*"] } } });
 await server.listen();
 const base = server.resolvedUrls.local[0];
 const browser = await chromium.launch({

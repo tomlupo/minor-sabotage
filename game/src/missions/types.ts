@@ -30,6 +30,8 @@ export interface Phase extends Mission {
   start(sim: Sim): { x: number; y: number };
   /** A line for the top of the screen, if any (a countdown, a warning). */
   banner?(sim: Sim): string | null;
+  /** Something the camera should keep in frame with the squad (the van as it comes). */
+  focus?(sim: Sim): { x: number; y: number } | null;
   /** Called once when the phase ends, to write its result into the campaign. */
   finish(sim: Sim, c: Campaign): TaskResult | FinaleResult;
 }

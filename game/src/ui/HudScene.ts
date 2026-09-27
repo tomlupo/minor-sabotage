@@ -296,10 +296,7 @@ export class HudScene extends Phaser.Scene {
       if (e.t === "pause") { this.pauseReason = e.reason; this.say(e.reason, "bad"); }
       else if (e.t === "message") this.say(e.text, e.tone);
       else if (e.t === "alarm") this.say("Alarm! The Germans are coming.", "bad");
-      else if (e.t === "objective" && e.status === "done") {
-        const o = sim.state.objectives.find((q) => q.id === e.id);
-        if (o) this.say(`✓ ${o.text}`, "good");
-      } else if (e.t === "death") {
+      else if (e.t === "death") {
         const u = sim.unit(e.unit);
         if (u && u.side === "pl" && u.name) this.say(`${u.name} has fallen`, "bad");
       }
@@ -308,7 +305,7 @@ export class HudScene extends Phaser.Scene {
 
   say(text: string, tone: string) {
     this.toast.push({ text, t: this.time.now, tone });
-    if (this.toast.length > 4) this.toast.shift();
+    if (this.toast.length > 3) this.toast.shift();
   }
 
   /** Pixel text (the game's own font), created once per key and reused every frame. */
@@ -359,23 +356,23 @@ export class HudScene extends Phaser.Scene {
       this.panelBehind(t, 2, 0.55);
     });
     const banner = this.g.run.phase.banner?.(sim);
-    if (banner && !s.paused) { keep.add("banner"); const t = this.text("banner", W / 2, this.safe.top + 66, banner, { align: 0.5 }); this.panelBehind(t, 3, 0.7); }
+    if (banner && !s.paused) { keep.add("banner"); const t = this.text("banner", W / 2, this.safe.top + 92, banner, { align: 0.5 }); this.panelBehind(t, 3, 0.7); }
     // toasts
     const now = this.time.now;
-    this.toast = this.toast.filter((t) => now - t.t < 3800);
+    this.toast = this.toast.filter((t) => now - t.t < 3200);
     this.toast.forEach((t, k) => {
       const col = t.tone === "good" ? PAL.hud.hp_ok : t.tone === "bad" ? PAL.hud.hp_low : PAL.shared.chalk;
       keep.add(`toast${k}`);
-      const tx = this.text(`toast${k}`, W / 2, this.scale.height * 0.6 + k * 12, t.text, { align: 0.5, color: col });
-      const a = Math.min(1, (3800 - (now - t.t)) / 600);
+      const tx = this.text(`toast${k}`, W / 2, this.scale.height - this.safe.bottom - 16 - (this.toast.length - 1 - k) * 11, t.text, { align: 0.5, color: col });
+      const a = Math.min(1, (3200 - (now - t.t)) / 500);
       this.panelBehind(tx, 2, 0.6 * a);
       tx.setAlpha(a);
     });
     // pause banner
     if (s.paused) {
       keep.add("paused");
-      const msg = this.pauseReason ? `${this.pauseReason}. Paused: one order per squad, then ▶` : "Paused: one order per squad, then ▶";
-      const t = this.text("paused", W / 2, this.safe.top + 66, msg, { align: 0.5, color: PAL.hud.paper_ink });
+      const msg = this.pauseReason ? `${this.pauseReason}. Paused: one order per squad, then play` : "Paused: one order per squad, then play";
+      const t = this.text("paused", W / 2, this.safe.top + 92, msg, { align: 0.5, color: PAL.hud.paper_ink });
       const b = t.getBounds();
       g.fillStyle(hex(PAL.hud.paper[1]), 0.96).fillRect(Math.floor(b.x - 6), Math.floor(b.y - 4), Math.ceil(b.width + 12), Math.ceil(b.height + 7));
       g.lineStyle(1, hex(PAL.shared.outline), 1).strokeRect(Math.floor(b.x - 6), Math.floor(b.y - 4), Math.ceil(b.width + 12), Math.ceil(b.height + 7));

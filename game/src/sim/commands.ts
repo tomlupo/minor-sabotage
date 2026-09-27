@@ -83,7 +83,9 @@ export function cmdThrow(sim: Sim, x: number, y: number, what: "grenade" | "bott
     }
   }
   if (!best) return null;
-  best.task = { kind: "throw", what: kind, x, y, t: 0, phase: Math.hypot(best.x - x, best.y - y) <= THROW.range ? "wind" : "approach" };
+  // thrown at a vehicle: remember which, so the throw leads it wherever it has got to
+  const veh = sim.state.vehicles.find((v) => Math.hypot(v.x - x, v.y - y) < Math.max(v.len, 4) && v.state !== "wreck");
+  best.task = { kind: "throw", what: kind, x, y, t: 0, phase: Math.hypot(best.x - x, best.y - y) <= THROW.range ? "wind" : "approach", veh: veh?.id };
   if (best.task.phase === "wind") {
     best.path = [];
     best.dir = Math.atan2(y - best.y, x - best.x);

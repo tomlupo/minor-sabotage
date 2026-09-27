@@ -405,6 +405,14 @@ export function finale(md: MapData, c: Campaign): Phase {
       return { x: (NAL.e + BIEL.w) / 2, y: DLUGA.n + 4 };
     },
 
+    focus(sim: Sim) {
+      const s = sim.state;
+      if (s.vars.phase === "escape") { const car = carOf(sim); return car ? { x: car.x, y: car.y } : null; }
+      const van = vanOf(sim);
+      if (van && s.vars.doorsOpened !== true) return { x: van.x, y: van.y };
+      return null;
+    },
+
     finish(sim: Sim, cc: Campaign): FinaleResult {
       const s = sim.state;
       const fallen = recordSoldiers(sim, cc);

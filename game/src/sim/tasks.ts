@@ -90,27 +90,34 @@ function throwTask(sim: Sim, u: Unit): void {
       setAnim(u, "throw", THROW.wind + 0.3);
       return;
     }
-    if (!u.path.length) {
-      const k = (d - THROW.range + 1) / d;
-      goTo(sim, u, u.x + (t.x - u.x) * k, u.y + (t.y - u.y) * k, 4000);
+    // a vehicle target moves: follow where it is now
+    const tv = t.veh !== undefined ? sim.vehicle(t.veh) : undefined;
+    if (tv) { t.x = tv.x; t.y = tv.y; }
+    if (!u.path.length || tv) {
+      const dd = Math.hypot(t.x - u.x, t.y - u.y);
+      const k = Math.max(0, dd - THROW.range + 1) / Math.max(dd, 0.01);
+      if (!u.path.length || (sim.state.tick + u.id) % 10 === 0) goTo(sim, u, u.x + (t.x - u.x) * k, u.y + (t.y - u.y) * k, 4000);
     }
     return;
   }
   if (t.t >= THROW.wind) {
     if (t.what === "grenade") u.grenades--; else u.bottles--;
     let dur = 0.35 + d * THROW.flightPerM;
-    // thrown at a moving vehicle: lead it, as anyone would
-    for (const v of sim.state.vehicles) {
-      if (v.speed < 0.5 || Math.hypot(v.x - t.x, v.y - t.y) > 5) continue;
-      const ahead = (t.x - v.x) * Math.cos(v.heading) + (t.y - v.y) * Math.sin(v.heading);
-      const lx = v.x + Math.cos(v.heading) * (v.speed * dur + Math.max(0, ahead));
-      const ly = v.y + Math.sin(v.heading) * (v.speed * dur + Math.max(0, ahead));
+    // thrown at a vehicle: at the cab, leading it as anyone would
+    const v = t.veh !== undefined ? sim.vehicle(t.veh) : sim.state.vehicles.find((q) => q.speed >= 0.5 && Math.hypot(q.x - t.x, q.y - t.y) <= 5);
+    if (v && v.state !== "wreck") {
+      const cab = v.len * 0.3;
+      let lx = v.x, ly = v.y;
+      for (let k = 0; k < 3; k++) {
+        const fl = 0.35 + Math.hypot(lx - u.x, ly - u.y) * THROW.flightPerM;
+        lx = v.x + Math.cos(v.heading) * (v.speed * fl + cab);
+        ly = v.y + Math.sin(v.heading) * (v.speed * fl + cab);
+      }
       if (Math.hypot(lx - u.x, ly - u.y) <= THROW.range + 3) {
         t.x = lx;
         t.y = ly;
         dur = 0.35 + Math.hypot(t.x - u.x, t.y - u.y) * THROW.flightPerM;
       }
-      break;
     }
     sim.state.projectiles.push({ id: sim.state.nextId++, kind: t.what, x0: u.x, y0: u.y, x1: t.x, y1: t.y, t: 0, dur, owner: u.id });
     sim.emit({ t: "throw", unit: u.id, kind: t.what, x: t.x, y: t.y });
