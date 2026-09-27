@@ -11,6 +11,7 @@ import { readSafeInsets } from "../render/view";
 import { sound } from "../render/sound";
 import { hudArt, type HudArt } from "./hudart";
 import { registerFonts, PX, PXS } from "./text";
+import { nextHint, markSeen, type Hint } from "./hints";
 import type { RGB } from "../art/palette";
 
 type Btn = {
@@ -47,6 +48,10 @@ export class HudScene extends Phaser.Scene {
   private orderMenu: number = -1;
   private pendingOrder: { squad: number; kind: "cover" | "signal" } | null = null;
   private safe = { top: 0, right: 0, bottom: 0, left: 0 };
+  private hint: { h: Hint; t: number } | null = null;
+  private hintShown = new Set<string>();
+  private hintCheck = 0;
+  private hintBox: { x: number; y: number; w: number; h: number } | null = null;
 
   constructor() {
     super("hud");
@@ -234,6 +239,13 @@ export class HudScene extends Phaser.Scene {
 
   private down(p: Phaser.Input.Pointer) {
     sound.unlock();
+    const hb = this.hintBox;
+    if (this.hint && hb && p.x >= hb.x && p.y >= hb.y && p.x < hb.x + hb.w && p.y < hb.y + hb.h) {
+      markSeen(this.hint.h.id);
+      this.hint = null;
+      sound.ui("ui_tap");
+      return;
+    }
     const btn = this.btnAt(p.x, p.y);
     const g: Gesture = { id: p.id, x0: p.x, y0: p.y, t0: this.time.now, moved: false, btn, held: false, lastDrag: 0 };
     this.gestures.set(p.id, g);
@@ -376,6 +388,26 @@ export class HudScene extends Phaser.Scene {
       const b = t.getBounds();
       g.fillStyle(hex(PAL.hud.paper[1]), 0.96).fillRect(Math.floor(b.x - 6), Math.floor(b.y - 4), Math.ceil(b.width + 12), Math.ceil(b.height + 7));
       g.lineStyle(1, hex(PAL.shared.outline), 1).strokeRect(Math.floor(b.x - 6), Math.floor(b.y - 4), Math.ceil(b.width + 12), Math.ceil(b.height + 7));
+    }
+    // first-time hints: one at a time, on paper, under the banners
+    if (!this.hint && now - this.hintCheck > 500) {
+      this.hintCheck = now;
+      const h = nextHint(sim, this.g.run.phase, this.hintShown);
+      if (h) { this.hint = { h, t: now }; this.hintShown.add(h.id); }
+    }
+    this.hintBox = null;
+    if (this.hint) {
+      if (now - this.hint.t > 7000) { markSeen(this.hint.h.id); this.hint = null; }
+      else {
+        keep.add("hint");
+        const y = this.safe.top + (s.paused || banner ? 108 : 92);
+        const t = this.text("hint", W / 2, y, this.hint.h.text, { align: 0.5, color: PAL.hud.paper_ink });
+        const b = t.getBounds();
+        const box = { x: Math.floor(b.x - 7), y: Math.floor(b.y - 4), w: Math.ceil(b.width + 14), h: Math.ceil(b.height + 8) };
+        g.fillStyle(hex(PAL.hud.paper[1]), 0.97).fillRect(box.x, box.y, box.w, box.h);
+        g.lineStyle(1, hex(PAL.shared.select_gold), 1).strokeRect(box.x, box.y, box.w, box.h);
+        this.hintBox = box;
+      }
     }
     if (this.pendingOrder) { keep.add("pending"); const t = this.text("pending", W / 2, this.scale.height - 22, this.pendingOrder.kind === "cover" ? "Tap where they should cover" : "Tap where they go on the signal", { align: 0.5, color: PAL.shared.select_gold }); this.panelBehind(t); }
     if (this.grenadeArmed) { keep.add("armed"); const t = this.text("armed", W / 2, this.scale.height - 22, "Tap where to throw", { align: 0.5, color: PAL.shared.chalk }); this.panelBehind(t); }

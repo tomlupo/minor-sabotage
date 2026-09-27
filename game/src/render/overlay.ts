@@ -88,6 +88,24 @@ export class Overlay {
       g.stroke();
     }
 
+    // guard posts sending men after the alarm: blow them up to stop them (Fodder's huts)
+    for (const sp of s.spawners) {
+      if (!sp.active || sp.destroyed || sp.left <= 0 || !onScreen(sp.x, sp.y, 30)) continue;
+      const pulse = 0.55 + 0.45 * Math.sin(time * 6);
+      g.strokeStyle = css(PAL.shared.poppy_red, pulse);
+      g.setLineDash([2, 2]);
+      g.beginPath();
+      g.ellipse(X(sp.x), Y(sp.y), 20, 15, 0, 0, Math.PI * 2);
+      g.stroke();
+      g.setLineDash([]);
+      g.fillStyle = css(PAL.shared.poppy_red, 0.9);
+      g.fillRect(X(sp.x) - 3, Y(sp.y) - 22, 7, 9);
+      g.fillStyle = css(PAL.shared.outline, 1);
+      g.fillRect(X(sp.x) - 2, Y(sp.y) - 21, 5, 7);
+      g.fillStyle = css(PAL.shared.poppy_red, 0.9);
+      g.fillRect(X(sp.x), Y(sp.y) - 19, 1, 3);
+    }
+
     // squads you are not leading: their orders in their colour
     for (const sq of s.squads) {
       if (!sq || !sq.inPlay || sq.id === s.controlled) continue;
