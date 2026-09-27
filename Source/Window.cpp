@@ -56,8 +56,9 @@ struct sTouchFinger {
 	bool			mLifted = false;		// Up, and letting go once the engine has seen its press
 	int16			mPressTick = 0;			// The engine's interrupt tick when this finger last pressed
 	uint64			mOrder = 0;				// Higher went down later; the newest finger steers
-	bool			mRepress = false;		// Dragging: left let go, to press again at the finger
-	cPosition		mLeadFrom;				// Where this finger last gave a walk order
+	cPosition		mPosition;				// Where the finger is, in window pixels
+	cPosition		mLeadFrom;				// Where it last gave a walk order, dragging
+	bool			mLeading = false;		// It has dragged out a path
 };
 
 static int sTouchMode = eTouchMode_Move;
@@ -173,17 +174,11 @@ static void Touch_Deliver(std::vector<cEvent>& pEvents) {
 			Touch_Button(Touch, TOUCH_LEFT, true, pEvents);
 		}
 
-		// Dragging to lead: the engine has seen left let go, so press it again at the finger. An
-		// order given while the squad is still taking the last one is queued, so they follow the path
-		if (Touch.mRepress && !Touch.mLifted) {
-			Touch.mRepress = false;
-			Touch.mLeadFrom = sTouchPointer;
-			Touch_Button(Touch, TOUCH_LEFT, true, pEvents);
-		}
-
-		// A throw lifted before the engine saw its right button gives up after a few frames
-		const bool GiveUp = Touch.mLeftPending && Touch_SamplesSince(Touch.mPressTick) > TOUCH_MIN_SAMPLES * 3;
-		if (Touch.mLifted && (GiveUp || (!Touch.mLeftPending && Touch_SamplesSince(Touch.mPressTick) >= TOUCH_MIN_SAMPLES))) {
+		// A throw lifted before the engine saw its right button gives up after a few frames. The
+		// tick only runs forward, so a negative count means it wrapped after a very long hold
+		const int16 Samples = Touch_SamplesSince(Touch.mPressTick);
+		const bool GiveUp = Touch.mLeftPending && (Samples < 0 || Samples > TOUCH_MIN_SAMPLES * 3);
+		if (Touch.mLifted && (GiveUp || (!Touch.mLeftPending && (Samples < 0 || Samples >= TOUCH_MIN_SAMPLES)))) {
 			Touch_Button(Touch, TOUCH_LEFT, false, pEvents);
 			Touch_Button(Touch, TOUCH_RIGHT, false, pEvents);
 			Finger = sTouchFingers.erase(Finger);
@@ -214,26 +209,52 @@ static float sStickOrderX, sStickOrderY;		// direction of the last walk order
 static int16 sStickOrderTick;
 static bool sStickMoving, sStickThrow;
 
-// Walk the selected squad to a map position, as a click on the map would
-static void Stick_Walk(int16 pX, int16 pY) {
+// A squad in a mission that is running, and taking orders: pOnFoot also rules out a vehicle
+static bool Walk_Ready(bool pOnFoot) {
 	cFodder& Fodder = *g_Fodder;
 	const int16 Squad = Fodder.mSquad_Selected;
+
+	return g_WebInMission && !Fodder.mPhase_Paused && !Fodder.mPhase_Finished &&
+		Squad >= 0 && Squad < 3 && Fodder.mSquad_Leader && Fodder.mSquad_Leader != INVALID_SPRITE_PTR &&
+		!(pOnFoot && Fodder.mSquad_CurrentVehicle);
+}
+
+/**
+ * A walk order for the selected squad, the one a click on the map gives (Mouse_Inputs_Check)
+ * without the rest of a click: choosing vehicles, sidebar buttons or squads to join
+ *
+ * pQueue adds the point to the path the squad is walking, as the engine does with an order
+ * given while the squad is still taking the last; otherwise it replaces the path.
+ */
+static bool Walk_Order(int16 pX, int16 pY, bool pQueue) {
+	if (!Walk_Ready(true))
+		return false;
+
+	cFodder& Fodder = *g_Fodder;
+	const int16 Squad = Fodder.mSquad_Selected;
+
+	// Squad_Walk_Target_Set writes past the end of the squad's walk list once it is full
+	if (pQueue && Fodder.mSquad_Walk_Target_Steps[Squad] && Fodder.mSquad_Walk_Target_Indexes[Squad] >= 28)
+		return false;
 
 	if (Fodder.mMapLoaded) {
 		pX = SDL_clamp(pX, (int16)0, (int16)(Fodder.mMapLoaded->getWidth() * 16 - 1));
 		pY = SDL_clamp(pY, (int16)3, (int16)(Fodder.mMapLoaded->getHeight() * 16 - 1));
 	}
 
-	// A fresh order, not one more waypoint after the last
-	Fodder.mSquad_Walk_Target_Steps[Squad] = 0;
-	Fodder.mSquad_WalkTargetX = 0;
-	Fodder.mSquad_WalkTargetY = 0;
+	if (!pQueue) {
+		Fodder.mSquad_Walk_Target_Steps[Squad] = 0;
+		Fodder.mSquad_WalkTargetX = 0;
+		Fodder.mSquad_WalkTargetY = 0;
+	}
 
 	Fodder.mCamera_PanTargetX = pX;
 	Fodder.mCamera_PanTargetY = pY;
+	Fodder.mMouse_Locked = false;
 	for (auto& Troop : Fodder.mGame_Data.mSoldiers_Allocated) {
 		if (Troop.mSprite == INVALID_SPRITE_PTR || Troop.mSprite == 0 || Troop.mSprite->field_32 != Squad)
 			continue;
+		Troop.mSprite->mVehicleWalkTarget = 0;
 		Troop.mSprite->field_44 = 0;
 		Troop.mSprite->mPosXFrac = 0;
 		Troop.mSprite->mPosYFrac = 0;
@@ -244,6 +265,22 @@ static void Stick_Walk(int16 pX, int16 pY) {
 		if (JoinTargetSquad == Squad)
 			JoinTargetSquad = -1;
 	}
+	return true;
+}
+
+// The map position under a point of the window, as Mouse_Inputs_Check turns the pointer into one;
+// false over the sidebar
+static bool Walk_MapPosition(const cPosition& pWindow, int16& pX, int16& pY) {
+	const cDimension Scale = g_Window->GetScale();
+	const int X = (int)pWindow.mX / (int)Scale.getWidth();
+	const int Y = (int)pWindow.mY / (int)Scale.getHeight();
+
+	if (X < SIDEBAR_WIDTH)
+		return false;
+
+	pX = (int16)(X - 32 + (g_Fodder->mCameraX >> 16) - 22);
+	pY = (int16)(Y + 4 + (g_Fodder->mCameraY >> 16) - 3);
+	return true;
 }
 
 // Move the pointer to a map position: the engine fires at it and the camera leans toward it
@@ -251,10 +288,11 @@ static void Stick_PointAt(int16 pX, int16 pY, std::vector<cEvent>& pEvents) {
 	const cDimension Scale = g_Window->GetScale();
 	const cDimension Window = g_Window->GetWindowSize();
 
-	// The inverse of how Mouse_Inputs_Check turns the pointer into a map position
+	// The inverse of how Mouse_Inputs_Check turns the pointer into a map position, kept on the
+	// map view: over the sidebar the pointer would press its buttons instead
 	const int MouseX = pX - (g_Fodder->mCameraX >> 16) + 22;
 	const int MouseY = pY - (g_Fodder->mCameraY >> 16) + 3;
-	const int WindowX = SDL_clamp((MouseX + 32) * (int)Scale.getWidth(), 1, (int)Window.getWidth() - 1);
+	const int WindowX = SDL_clamp((MouseX + 32) * (int)Scale.getWidth(), (SIDEBAR_WIDTH + 8) * (int)Scale.getWidth(), (int)Window.getWidth() - 1);
 	const int WindowY = SDL_clamp((MouseY - 4) * (int)Scale.getHeight(), 1, (int)Window.getHeight() - 1);
 
 	sTouchPointer = cPosition(WindowX, WindowY);
@@ -265,22 +303,21 @@ static void Stick_PointAt(int16 pX, int16 pY, std::vector<cEvent>& pEvents) {
 
 static void Stick_Update(std::vector<cEvent>& pEvents) {
 	cFodder& Fodder = *g_Fodder;
-	const int16 Squad = Fodder.mSquad_Selected;
-	const bool Ready = g_WebInMission && Squad >= 0 && Squad < 3 && !Fodder.mSquad_CurrentVehicle &&
-		Fodder.mSquad_Leader && Fodder.mSquad_Leader != INVALID_SPRITE_PTR;
 
+	// A vehicle drives by a tap, as in classic play, but its guns take the aim stick
+	const bool Ready = Walk_Ready(false);
 	const float MoveLength = SDL_sqrtf(sStickMoveX * sStickMoveX + sStickMoveY * sStickMoveY);
 	const float AimLength = SDL_sqrtf(sStickAimX * sStickAimX + sStickAimY * sStickAimY);
 	const bool Aiming = Ready && AimLength >= STICK_DEAD_ZONE;
 
-	if (Ready && MoveLength >= STICK_DEAD_ZONE) {
+	if (Walk_Ready(true) && MoveLength >= STICK_DEAD_ZONE) {
 		const float DirX = sStickMoveX / MoveLength, DirY = sStickMoveY / MoveLength;
 		const bool Turned = !sStickMoving || (DirX * sStickOrderX + DirY * sStickOrderY) < 0.94f;
 		const bool Due = (int16)(Fodder.mInterruptTick - sStickOrderTick) >= STICK_ORDER_TICKS;
 
 		if (Turned || Due) {
 			const int16 LeaderX = Fodder.mSquad_Leader->mPosX, LeaderY = Fodder.mSquad_Leader->mPosY;
-			Stick_Walk(LeaderX + (int16)(DirX * STICK_WALK_AHEAD), LeaderY + (int16)(DirY * STICK_WALK_AHEAD));
+			Walk_Order(LeaderX + (int16)(DirX * STICK_WALK_AHEAD), LeaderY + (int16)(DirY * STICK_WALK_AHEAD), false);
 			if (!Aiming)
 				Stick_PointAt(LeaderX + (int16)(DirX * STICK_AIM_AHEAD), LeaderY + (int16)(DirY * STICK_AIM_AHEAD), pEvents);
 
@@ -291,8 +328,8 @@ static void Stick_Update(std::vector<cEvent>& pEvents) {
 		}
 	} else if (sStickMoving) {
 		// Let go: stop where the leader stands
-		if (Ready)
-			Stick_Walk(Fodder.mSquad_Leader->mPosX, Fodder.mSquad_Leader->mPosY);
+		if (Walk_Ready(true))
+			Walk_Order(Fodder.mSquad_Leader->mPosX, Fodder.mSquad_Leader->mPosY, false);
 		sStickMoving = false;
 	}
 
@@ -549,7 +586,7 @@ void cWindow::EventCheck() {
 				Touch_Button(Finger, TOUCH_RIGHT, false, mEvents);
 				Finger = sTouchFinger();
 				Finger.mOrder = ++sTouchOrder;
-				Finger.mLeadFrom = Position;
+				Finger.mPosition = Finger.mLeadFrom = Position;
 				sTouchInUse = true;
 
 				// The newest finger takes the pointer before pressing
@@ -559,13 +596,26 @@ void cWindow::EventCheck() {
 				mEvents.push_back(Event);
 				Event.mType = eEvent_None;
 
-				Touch_Apply(Finger, sTouchMode, true, mEvents);
+				// While the aim stick holds fire, a finger on the map aims: pressing left there
+				// would throw a grenade (left while right is held)
+				auto Aim = sTouchFingers.find(STICK_AIM_FINGER);
+				const bool Aiming = Aim != sTouchFingers.end() && !Aim->second.mLifted;
+				Touch_Apply(Finger, Aiming ? eTouchMode_Fire : sTouchMode, true, mEvents);
 				break;
 			}
 
 			auto Finger = sTouchFingers.find(SysEvent.tfinger.fingerID);
 			if (Finger == sTouchFingers.end() || Finger->second.mLifted)
 				break;
+			auto& Touch = Finger->second;
+			Touch.mPosition = Position;
+
+			// A finger dragged while moving leads the squad: every 12 pixels one more point on its
+			// path, given as a walk order rather than a click, so it can't choose a vehicle or a button
+			const bool Leads = sTouchMode == eTouchMode_Move && (Touch.mButtons & TOUCH_LEFT);
+			const int DX = (int)Position.mX - (int)Touch.mLeadFrom.mX;
+			const int DY = (int)Position.mY - (int)Touch.mLeadFrom.mY;
+			const int Step = 12 * mScaler;
 
 			if (SysEvent.type == SDL_EVENT_FINGER_MOTION) {
 				if (!Touch_Steers(Finger->first))
@@ -575,23 +625,31 @@ void cWindow::EventCheck() {
 				Event.mType = eEvent_MouseMove;
 				Event.mPosition = Position;
 
-				// A finger dragged while moving leads the squad: another walk order every 12 pixels
-				auto& Touch = Finger->second;
-				const int Step = 12 * mScaler;
-				const int DX = (int)Position.mX - (int)Touch.mLeadFrom.mX;
-				const int DY = (int)Position.mY - (int)Touch.mLeadFrom.mY;
-				if (sTouchMode == eTouchMode_Move && (Touch.mButtons & TOUCH_LEFT) && !Touch.mRepress &&
-					DX * DX + DY * DY >= Step * Step && Touch_SamplesSince(Touch.mPressTick) >= TOUCH_MIN_SAMPLES) {
-					mEvents.push_back(Event);
-					Event.mType = eEvent_None;
-					Touch_Button(Touch, TOUCH_LEFT, false, mEvents);
-					Touch.mRepress = true;
+				int16 MapX, MapY;
+				if (Leads && DX * DX + DY * DY >= Step * Step && Walk_MapPosition(Position, MapX, MapY) && Walk_Order(MapX, MapY, true)) {
+					Touch.mLeadFrom = Position;
+					Touch.mLeading = true;
 				}
 				break;
 			}
 
-			// Up or cancelled: Touch_Deliver lets go once the engine has seen the press
-			Finger->second.mLifted = true;
+			// Up or cancelled. A dragged path ends where the finger lifted
+			int16 MapX, MapY;
+			if (Leads && Touch.mLeading && DX * DX + DY * DY >= (Step * Step) / 9 && Walk_MapPosition(Position, MapX, MapY))
+				Walk_Order(MapX, MapY, true);
+
+			// Touch_Deliver lets go once the engine has seen the press; the pointer goes back to
+			// the finger that steers now, if another is down
+			const bool Steered = Touch_Steers(Finger->first);
+			Touch.mLifted = true;
+			for (auto& Other : sTouchFingers) {
+				if (Steered && Touch_Steers(Other.first)) {
+					sTouchPointer = Other.second.mPosition;
+					Event.mType = eEvent_MouseMove;
+					Event.mPosition = sTouchPointer;
+					break;
+				}
+			}
 			break;
 		}
 #else
@@ -1038,6 +1096,10 @@ float cWindow::GetRefreshRate() {
 #ifdef EMSCRIPTEN
 bool cWindow::TouchInUse() const {
 	return sTouchInUse;
+}
+
+bool cWindow::StickSteering() const {
+	return sStickMoving;
 }
 #endif
 

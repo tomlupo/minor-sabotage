@@ -699,6 +699,9 @@
     }
     function applySound() {
       const ctx = audioContext();
+      // Muted, the game lets other apps' audio play on ('ambient'); with sound, it plays
+      // even with the mute switch on ('playback')
+      try { if (navigator.audioSession) navigator.audioSession.type = muted ? 'ambient' : 'playback'; } catch (e) { /* older Safari */ }
       if (volume) volume.gain.value = muted ? 0 : 1;
       else if (ctx) muted ? ctx.suspend() : ctx.resume();
     }
@@ -813,15 +816,15 @@
       const allowed = location.protocol === 'https:' || location.hostname === 'localhost' || params.has('sw');
       if (!('serviceWorker' in navigator) || !allowed || params.has('nosw')) return;
       // A new build installs in the background and takes over at the next launch
+      const announce = () => toast('An update is ready: it loads the next time you open the game');
+      const watch = worker => worker && worker.addEventListener('statechange', () => {
+        if (worker.state === 'installed' && navigator.serviceWorker.controller) announce();
+      });
       navigator.serviceWorker.register('sw.js').then(registration => {
-        registration.addEventListener('updatefound', () => {
-          const worker = registration.installing;
-          if (!worker) return;
-          worker.addEventListener('statechange', () => {
-            if (worker.state === 'installed' && navigator.serviceWorker.controller)
-              toast('An update is ready: it loads the next time you open the game');
-          });
-        });
+        // The browser may have found the update before this page asked
+        if (registration.waiting && navigator.serviceWorker.controller) announce();
+        watch(registration.installing);
+        registration.addEventListener('updatefound', () => watch(registration.installing));
       }).catch(e => console.warn('Open Fodder: no offline copy (' + e + ')'));
     }
 

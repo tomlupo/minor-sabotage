@@ -104,6 +104,7 @@ class cWindow {
 		void				SetRelativeMouseMode(bool pEnable);
 #ifdef EMSCRIPTEN
 		bool				TouchInUse() const;
+		bool				StickSteering() const;
 #endif
 		void				ToggleVSync(bool pEnabled);
 		float				GetRefreshRate();

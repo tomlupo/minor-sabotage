@@ -296,12 +296,14 @@ extern bool g_WebInMission;
  * It is the last target on the squad's walk list, so a path dragged out with a finger ends there.
  */
 static void Mouse_DrawDestination(cFodder& pFodder) {
-    static int16 ShownX = -1, ShownY = -1, ShownSince = 0;
-
     const int16 Squad = pFodder.mSquad_Selected;
     if (!g_WebInMission || Squad < 0 || Squad >= 3 || pFodder.mSquad_CurrentVehicle)
         return;
     if (pFodder.mSquad_Leader == INVALID_SPRITE_PTR || pFodder.mSquad_Leader == 0)
+        return;
+
+    // With the move stick the destination is only ever a step ahead of the leader
+    if (pFodder.mWindow->StickSteering())
         return;
 
     int16 X = -1, Y = -1;
@@ -314,15 +316,15 @@ static void Mouse_DrawDestination(cFodder& pFodder) {
     if (X < 0)
         return;
 
-    // Gone once the leader is there, or after 8 seconds if the squad can't get there
-    if (X != ShownX || Y != ShownY) {
-        ShownX = X;
-        ShownY = Y;
-        ShownSince = pFodder.mInterruptTick;
-    }
-    const int DX = pFodder.mSquad_Leader->mPosX - X;
-    const int DY = pFodder.mSquad_Leader->mPosY - Y;
-    if (DX * DX + DY * DY < 10 * 10 || (int16)(pFodder.mInterruptTick - ShownSince) > 8 * 50)
+    // Shown while the leader still has somewhere to go: waypoints left, or not at the current one
+    const sSprite* Leader = pFodder.mSquad_Leader;
+    const int Index = Leader->mNextWalkTargetIndex;
+    const bool MoreWaypoints = Index >= 0 && Index < 30 && pFodder.mSquad_WalkTargets[Squad][Index].asInt != -1;
+    const int ToTargetX = Leader->mPosX - Leader->mTargetX, ToTargetY = Leader->mPosY - Leader->mTargetY;
+    const int ToDestinationX = Leader->mPosX - X, ToDestinationY = Leader->mPosY - Y;
+    if (ToDestinationX * ToDestinationX + ToDestinationY * ToDestinationY < 10 * 10)
+        return;
+    if (!MoreWaypoints && ToTargetX * ToTargetX + ToTargetY * ToTargetY < 3 * 3)
         return;
 
     // A walk target is the pointer's position moved into the map (Mouse_Inputs_Check);
