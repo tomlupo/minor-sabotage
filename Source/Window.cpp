@@ -617,7 +617,8 @@ void cWindow::EventCheck() {
 			Touch.mPosition = Position;
 
 			// A finger dragged while moving leads the squad: every 12 pixels one more point on its
-			// path, given as a walk order rather than a click, so it can't choose a vehicle or a button
+			// path, given as a walk order rather than a click, so it can't choose a vehicle or a button.
+			// The first point starts a new path, as a press on one of the squad's own men gives none
 			const bool Leads = sTouchMode == eTouchMode_Move && (Touch.mButtons & TOUCH_LEFT);
 			const int DX = (int)Position.mX - (int)Touch.mLeadFrom.mX;
 			const int DY = (int)Position.mY - (int)Touch.mLeadFrom.mY;
@@ -632,20 +633,16 @@ void cWindow::EventCheck() {
 				Event.mPosition = Position;
 
 				int16 MapX, MapY;
-				if (Leads && DX * DX + DY * DY >= Step * Step && Walk_MapPosition(Position, MapX, MapY) && Walk_Order(MapX, MapY, true)) {
+				if (Leads && DX * DX + DY * DY >= Step * Step && Walk_MapPosition(Position, MapX, MapY) && Walk_Order(MapX, MapY, Touch.mLeading)) {
 					Touch.mLeadFrom = Position;
 					Touch.mLeading = true;
 				}
 				break;
 			}
 
-			// Up or cancelled. A dragged path ends where the finger lifted
-			int16 MapX, MapY;
-			if (Leads && Touch.mLeading && DX * DX + DY * DY >= (Step * Step) / 9 && Walk_MapPosition(Position, MapX, MapY))
-				Walk_Order(MapX, MapY, true);
-
-			// Touch_Deliver lets go once the engine has seen the press; the pointer goes back to
-			// the finger that steers now, if another is down
+			// Up or cancelled: a dragged path ends at its last point. Touch_Deliver lets go once the
+			// engine has seen the press; the pointer goes back to the finger that steers now, if
+			// another is down
 			const bool Steered = Touch_Steers(Finger->first);
 			Touch.mLifted = true;
 			for (auto& Other : sTouchFingers) {
