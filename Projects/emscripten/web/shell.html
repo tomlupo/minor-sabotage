@@ -125,6 +125,18 @@
   .lefty #fire { right: calc(var(--safe-r) + 16px); }
   .lefty #throw { right: calc(var(--safe-r) + 118px); }
   .lefty #swap { right: calc(var(--safe-r) + 34px); }
+  .stick-zone { display: none; position: absolute; width: 150px; height: 150px; bottom: calc(var(--safe-b) + 4px); pointer-events: auto; touch-action: none; }
+  #stick-move { left: calc(var(--safe-l) + 4px); }
+  #stick-aim { right: calc(var(--safe-r) + 4px); }
+  .touch.mission.sticks .stick-zone { display: block; }
+  .stick-base { position: absolute; left: 50%; top: 50%; width: 98px; height: 98px; margin: -49px 0 0 -49px; border-radius: 50%; border: 2px solid rgba(220, 211, 162, 0.5); background: rgba(9, 12, 7, 0.35); }
+  .stick-knob { position: absolute; left: 50%; top: 50%; width: 44px; height: 44px; margin: -22px 0 0 -22px; border-radius: 50%; background: rgba(220, 211, 162, 0.5); border: 2px solid rgba(220, 211, 162, 0.9); }
+  .stick-zone .label { position: absolute; left: 0; right: 0; bottom: 2px; text-align: center; font-size: 9px; font-weight: 800; letter-spacing: 0.14em; color: rgba(220, 211, 162, 0.8); }
+  .stick-zone.active .stick-base { border-color: var(--khaki); }
+  #stick-aim.active .stick-knob { background: rgba(200, 50, 31, 0.85); border-color: #f2a594; }
+  .touch.mission.sticks #fire { display: none; }
+  .touch.mission.sticks #throw { left: auto; right: calc(var(--safe-r) + 158px); bottom: calc(var(--safe-b) + 20px); }
+  .touch.mission.sticks #swap { left: auto; right: calc(var(--safe-r) + 166px); bottom: calc(var(--safe-b) + 96px); }
   .rocket-icon { display: none; }
   .rockets .rocket-icon { display: block; }
   .rockets .grenade-icon { display: none; }
@@ -218,6 +230,8 @@
     <span class="label grenade-icon">Grenade</span><span class="label rocket-icon">Rocket</span>
   </button>
   <button class="hud thumb" id="swap" aria-label="Swap grenades and rockets"><svg><use href="#i-swap" /></svg></button>
+  <div class="stick-zone" id="stick-move" aria-label="Move stick"><div class="stick-base"><div class="stick-knob"></div></div><span class="label">MOVE</span></div>
+  <div class="stick-zone" id="stick-aim" aria-label="Aim and fire stick"><div class="stick-base"><div class="stick-knob"></div></div><span class="label">FIRE</span></div>
   <div id="topbar">
     <button class="hud pill squad" data-key="30" aria-label="Squad 1">1</button>
     <button class="hud pill squad" data-key="31" aria-label="Squad 2">2</button>
@@ -274,6 +288,7 @@
     <div class="items" id="items">
       <button class="item" id="item-resume">Back to the game</button>
       <button class="item" id="item-sound">Sound <small id="sound-state">On</small></button>
+      <button class="item touch-only" id="item-controls">Controls <small id="controls-state">Classic</small></button>
       <button class="item touch-only" id="item-hand">Fire button <small id="hand-state">Left thumb</small></button>
       <button class="item" id="item-help">How to play</button>
       <button class="item" id="item-fullscreen" hidden>Full screen</button>
@@ -289,6 +304,7 @@
         <li><b>⇄</b><span>Swap between grenades and rockets</span></li>
         <li><b>1 2 3</b><span>Switch squads, or tap them in the sidebar</span></li>
         <li><b>Sidebar</b><span>Tap a soldier or squad to split and regroup, as with a mouse</span></li>
+        <li><b>Twin sticks</b><span>Under Controls: the left stick walks, the right stick aims and fires, GRENADE throws where you aim</span></li>
       </ul>
       <ul class="legend mouse-only">
         <li><b>Left click</b><span>Move the squad</span></li>
@@ -346,6 +362,8 @@
     let map = 0;              // last of_map(): the mission map's size in tiles
     let muted = store.get('muted') === '1';
     let lefty = store.get('hand') === 'left';
+    let controls = (params.get('controls') || store.get('controls')) === 'sticks' ? 'sticks' : 'classic';
+    const stickResets = [];
     let pausedBySheet = false;
     let installPrompt = null;
 
@@ -597,10 +615,20 @@
       ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => button.addEventListener(type, release));
     }
     function releaseThumbs() {
+      stickResets.forEach(reset => reset());
       held.length = 0;
       document.querySelectorAll('.hud.down').forEach(b => b.classList.remove('down'));
       setTouchMode();
     }
+    $('throw').addEventListener('pointerdown', e => {
+      if (controls !== 'sticks') return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      if (Module._of_arm) Module._of_arm();
+      if (Module._of_stick_throw) Module._of_stick_throw();
+      $('throw').classList.add('down');
+      setTimeout(() => $('throw').classList.remove('down'), 160);
+    });
     holdButton($('fire'), TOUCH.FIRE);
     holdButton($('throw'), TOUCH.THROW, () => { if (Module._of_arm) Module._of_arm(); });
 
@@ -681,6 +709,55 @@
       showSound();
     });
 
+    // A stick sends its direction, -1..1 on each axis, while the thumb is on it
+    function stick(zone, id) {
+      const base = zone.querySelector('.stick-base'), knob = zone.querySelector('.stick-knob');
+      const RANGE = 40;
+      let pointer = null;
+      const send = (x, y) => { if (Module._of_stick) Module._of_stick(id, x, y); };
+      const update = e => {
+        const r = base.getBoundingClientRect();
+        let dx = e.clientX - (r.left + r.width / 2), dy = e.clientY - (r.top + r.height / 2);
+        const length = Math.hypot(dx, dy);
+        if (length > RANGE) { dx *= RANGE / length; dy *= RANGE / length; }
+        knob.style.transform = 'translate(' + dx + 'px, ' + dy + 'px)';
+        send(dx / RANGE, dy / RANGE);
+      };
+      const reset = () => {
+        if (pointer === null) return;
+        pointer = null;
+        zone.classList.remove('active');
+        knob.style.transform = '';
+        send(0, 0);
+      };
+      zone.addEventListener('pointerdown', e => {
+        e.preventDefault();
+        if (pointer !== null) return;
+        pointer = e.pointerId;
+        zone.setPointerCapture(pointer);
+        zone.classList.add('active');
+        update(e);
+      });
+      zone.addEventListener('pointermove', e => { if (e.pointerId === pointer) update(e); });
+      ['pointerup', 'pointercancel', 'lostpointercapture'].forEach(type => zone.addEventListener(type, e => {
+        if (e.pointerId === pointer) reset();
+      }));
+      stickResets.push(reset);
+    }
+    stick($('stick-move'), 0);
+    stick($('stick-aim'), 1);
+
+    function showControls() {
+      root.classList.toggle('sticks', controls === 'sticks');
+      $('controls-state').textContent = controls === 'sticks' ? 'Twin sticks' : 'Classic';
+    }
+    $('item-controls').addEventListener('click', () => {
+      controls = controls === 'sticks' ? 'classic' : 'sticks';
+      store.set('controls', controls);
+      releaseThumbs();
+      showControls();
+    });
+
     function showHand() {
       root.classList.toggle('lefty', lefty);
       $('hand-state').textContent = lefty ? 'Right thumb' : 'Left thumb';
@@ -758,6 +835,7 @@
 
     showSound();
     showHand();
+    showControls();
   })();
 </script>
 {{{ SCRIPT }}}

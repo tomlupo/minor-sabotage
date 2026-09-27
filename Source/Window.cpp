@@ -56,6 +56,8 @@ struct sTouchFinger {
 	bool			mLifted = false;		// Up, and letting go once the engine has seen its press
 	int16			mPressTick = 0;			// The engine's interrupt tick when this finger last pressed
 	uint64			mOrder = 0;				// Higher went down later; the newest finger steers
+	bool			mRepress = false;		// Dragging: left let go, to press again at the finger
+	cPosition		mLeadFrom;				// Where this finger last gave a walk order
 };
 
 static int sTouchMode = eTouchMode_Move;
@@ -64,6 +66,7 @@ static int sTouchHolds[2];					// Fingers holding the left and right buttons
 static uint64 sTouchOrder = 0;
 static cPosition sTouchPointer;				// Where the fingers have put the pointer
 static std::vector<cEvent> sPageEvents;	// Queued by the page shell between frames
+static bool sTouchInUse = false;			// Touch rather than a mouse: no pointer is drawn
 
 // Engine samples of the mouse since pTick; a press sent at pTick is first seen at pTick + 1
 static int16 Touch_SamplesSince(int16 pTick) {
@@ -150,6 +153,8 @@ static bool Touch_Steers(SDL_FingerID pFinger) {
 	return Newest && Steering == pFinger;
 }
 
+static void Stick_Update(std::vector<cEvent>& pEvents);
+
 // Events the page queued, a throw's left press, and lifted fingers whose press the engine has now seen
 static void Touch_Deliver(std::vector<cEvent>& pEvents) {
 	pEvents.insert(pEvents.end(), sPageEvents.begin(), sPageEvents.end());
@@ -158,11 +163,21 @@ static void Touch_Deliver(std::vector<cEvent>& pEvents) {
 	if (!g_Fodder)
 		return;
 
+	Stick_Update(pEvents);
+
 	for (auto Finger = sTouchFingers.begin(); Finger != sTouchFingers.end();) {
 		auto& Touch = Finger->second;
 
 		if (Touch.mLeftPending && g_Fodder->mButtonPressRight) {
 			Touch.mLeftPending = false;
+			Touch_Button(Touch, TOUCH_LEFT, true, pEvents);
+		}
+
+		// Dragging to lead: the engine has seen left let go, so press it again at the finger. An
+		// order given while the squad is still taking the last one is queued, so they follow the path
+		if (Touch.mRepress && !Touch.mLifted) {
+			Touch.mRepress = false;
+			Touch.mLeadFrom = sTouchPointer;
 			Touch_Button(Touch, TOUCH_LEFT, true, pEvents);
 		}
 
@@ -176,6 +191,160 @@ static void Touch_Deliver(std::vector<cEvent>& pEvents) {
 		}
 		++Finger;
 	}
+}
+
+/**
+ * Twin sticks, the page's other way to play
+ *
+ * The move stick gives walk orders a short way ahead of the squad leader, each replacing the last,
+ * and the camera leads that way. The aim stick points the pointer ahead of the leader and holds
+ * fire through a finger of its own, so it shares the buttons with real fingers.
+ */
+extern bool g_WebInMission;
+
+static const SDL_FingerID STICK_AIM_FINGER = 0x7FFFFFF0;
+static const SDL_FingerID STICK_THROW_FINGER = 0x7FFFFFF1;
+static const float STICK_DEAD_ZONE = 0.3f;
+static const int16 STICK_WALK_AHEAD = 40;		// pixels ahead of the leader for each walk order
+static const int16 STICK_AIM_AHEAD = 80;
+static const int16 STICK_ORDER_TICKS = 12;		// a new walk order at least this often, in interrupts
+
+static float sStickMoveX, sStickMoveY, sStickAimX, sStickAimY;
+static float sStickOrderX, sStickOrderY;		// direction of the last walk order
+static int16 sStickOrderTick;
+static bool sStickMoving, sStickThrow;
+
+// Walk the selected squad to a map position, as a click on the map would
+static void Stick_Walk(int16 pX, int16 pY) {
+	cFodder& Fodder = *g_Fodder;
+	const int16 Squad = Fodder.mSquad_Selected;
+
+	if (Fodder.mMapLoaded) {
+		pX = SDL_clamp(pX, (int16)0, (int16)(Fodder.mMapLoaded->getWidth() * 16 - 1));
+		pY = SDL_clamp(pY, (int16)3, (int16)(Fodder.mMapLoaded->getHeight() * 16 - 1));
+	}
+
+	// A fresh order, not one more waypoint after the last
+	Fodder.mSquad_Walk_Target_Steps[Squad] = 0;
+	Fodder.mSquad_WalkTargetX = 0;
+	Fodder.mSquad_WalkTargetY = 0;
+
+	Fodder.mCamera_PanTargetX = pX;
+	Fodder.mCamera_PanTargetY = pY;
+	for (auto& Troop : Fodder.mGame_Data.mSoldiers_Allocated) {
+		if (Troop.mSprite == INVALID_SPRITE_PTR || Troop.mSprite == 0 || Troop.mSprite->field_32 != Squad)
+			continue;
+		Troop.mSprite->field_44 = 0;
+		Troop.mSprite->mPosXFrac = 0;
+		Troop.mSprite->mPosYFrac = 0;
+	}
+	Fodder.Squad_Walk_Target_Set(pX, pY, Squad, Fodder.mSquad_Leader->mPosX);
+
+	for (auto& JoinTargetSquad : Fodder.mSquad_Join_TargetSquad) {
+		if (JoinTargetSquad == Squad)
+			JoinTargetSquad = -1;
+	}
+}
+
+// Move the pointer to a map position: the engine fires at it and the camera leans toward it
+static void Stick_PointAt(int16 pX, int16 pY, std::vector<cEvent>& pEvents) {
+	const cDimension Scale = g_Window->GetScale();
+	const cDimension Window = g_Window->GetWindowSize();
+
+	// The inverse of how Mouse_Inputs_Check turns the pointer into a map position
+	const int MouseX = pX - (g_Fodder->mCameraX >> 16) + 22;
+	const int MouseY = pY - (g_Fodder->mCameraY >> 16) + 3;
+	const int WindowX = SDL_clamp((MouseX + 32) * (int)Scale.getWidth(), 1, (int)Window.getWidth() - 1);
+	const int WindowY = SDL_clamp((MouseY - 4) * (int)Scale.getHeight(), 1, (int)Window.getHeight() - 1);
+
+	sTouchPointer = cPosition(WindowX, WindowY);
+	cEvent Event(eEvent_MouseMove);
+	Event.mPosition = sTouchPointer;
+	pEvents.push_back(Event);
+}
+
+static void Stick_Update(std::vector<cEvent>& pEvents) {
+	cFodder& Fodder = *g_Fodder;
+	const int16 Squad = Fodder.mSquad_Selected;
+	const bool Ready = g_WebInMission && Squad >= 0 && Squad < 3 && !Fodder.mSquad_CurrentVehicle &&
+		Fodder.mSquad_Leader && Fodder.mSquad_Leader != INVALID_SPRITE_PTR;
+
+	const float MoveLength = SDL_sqrtf(sStickMoveX * sStickMoveX + sStickMoveY * sStickMoveY);
+	const float AimLength = SDL_sqrtf(sStickAimX * sStickAimX + sStickAimY * sStickAimY);
+	const bool Aiming = Ready && AimLength >= STICK_DEAD_ZONE;
+
+	if (Ready && MoveLength >= STICK_DEAD_ZONE) {
+		const float DirX = sStickMoveX / MoveLength, DirY = sStickMoveY / MoveLength;
+		const bool Turned = !sStickMoving || (DirX * sStickOrderX + DirY * sStickOrderY) < 0.94f;
+		const bool Due = (int16)(Fodder.mInterruptTick - sStickOrderTick) >= STICK_ORDER_TICKS;
+
+		if (Turned || Due) {
+			const int16 LeaderX = Fodder.mSquad_Leader->mPosX, LeaderY = Fodder.mSquad_Leader->mPosY;
+			Stick_Walk(LeaderX + (int16)(DirX * STICK_WALK_AHEAD), LeaderY + (int16)(DirY * STICK_WALK_AHEAD));
+			if (!Aiming)
+				Stick_PointAt(LeaderX + (int16)(DirX * STICK_AIM_AHEAD), LeaderY + (int16)(DirY * STICK_AIM_AHEAD), pEvents);
+
+			sStickOrderX = DirX;
+			sStickOrderY = DirY;
+			sStickOrderTick = Fodder.mInterruptTick;
+			sStickMoving = true;
+		}
+	} else if (sStickMoving) {
+		// Let go: stop where the leader stands
+		if (Ready)
+			Stick_Walk(Fodder.mSquad_Leader->mPosX, Fodder.mSquad_Leader->mPosY);
+		sStickMoving = false;
+	}
+
+	auto Aim = sTouchFingers.find(STICK_AIM_FINGER);
+	if (Aiming) {
+		const float DirX = sStickAimX / AimLength, DirY = sStickAimY / AimLength;
+		Stick_PointAt(Fodder.mSquad_Leader->mPosX + (int16)(DirX * STICK_AIM_AHEAD),
+			Fodder.mSquad_Leader->mPosY + (int16)(DirY * STICK_AIM_AHEAD), pEvents);
+
+		if (Aim == sTouchFingers.end() || Aim->second.mLifted) {
+			auto& Finger = sTouchFingers[STICK_AIM_FINGER];
+			Touch_Button(Finger, TOUCH_LEFT, false, pEvents);
+			Touch_Button(Finger, TOUCH_RIGHT, false, pEvents);
+			Finger = sTouchFinger();
+			Finger.mOrder = ++sTouchOrder;
+			Touch_Button(Finger, TOUCH_RIGHT, true, pEvents);
+		}
+	} else if (Aim != sTouchFingers.end()) {
+		Aim->second.mLifted = true;
+	}
+
+	// The grenade button: throw at the pointer, which the sticks keep ahead of the squad
+	if (sStickThrow) {
+		sStickThrow = false;
+		if (Ready) {
+			auto& Finger = sTouchFingers[STICK_THROW_FINGER];
+			Touch_Button(Finger, TOUCH_LEFT, false, pEvents);
+			Touch_Button(Finger, TOUCH_RIGHT, false, pEvents);
+			Finger = sTouchFinger();
+			Finger.mOrder = ++sTouchOrder;
+			Touch_Apply(Finger, eTouchMode_Throw, true, pEvents);
+			Finger.mLifted = true;
+		}
+	}
+}
+
+// Called by the page shell's sticks: 0 moves, 1 aims; x and y in -1..1, both 0 when let go
+extern "C" EMSCRIPTEN_KEEPALIVE void of_stick(int pStick, float pX, float pY) {
+	sTouchInUse = true;
+	if (pStick == 0) {
+		sStickMoveX = pX;
+		sStickMoveY = pY;
+	} else {
+		sStickAimX = pX;
+		sStickAimY = pY;
+	}
+}
+
+// Called by the page shell's grenade button in twin-stick play
+extern "C" EMSCRIPTEN_KEEPALIVE void of_stick_throw() {
+	sTouchInUse = true;
+	sStickThrow = true;
 }
 
 // Called by the page shell while a thumb button is held
@@ -380,6 +549,8 @@ void cWindow::EventCheck() {
 				Touch_Button(Finger, TOUCH_RIGHT, false, mEvents);
 				Finger = sTouchFinger();
 				Finger.mOrder = ++sTouchOrder;
+				Finger.mLeadFrom = Position;
+				sTouchInUse = true;
 
 				// The newest finger takes the pointer before pressing
 				sTouchPointer = Position;
@@ -397,10 +568,24 @@ void cWindow::EventCheck() {
 				break;
 
 			if (SysEvent.type == SDL_EVENT_FINGER_MOTION) {
-				if (Touch_Steers(Finger->first)) {
-					sTouchPointer = Position;
-					Event.mType = eEvent_MouseMove;
-					Event.mPosition = Position;
+				if (!Touch_Steers(Finger->first))
+					break;
+
+				sTouchPointer = Position;
+				Event.mType = eEvent_MouseMove;
+				Event.mPosition = Position;
+
+				// A finger dragged while moving leads the squad: another walk order every 12 pixels
+				auto& Touch = Finger->second;
+				const int Step = 12 * mScaler;
+				const int DX = (int)Position.mX - (int)Touch.mLeadFrom.mX;
+				const int DY = (int)Position.mY - (int)Touch.mLeadFrom.mY;
+				if (sTouchMode == eTouchMode_Move && (Touch.mButtons & TOUCH_LEFT) && !Touch.mRepress &&
+					DX * DX + DY * DY >= Step * Step && Touch_SamplesSince(Touch.mPressTick) >= TOUCH_MIN_SAMPLES) {
+					mEvents.push_back(Event);
+					Event.mType = eEvent_None;
+					Touch_Button(Touch, TOUCH_LEFT, false, mEvents);
+					Touch.mRepress = true;
 				}
 				break;
 			}
@@ -445,6 +630,9 @@ void cWindow::EventCheck() {
 
 		case SDL_EVENT_MOUSE_MOTION:
 		{
+#ifdef EMSCRIPTEN
+			sTouchInUse = false;
+#endif
             sMouseMotionRemainderX += SysEvent.motion.xrel;
             sMouseMotionRemainderY += SysEvent.motion.yrel;
             const int Xrel = (int)sMouseMotionRemainderX;
@@ -846,6 +1034,12 @@ float cWindow::GetRefreshRate() {
 	}
 	return mode->refresh_rate;
 }
+
+#ifdef EMSCRIPTEN
+bool cWindow::TouchInUse() const {
+	return sTouchInUse;
+}
+#endif
 
 bool cWindowNull::InitWindow(const std::string& pWindowTitle) {
 

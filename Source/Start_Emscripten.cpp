@@ -27,7 +27,7 @@ cAbout* About = 0;
 
 // -1 = Phase Try Again, 0 = Phase Won, 1 = Phase Running
 static int16 sPhaseResult = -1;
-static bool sInMission = false;
+bool g_WebInMission = false;	// Read by the pointer drawing (Mouse.cpp)
 
 /**
  * State the page shell polls to decide which touch controls to show
@@ -39,7 +39,7 @@ static bool sInMission = false;
 extern "C" EMSCRIPTEN_KEEPALIVE int of_state() {
 	if (!g_Fodder)
 		return 0;
-	if (!sInMission)
+	if (!g_WebInMission)
 		return About ? 512 : 0;
 
 	int State = 1;
@@ -71,7 +71,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int of_state() {
  * the page crops the picture to the map.
  */
 extern "C" EMSCRIPTEN_KEEPALIVE int of_map() {
-	if (!g_Fodder || !sInMission || !g_Fodder->mMapLoaded)
+	if (!g_Fodder || !g_WebInMission || !g_Fodder->mMapLoaded)
 		return 0;
 
 	return ((g_Fodder->mMapLoaded->getHeight() & 0x7FFF) << 16) | (g_Fodder->mMapLoaded->getWidth() & 0xFFFF);
@@ -85,7 +85,7 @@ extern "C" EMSCRIPTEN_KEEPALIVE int of_map() {
  * it has ammo, else takes grenades, else rockets, the click a mouse player would make.
  */
 extern "C" EMSCRIPTEN_KEEPALIVE void of_arm() {
-	if (!g_Fodder || !sInMission)
+	if (!g_Fodder || !g_WebInMission)
 		return;
 
 	const int16 Squad = g_Fodder->mSquad_Selected;
@@ -138,7 +138,7 @@ void phase_loop();
 void menu_loop();
 
 static void Switch_To_Menu() {
-	sInMission = false;
+	g_WebInMission = false;
 	sPhaseResult = -1;
 	g_Fodder->mPhase_Paused = false;
 
@@ -220,7 +220,7 @@ static void menu_frame() {
 	g_Fodder->mPhase_In_Progress = false;
 	result = -1;
 	sPhaseResult = -1;
-	sInMission = true;
+	g_WebInMission = true;
 	emscripten_cancel_main_loop();
 	emscripten_set_main_loop(phase_loop, 0, true);
 }

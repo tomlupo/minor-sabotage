@@ -102,6 +102,9 @@ class cWindow {
         cDimension          GetScale() const;
 
 		void				SetRelativeMouseMode(bool pEnable);
+#ifdef EMSCRIPTEN
+		bool				TouchInUse() const;
+#endif
 		void				ToggleVSync(bool pEnabled);
 		float				GetRefreshRate();
 

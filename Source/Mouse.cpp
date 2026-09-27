@@ -286,6 +286,78 @@ void cFodder::Mouse_UpdateButtons() {
 
 }
 
+#ifdef EMSCRIPTEN
+extern bool g_WebInMission;
+
+/**
+ * Where the selected squad is walking, as a small pulsing diamond until it gets there
+ *
+ * Touch has no pointer to show where you tapped, so show where the squad is going instead.
+ * It is the last target on the squad's walk list, so a path dragged out with a finger ends there.
+ */
+static void Mouse_DrawDestination(cFodder& pFodder) {
+    static int16 ShownX = -1, ShownY = -1, ShownSince = 0;
+
+    const int16 Squad = pFodder.mSquad_Selected;
+    if (!g_WebInMission || Squad < 0 || Squad >= 3 || pFodder.mSquad_CurrentVehicle)
+        return;
+    if (pFodder.mSquad_Leader == INVALID_SPRITE_PTR || pFodder.mSquad_Leader == 0)
+        return;
+
+    int16 X = -1, Y = -1;
+    for (auto& Target : pFodder.mSquad_WalkTargets[Squad]) {
+        if (Target.asInt == -1)
+            break;
+        X = Target.mX;
+        Y = Target.mY;
+    }
+    if (X < 0)
+        return;
+
+    // Gone once the leader is there, or after 8 seconds if the squad can't get there
+    if (X != ShownX || Y != ShownY) {
+        ShownX = X;
+        ShownY = Y;
+        ShownSince = pFodder.mInterruptTick;
+    }
+    const int DX = pFodder.mSquad_Leader->mPosX - X;
+    const int DY = pFodder.mSquad_Leader->mPosY - Y;
+    if (DX * DX + DY * DY < 10 * 10 || (int16)(pFodder.mInterruptTick - ShownSince) > 8 * 50)
+        return;
+
+    // A walk target is the pointer's position moved into the map (Mouse_Inputs_Check);
+    // undo that, plus the surface's 16-pixel border and the 48-pixel sidebar
+    uint8* Buffer = pFodder.mSurface->GetSurfaceBuffer();
+    const int Width = (int)pFodder.mSurface->GetWidth();
+    const int Height = (int)pFodder.mSurface->GetHeight();
+    const int CenterX = X - (pFodder.mCameraX >> 16) + 22 + SIDEBAR_WIDTH;
+    const int CenterY = Y - (pFodder.mCameraY >> 16) + 3 + 12;
+
+    const uint8 Bright = pFodder.mSurface->paletteNearest(255, 226, 96);
+    const uint8 Dark = pFodder.mSurface->paletteNearest(0, 0, 0);
+    const int Radius = ((pFodder.mInterruptTick >> 3) & 1) ? 5 : 4;
+
+    for (int OffsetY = -Radius - 1; OffsetY <= Radius + 1; ++OffsetY) {
+        for (int OffsetX = -Radius - 1; OffsetX <= Radius + 1; ++OffsetX) {
+            const int Distance = std::abs(OffsetX) + std::abs(OffsetY);
+            uint8 Color;
+            if (Distance == Radius || Distance == 0)
+                Color = Bright;
+            else if (Distance == Radius - 1 || Distance == Radius + 1 || Distance == 1)
+                Color = Dark;
+            else
+                continue;
+
+            const int PixelX = CenterX + OffsetX;
+            const int PixelY = CenterY + OffsetY;
+            if (PixelX < 16 + SIDEBAR_WIDTH || PixelX >= Width - 16 || PixelY < 16 || PixelY >= Height - 16)
+                continue;
+            Buffer[PixelY * Width + PixelX] = Color;
+        }
+    }
+}
+#endif
+
 void cFodder::Mouse_DrawCursor() {
     if (mParams->mDisableVideo)
         return;
@@ -297,6 +369,16 @@ void cFodder::Mouse_DrawCursor() {
         mMouseSpriteCurrent = mMouseSpriteNew;
         mMouseSpriteNew = -1;
     }
+
+#ifdef EMSCRIPTEN
+    // Touch has no hover, so a pointer would only repeat the last tap: show where the squad is
+    // going instead, and the crosshair only while firing
+    if (mWindow->TouchInUse()) {
+        Mouse_DrawDestination(*this);
+        if (!mButtonPressRight)
+            return;
+    }
+#endif
 
     if (mGraphics)
         mGraphics->Mouse_DrawCursor();
