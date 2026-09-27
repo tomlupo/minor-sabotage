@@ -390,6 +390,7 @@
 
     // iOS plays audio only from a context created or resumed during a tap, so make it here and
     // hand it to SDL, which uses Module.SDL3.audioContext when one is already there
+    let volume = null;
     function unlockAudio() {
       try { if (navigator.audioSession) navigator.audioSession.type = 'playback'; } catch (e) { /* older Safari */ }
       const AC = window.AudioContext || window.webkitAudioContext;
@@ -397,19 +398,29 @@
       Module.SDL3 = Module.SDL3 || {};
       if (!Module.SDL3.audioContext) {
         const ctx = new AC();
+        // SDL connects its output to ctx.destination: give it a gain node there instead, so the
+        // sound switch turns the volume down rather than suspending a context SDL keeps resuming
+        try {
+          volume = ctx.createGain();
+          volume.connect(ctx.destination);
+          Object.defineProperty(ctx, 'destination', { value: volume });
+        } catch (e) {
+          volume = null;
+        }
         const source = ctx.createBufferSource();
         source.buffer = ctx.createBuffer(1, 1, 22050);
         source.connect(ctx.destination);
         source.start(0);
         Module.SDL3.audioContext = ctx;
       }
-      if (!muted && audioContext().state !== 'running') audioContext().resume();
+      applySound();
+      if (audioContext().state !== 'running') audioContext().resume();
     }
 
     // iOS suspends audio when the app goes to the background; any tap brings it back
     ['pointerdown', 'touchend', 'keydown'].forEach(type => window.addEventListener(type, () => {
       const ctx = audioContext();
-      if (ctx && !muted && ctx.state !== 'running') ctx.resume();
+      if (ctx && ctx.state !== 'running' && (volume || !muted)) ctx.resume();
     }, { capture: true, passive: true }));
 
     function goFullscreen() {
@@ -523,9 +534,10 @@
       if (next !== state) {
         const changed = next ^ state;
         state = next;
-        // The grenade button shows what it will throw: what's armed, else what of_arm would pick
-        const rockets = (state & STATE.ROCKETS_ARMED) ||
-          (!(state & STATE.GRENADES_ARMED) && !(state & STATE.HAS_GRENADES) && (state & STATE.HAS_ROCKETS));
+        // The grenade button shows what it will throw, by of_arm's rule: the armed weapon while
+        // it has ammo, else grenades, else rockets
+        const hasGrenades = !!(state & STATE.HAS_GRENADES), hasRockets = !!(state & STATE.HAS_ROCKETS);
+        const rockets = ((state & STATE.ROCKETS_ARMED) && hasRockets) || (!hasGrenades && hasRockets);
         root.classList.toggle('mission', !!(state & STATE.MISSION));
         root.classList.toggle('rockets', !!rockets);
         root.classList.toggle('no-ammo', !(state & (STATE.HAS_GRENADES | STATE.HAS_ROCKETS)));
@@ -547,8 +559,6 @@
         lastHeight = canvas.height;
         layout();
       }
-      const ctx = audioContext();
-      if (muted && ctx && ctx.state === 'running' && Module.SDL3.audio_playback) ctx.suspend();
       requestAnimationFrame(poll);
     }
 
@@ -659,11 +669,15 @@
     function showSound() {
       $('sound-state').textContent = muted ? 'Off' : 'On';
     }
+    function applySound() {
+      const ctx = audioContext();
+      if (volume) volume.gain.value = muted ? 0 : 1;
+      else if (ctx) muted ? ctx.suspend() : ctx.resume();
+    }
     $('item-sound').addEventListener('click', () => {
       muted = !muted;
       store.set('muted', muted ? '1' : '0');
-      const ctx = audioContext();
-      if (ctx) muted ? ctx.suspend() : ctx.resume();
+      applySound();
       showSound();
     });
 
@@ -721,11 +735,17 @@
     function registerServiceWorker() {
       const allowed = location.protocol === 'https:' || location.hostname === 'localhost' || params.has('sw');
       if (!('serviceWorker' in navigator) || !allowed || params.has('nosw')) return;
-      const hadWorker = !!navigator.serviceWorker.controller;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (hadWorker) toast('A new version is ready: it loads next time you start the game');
-      });
-      navigator.serviceWorker.register('sw.js').catch(e => console.warn('Open Fodder: no offline copy (' + e + ')'));
+      // A new build installs in the background and takes over at the next launch
+      navigator.serviceWorker.register('sw.js').then(registration => {
+        registration.addEventListener('updatefound', () => {
+          const worker = registration.installing;
+          if (!worker) return;
+          worker.addEventListener('statechange', () => {
+            if (worker.state === 'installed' && navigator.serviceWorker.controller)
+              toast('An update is ready: it loads the next time you open the game');
+          });
+        });
+      }).catch(e => console.warn('Open Fodder: no offline copy (' + e + ')'));
     }
 
     function toast(text) {

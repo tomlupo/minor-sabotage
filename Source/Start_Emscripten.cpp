@@ -78,22 +78,30 @@ extern "C" EMSCRIPTEN_KEEPALIVE int of_map() {
 }
 
 /**
- * Called as the page's grenade button goes down
+ * Called as the page's grenade button goes down: choose what it throws
  *
- * Each phase starts with no grenade or rocket chosen: a mouse player clicks one in the
- * sidebar first. The button stands in for that click: grenades if the squad has any, else rockets.
+ * A mouse player picks grenades or rockets in the sidebar, and each phase starts with
+ * grenades chosen even when the squad has none. The button keeps the chosen weapon while
+ * it has ammo, else takes grenades, else rockets, the click a mouse player would make.
  */
 extern "C" EMSCRIPTEN_KEEPALIVE void of_arm() {
 	if (!g_Fodder || !sInMission)
 		return;
 
 	const int16 Squad = g_Fodder->mSquad_Selected;
-	if (Squad < 0 || Squad >= 3 || g_Fodder->mSquad_CurrentWeapon[Squad] != eWeapon_None)
+	if (Squad < 0 || Squad >= 3)
 		return;
 
-	if (g_Fodder->mSquad_Grenades[Squad])
+	const int16 Weapon = g_Fodder->mSquad_CurrentWeapon[Squad];
+	const bool Grenades = g_Fodder->mSquad_Grenades[Squad] != 0;
+	const bool Rockets = g_Fodder->mSquad_Rockets[Squad] != 0;
+
+	if ((Weapon == eWeapon_Grenade && Grenades) || (Weapon == eWeapon_Rocket && Rockets))
+		return;
+
+	if (Grenades)
 		g_Fodder->Squad_Select_Grenades();
-	else if (g_Fodder->mSquad_Rockets[Squad])
+	else if (Rockets)
 		g_Fodder->Squad_Select_Rockets();
 }
 

@@ -1,6 +1,7 @@
 // Open Fodder service worker: keeps the game on the device after the first visit, so it starts
 // at once and plays offline. install.cmake stamps BUILD with a hash of the files below, so each
-// build gets its own cache and a new build replaces the old one on the next launch.
+// build gets its own cache. A new build installs in the background and waits: it takes over only
+// once no page of the old build is open, so a running page never mixes two builds' files.
 const BUILD = '@OPENFODDER_BUILD@';
 const CACHE = 'openfodder-' + BUILD;
 const FILES = [
@@ -14,7 +15,6 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE)
       .then(cache => cache.addAll(FILES.map(file => new Request(file, { cache: 'no-cache' }))))
-      .then(() => self.skipWaiting())
   );
 });
 
