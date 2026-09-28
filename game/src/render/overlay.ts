@@ -2,8 +2,8 @@
 // of cone_yellow, 42% on the fill and 85% on the edge), your route (dotted select_gold ending in
 // the gold diamond) and the gold ring under each of your men, the orders of squads you are not
 // leading in their colour (a hold flag, a cover cone, a dotted route to the "waits for signal"
-// mark), the guard posts that send men after the alarm, the jobs you can tap (chalk), and where
-// you tapped.
+// mark), the guard posts that send men after the alarm, the jobs you can tap and the places
+// the objectives name (chalk rings with a dark edge), and where you tapped.
 //
 // It is all rasterised into one buffer of art pixels laid over the world under the camera: every
 // pixel is set whole, in one colour at the opacity its mark is drawn at, with no anti-aliased
@@ -164,6 +164,20 @@ class Raster {
     }
   }
 
+  /** The ring with a one-pixel dark edge round each dash, so it reads on pale ground too. */
+  ringEdged(r: Ring, x: number, y: number, c: number, edge: number, onPx = 2, period = 4, phase = 0) {
+    const left = x - (r.w - 1) / 2, top = y - (r.h - 1) / 2;
+    if (!this.sees(left - 1, top - 1, left + r.w, top + r.h)) return;
+    const n = r.pts.length / 2;
+    const lit = (i: number) => ((i + phase) % period + period) % period < onPx;
+    for (let i = 0; i < n; i++) {
+      if (!lit(i)) continue;
+      const px = left + r.pts[i * 2], py = top + r.pts[i * 2 + 1];
+      this.put(px - 1, py, edge); this.put(px + 1, py, edge); this.put(px, py - 1, edge); this.put(px, py + 1, edge);
+    }
+    this.ring(r, x, y, c, onPx, period, phase);
+  }
+
   /** A ring centred on world px (x, y), dashed `on` px in every `period`, marching by `phase`. */
   ring(r: Ring, x: number, y: number, c: number, onPx = 2, period = 4, phase = 0) {
     const left = x - (r.w - 1) / 2, top = y - (r.h - 1) / 2;
@@ -187,7 +201,8 @@ export class Overlay {
   private readonly waitMarks = ([1, 2, 3] as const).map((s) => buildWaitMark(s));
   /** Tap feedback ring (world px). */
   ring: { x: number; y: number; t: number; enemy: boolean } | null = null;
-  /** Interactables to highlight (world metres), set by the scene. */
+  /** Jobs on offer (`on`: their dashes march) and places an objective names (still), in world
+   *  metres; set by the scene. */
   marks: { x: number; y: number; r: number; on: boolean }[] = [];
 
   constructor(private scene: Phaser.Scene) {
@@ -300,11 +315,12 @@ export class Overlay {
       }
     }
 
-    // jobs the mission offers: a chalk ring, its dashes marching while it is on offer
+    // jobs the mission offers and places its objectives name: a chalk ring with a dark edge, its
+    // dashes marching while a job is on offer
     const chalk = word(PAL.shared.chalk);
     for (const mk of this.marks) {
       const rw = Math.round(mk.r * 12), rh = Math.round(mk.r * 9);
-      R.ring(this.ringFor(rw * 2 + 1, rh * 2 + 1), X(mk.x), Y(mk.y), chalk, 2, 4, mk.on ? march : 0);
+      R.ringEdged(this.ringFor(rw * 2 + 1, rh * 2 + 1), X(mk.x), Y(mk.y), chalk, dark, 2, 4, mk.on ? march : 0);
     }
 
     // where you tapped: the ring grows and breaks up (red on an enemy)

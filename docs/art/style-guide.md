@@ -147,6 +147,11 @@ door shut), and a raised alarm is a glyph over the guard's head, not a pose.
   the edge. Your route is dotted `select_gold` ending in a diamond, and the selected trooper has a
   gold ellipse. A trooper hidden behind a roof shows as a dotted outline, gold for yours and red
   for theirs.
+- **Jobs and places:** a job you can tap is a dashed chalk ring, its dashes marching while it is
+  on offer, and a place an open objective names is a still one; both carry a dark edge, so they
+  read on pale pavement. Whichever of them is off the screen gets a chalk arrow with a dark edge
+  on the screen's inner edge, clear of the HUD, pointing at it (Tom, 2026-09-28: "dont reealy
+  know where is it").
 - **Orders for squads you are not playing** are drawn in that squad's colour: a hold flag, a cover
   cone, and a dotted route that ends in a "waits for signal" mark.
 - **The HUD**, laid out as in the port: the roster at the top left, FIRE and GRENADE under the left

@@ -13,6 +13,8 @@ import { sound } from "../render/sound";
 import { hudArt, type HudArt, type HudImage } from "./hudart";
 import { txt, capsOf, capShift, fitLine, PX, PXS, PXB } from "./text";
 import { nextHint, markSeen, type Hint } from "./hints";
+import { placeArrows, arrowMask, type Box } from "./pointers";
+import { sx, sy } from "../render/iso";
 import type { RGB } from "../art/palette";
 
 type OrderKind = "hold" | "cover" | "signal";
@@ -383,12 +385,16 @@ export class HudScene extends Phaser.Scene {
     const g = this.gfx;
     g.clear();
     const keep = new Set<string>();
+    // what the HUD covers this frame: the arrows keep clear of it
+    const blocked: Box[] = [];
+    const cover = (t: Phaser.GameObjects.Text, pad: number) => { const b = t.getBounds(); blocked.push({ x: b.x - pad, y: b.y - pad, w: b.width + pad * 2, h: b.height + pad * 2 }); };
     const W = screen.w;
     const sim = this.g.run.sim;
     const s = sim.state;
     for (const b of this.btns) {
       if (!b.visible()) { this.images.get(b.key)?.setVisible(false); continue; }
       this.drawButton(b, keep);
+      blocked.push({ x: b.x, y: b.y, w: b.w, h: b.h });
     }
     // objectives: top right, under pause and map, on a dark panel
     const objs = s.objectives.filter((o) => o.primary || o.status !== "open");
@@ -400,10 +406,11 @@ export class HudScene extends Phaser.Scene {
       const t = this.text(`obj${k}`, ox - 10, y, o.text, { color: col, align: 1 });
       const b = t.getBounds();
       this.gfx.fillStyle(hex(PAL.shared.outline), 0.55).fillRect(Math.floor(b.x - 2), y - 1, Math.ceil(b.width) + 14, 9);
+      blocked.push({ x: Math.floor(b.x - 2), y: y - 1, w: Math.ceil(b.width) + 14, h: 9 });
       this.checkbox(ox - 7, y, o.status, col);
     });
     const banner = this.g.run.phase.banner?.(sim);
-    if (banner && !s.paused) { keep.add("banner"); const t = this.text("banner", W / 2, this.safe.top + 92, banner, { align: 0.5 }); this.panelBehind(t, 3, 0.7); }
+    if (banner && !s.paused) { keep.add("banner"); const t = this.text("banner", W / 2, this.safe.top + 92, banner, { align: 0.5 }); this.panelBehind(t, 3, 0.7); cover(t, 3); }
     // toasts
     const now = this.time.now;
     this.toast = this.toast.filter((t) => now - t.t < 3200);
@@ -414,6 +421,7 @@ export class HudScene extends Phaser.Scene {
       const a = Math.min(1, (3200 - (now - t.t)) / 500);
       this.panelBehind(tx, 2, 0.6 * a);
       tx.setAlpha(a);
+      cover(tx, 2);
     });
     // pause banner
     if (s.paused) {
@@ -423,6 +431,7 @@ export class HudScene extends Phaser.Scene {
       const b = t.getBounds();
       g.fillStyle(hex(PAL.hud.paper[1]), 0.96).fillRect(Math.floor(b.x - 6), Math.floor(b.y - 4), Math.ceil(b.width + 12), Math.ceil(b.height + 7));
       g.lineStyle(1, hex(PAL.shared.outline), 1).strokeRect(Math.floor(b.x - 6), Math.floor(b.y - 4), Math.ceil(b.width + 12), Math.ceil(b.height + 7));
+      cover(t, 6);
     }
     // first-time hints: one at a time, on paper, under the banners
     if (!this.hint && now - this.hintCheck > 500) {
@@ -442,11 +451,35 @@ export class HudScene extends Phaser.Scene {
         g.fillStyle(hex(PAL.hud.paper[1]), 0.97).fillRect(box.x, box.y, box.w, box.h);
         g.lineStyle(1, hex(PAL.shared.outline), 1).strokeRect(box.x, box.y, box.w, box.h);
         this.hintBox = box;
+        blocked.push(box);
       }
     }
-    if (this.pendingOrder) { keep.add("pending"); const t = this.text("pending", W / 2, screen.h - 22, this.pendingOrder.kind === "cover" ? "Tap where they should cover" : "Tap where they go on the signal", { align: 0.5, color: PAL.shared.chalk }); this.panelBehind(t); }
-    if (this.grenadeArmed) { keep.add("armed"); const t = this.text("armed", W / 2, screen.h - 22, "Tap where to throw", { align: 0.5, color: PAL.shared.chalk }); this.panelBehind(t); }
+    if (this.pendingOrder) { keep.add("pending"); const t = this.text("pending", W / 2, screen.h - 22, this.pendingOrder.kind === "cover" ? "Tap where they should cover" : "Tap where they go on the signal", { align: 0.5, color: PAL.shared.chalk }); this.panelBehind(t); cover(t, 3); }
+    if (this.grenadeArmed) { keep.add("armed"); const t = this.text("armed", W / 2, screen.h - 22, "Tap where to throw", { align: 0.5, color: PAL.shared.chalk }); this.panelBehind(t); cover(t, 3); }
+    this.drawArrows(blocked);
     this.hideTextsExcept(keep);
+  }
+
+  /** A chalk arrow on the screen's inner edge for each job and place the phase asks of you
+   *  that is off the screen (Tom, 2026-09-28: "dont reealy know where is it"). */
+  private drawArrows(blocked: Box[]) {
+    const cam = this.g.cameras.main;
+    // the map view shows the whole zone
+    if (cam.zoom !== screen.s) return;
+    // the street's view in world art px: the camera zooms about its centre
+    const vw = cam.width / cam.zoom, vh = cam.height / cam.zoom;
+    const left = cam.scrollX + (cam.width - vw) / 2, top = cam.scrollY + (cam.height - vh) / 2;
+    const marks = this.g.marksOf().map((m) => ({ key: m.key, x: sx(m.x) - left, y: sy(m.y) - top }));
+    // a pixel's nudge the way it points, twice a second
+    const nudge = Math.floor(this.time.now / 300) % 2;
+    for (const a of placeArrows(marks, screen.w, screen.h, this.safe, blocked)) {
+      const m = arrowMask(a.angle);
+      const x = a.x + Math.round(Math.cos(a.angle) * nudge), y = a.y + Math.round(Math.sin(a.angle) * nudge);
+      this.gfx.fillStyle(hex(PAL.shared.outline), 1);
+      for (const [dx, dy] of m.edge) this.gfx.fillRect(x + dx, y + dy, 1, 1);
+      this.gfx.fillStyle(hex(PAL.shared.chalk), 1);
+      for (const [dx, dy] of m.fill) this.gfx.fillRect(x + dx, y + dy, 1, 1);
+    }
   }
 
   private drawButton(b: Btn, keep: Set<string>) {

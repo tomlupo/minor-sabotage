@@ -21,6 +21,12 @@ import { store } from "../game/store";
 const SHAKE = { x: 2.9, y: 1.6 };
 /** How far the light layer reaches past the screen, so a shake never bares its edge. */
 const LIGHT_BLEED = 1.1;
+/** Metres round the ring at a place an objective names (a job's ring is its own reach). */
+const PLACE_R = 1.6;
+
+/** Something the phase asks of you on the ground (world metres): a job on offer, keyed by
+ *  what it does (several places can do one job), or a place an open objective names. */
+export interface GroundMark { key: string; x: number; y: number; r: number; job: boolean }
 import type { Flow } from "../game/flow";
 
 export interface PhaseRun {
@@ -135,7 +141,7 @@ export class GameScene extends Phaser.Scene {
     this.fx.update(sim, dt);
     // the camera settles first, so the overlay is laid under this frame's view
     this.follow(dt);
-    this.overlay.marks = phase.interactables(sim).filter((i) => i.ready(sim)).map((i) => ({ x: i.x, y: i.y, r: i.r, on: true }));
+    this.overlay.marks = this.marksOf().map((m) => ({ x: m.x, y: m.y, r: m.r, on: m.job }));
     this.overlay.draw(sim, this.cameras.main, time / 1000);
     sound.listener(wx(this.cameras.main.midPoint.x), wy(this.cameras.main.midPoint.y));
     if (sim.state.outcome && !this.ended) this.ended = time;
@@ -225,6 +231,17 @@ export class GameScene extends Phaser.Scene {
       if (d <= it.r + 1.1 && d < bd) { bd = d; best = it; }
     }
     return best;
+  }
+
+  /** What the phase asks of you on the ground now: the jobs on offer and the places the open
+   *  objectives name. The overlay rings them; the HUD points at those off the screen. */
+  marksOf(): GroundMark[] {
+    const { sim, phase } = this.run;
+    const out: GroundMark[] = phase.interactables(sim).filter((i) => i.ready(sim)).map((i) => ({ key: i.label, x: i.x, y: i.y, r: i.r, job: true }));
+    for (const o of sim.state.objectives) {
+      if (o.primary && o.status === "open" && o.x !== undefined && o.y !== undefined) out.push({ key: `objective:${o.id}`, x: o.x, y: o.y, r: PLACE_R, job: false });
+    }
+    return out;
   }
 
   /** Smart tap: an enemy is fired upon (or knifed), a friend down is helped, a job is done, else walk. */
