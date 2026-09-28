@@ -48,11 +48,6 @@ function entersFire(sim: Sim, x0: number, y0: number, x1: number, y1: number): b
 
 /** How far outside a fire's harm (0.8 of its radius) a man keeps. */
 const FIRE_MARGIN = 0.3;
-/**
- * How far past a fire's harm a man it has caught aims. His step stops short of a point under
- * 1 cm off (stepMovement), so aiming at the edge itself would leave him standing just inside it.
- */
-const FIRE_CLEAR = 0.05;
 /** How far round him, in metres and in cells, a man a fire has caught looks for the way out. */
 const FIRE_LOOK = 5;
 
@@ -61,10 +56,10 @@ const RAYS = Array.from({ length: 32 }, (_, k): [number, number] => [Math.cos((k
 const STEPS8: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 /**
- * Where a man a fire has caught (inside its harm) heads: FIRE_CLEAR past every fire's harm, by
- * the shortest walk over open ground, through the fire where that is shortest. Standing in it he
+ * Where a man a fire has caught (inside its harm) heads: out of every fire's harm, by the
+ * shortest walk over open ground, through the fire where that is shortest. Standing in it he
  * dies (combat.ts stepFires), and how deep he goes on the way matters less than how long he
- * takes. He stops once out. Null when there is no way out: he stays, and the pause in
+ * takes. He stops at its edge. Null when there is no way out: he stays, and the pause in
  * stepMovement keeps him from going deeper.
  */
 function wayOutOfFire(sim: Sim, u: Unit): Pt | null {
@@ -101,16 +96,20 @@ function straightOut(sim: Sim, u: Unit): Pt | null {
   return best;
 }
 
-/** How far along the line from (x, y) in the direction (dx, dy) (of length 1) it comes FIRE_CLEAR past every fire's harm. */
+/**
+ * How far along the line from (x, y) in the direction (dx, dy) (of length 1) it comes out of
+ * every fire's harm. Round again after each one it leaves: a fire listed earlier may lie beyond
+ * one listed later.
+ */
 function clearAlong(sim: Sim, x: number, y: number, dx: number, dy: number): number {
   let s = 0;
   for (let on = true; on; ) {
     on = false;
     for (const f of sim.state.fires) {
-      const R = f.r * 0.8 + FIRE_CLEAR, wx = x + dx * s - f.x, wy = y + dy * s - f.y;
+      const R = f.r * 0.8, wx = x + dx * s - f.x, wy = y + dy * s - f.y;
       const b = wx * dx + wy * dy, c = wx * wx + wy * wy - R * R;
       if (c >= 0) continue;
-      // inside this one: on to where the line leaves it
+      // inside this one: on to just past where the line leaves it
       s += Math.sqrt(b * b - c) - b + 1e-6;
       on = true;
     }
@@ -120,34 +119,33 @@ function clearAlong(sim: Sim, x: number, y: number, dx: number, dy: number): num
 
 /**
  * Where a man a fire has caught heads when walls or a vehicle leave him no straight way out: the
- * centre of the first cell of the shortest walk, in metres, round them to a cell clear of the
- * fires (see wayOutOfFire), within FIRE_LOOK cells; null if there is none.
+ * centre of the first cell of the shortest walk, in metres, from his cell round them to a cell
+ * out of the fires' harm; never his own cell (standing in a vehicle's outline, its centre is in
+ * the vehicle). The search goes no further than FIRE_LOOK cells from him; null if it finds none.
  */
 function wayRound(sim: Sim, u: Unit): Pt | null {
-  const G = sim.grid, n = 2 * FIRE_LOOK + 1;
-  const ox = Math.floor(u.x) - FIRE_LOOK, oy = Math.floor(u.y) - FIRE_LOOK, start = FIRE_LOOK * n + FIRE_LOOK;
-  const dist = new Array<number>(n * n).fill(Infinity), first = new Array<number>(n * n).fill(-1);
-  const done = new Array<boolean>(n * n).fill(false);
-  dist[start] = 0;
+  const G = sim.grid, sx = Math.floor(u.x), sy = Math.floor(u.y), start = sy * G.w + sx;
+  const dist = new Map<number, number>([[start, 0]]), first = new Map<number, number>(), done = new Set<number>();
   for (;;) {
-    let k = -1;
-    for (let i = 0; i < n * n; i++) if (!done[i] && dist[i] < (k < 0 ? Infinity : dist[k])) k = i;
-    if (k < 0) return null;
-    done[k] = true;
-    const cx = ox + (k % n), cy = oy + Math.floor(k / n);
-    if (k !== start && !sim.fireAt(cx + 0.5, cy + 0.5, FIRE_CLEAR)) {
-      const f = first[k];
-      return { x: ox + (f % n) + 0.5, y: oy + Math.floor(f / n) + 0.5 };
+    let k = -1, kd = Infinity;
+    for (const [c, d] of dist) if (!done.has(c) && d < kd) {
+      k = c;
+      kd = d;
     }
-    // out of his own cell from where he stands, on from a cell's centre
-    const x0 = k === start ? u.x : cx + 0.5, y0 = k === start ? u.y : cy + 0.5;
+    if (k < 0) return null;
+    done.add(k);
+    const cx = k % G.w, cy = (k - cx) / G.w;
+    if (k !== start && !sim.fireAt(cx + 0.5, cy + 0.5)) {
+      const f = first.get(k)!, fx = f % G.w;
+      return { x: fx + 0.5, y: (f - fx) / G.w + 0.5 };
+    }
     for (const [dx, dy] of STEPS8) {
-      const i = k + dy * n + dx;
-      if (cx + dx < ox || cy + dy < oy || cx + dx >= ox + n || cy + dy >= oy + n || done[i] || !G.canStep(cx, cy, dx, dy)) continue;
-      const d = dist[k] + Math.hypot(cx + dx + 0.5 - x0, cy + dy + 0.5 - y0);
-      if (d < dist[i]) {
-        dist[i] = d;
-        first[i] = k === start ? i : first[k];
+      const nx = cx + dx, ny = cy + dy, i = ny * G.w + nx;
+      if (Math.abs(nx - sx) > FIRE_LOOK || Math.abs(ny - sy) > FIRE_LOOK || done.has(i) || !G.canStep(cx, cy, dx, dy)) continue;
+      const d = kd + Math.hypot(dx, dy);
+      if (d < (dist.get(i) ?? Infinity)) {
+        dist.set(i, d);
+        first.set(i, k === start ? i : first.get(k)!);
       }
     }
   }
@@ -165,16 +163,13 @@ export function stepMovement(sim: Sim, dt: number): void {
     // edge itself: tasks.ts work)
     const way = !kneeling && sim.fireAt(u.x, u.y) ? wayOutOfFire(sim, u) : null;
     if (way) {
-      const dx = way.x - u.x, dy = way.y - u.y, d = Math.hypot(dx, dy), step = sp * dt;
-      if (d > 0.01) {
-        const k = Math.min(1, step / d);
-        if (u.animLock <= 0) u.dir = Math.atan2(dy, dx);
-        u.x += dx * k;
-        u.y += dy * k;
-        u.moving = true;
-        if (u.animLock <= 0) setAnim(u, "walk");
-        continue;
-      }
+      const dx = way.x - u.x, dy = way.y - u.y, k = Math.min(1, (sp * dt) / Math.hypot(dx, dy));
+      if (u.animLock <= 0) u.dir = Math.atan2(dy, dx);
+      u.x += dx * k;
+      u.y += dy * k;
+      u.moving = true;
+      if (u.animLock <= 0) setAnim(u, "walk");
+      continue;
     }
     if (u.path.length && !kneeling) {
       const p = u.path[0];
@@ -183,25 +178,27 @@ export function stepMovement(sim: Sim, dt: number): void {
       const stepLen = sp * dt;
       const arrive = d <= stepLen || d < 0.04;
       const nx = arrive ? p.x : u.x + (dx / d) * stepLen, ny = arrive ? p.y : u.y + (dy / d) * stepLen;
-      // he waits at the fire's edge until it is out
-      if (entersFire(sim, u.x, u.y, nx, ny)) {
-        u.moving = false;
-      } else if (arrive) {
-        u.x = p.x;
-        u.y = p.y;
-        u.path.shift();
+      // the step he takes: onto the next point of his way, towards it, or where a wall stands in
+      // the way a slide along one axis (a slide counts only when it moves him: walking square
+      // into a closed cell, a zero step "succeeded" and he stood still for ever)
+      let tx = nx, ty = ny;
+      if (!arrive && !G.walkable(nx, ny)) {
+        if (Math.abs(nx - u.x) > 1e-4 && G.walkable(nx, u.y)) ty = u.y;
+        else if (Math.abs(ny - u.y) > 1e-4 && G.walkable(u.x, ny)) tx = u.x;
+        else tx = NaN;
+      }
+      if (Number.isNaN(tx)) {
+        // blocked (a vehicle pulled in): try again around it
+        const last = u.path[u.path.length - 1];
+        u.path = sim.route({ x: u.x, y: u.y }, last) ?? [];
         u.moving = true;
+      } else if (entersFire(sim, u.x, u.y, tx, ty)) {
+        // he waits at the fire's edge until it is out: no step, not even a slide, takes him nearer
+        u.moving = false;
       } else {
-        // (a slide along one axis counts only when it moves him: walking square into a closed
-        // cell, a zero step "succeeded" and he stood still for ever)
-        if (G.walkable(nx, ny)) { u.x = nx; u.y = ny; }
-        else if (Math.abs(nx - u.x) > 1e-4 && G.walkable(nx, u.y)) u.x = nx;
-        else if (Math.abs(ny - u.y) > 1e-4 && G.walkable(u.x, ny)) u.y = ny;
-        else {
-          // blocked (a vehicle pulled in): try again around it
-          const last = u.path[u.path.length - 1];
-          u.path = sim.route({ x: u.x, y: u.y }, last) ?? [];
-        }
+        u.x = tx;
+        u.y = ty;
+        if (arrive) u.path.shift();
         u.moving = true;
       }
       if (d > 0.01 && u.animLock <= 0) u.dir = Math.atan2(dy, dx);
@@ -233,14 +230,15 @@ function separate(sim: Sim): void {
       if (d >= min) continue;
       const push = (min - d) * 0.5;
       const nx = d > 1e-4 ? dx / d : 1, ny = d > 1e-4 ? dy / d : 0;
-      // the one standing still gives way less
+      // the one standing still gives way less; nobody is pushed into a fire's harm (a man
+      // walking out of one would be pushed back in as fast as he walked)
       const wa = a.state !== "ok" ? 0 : a.moving ? 0.5 : 0.35;
       const wb = b.state !== "ok" ? 0 : b.moving ? 0.5 : 0.35;
       const tot = wa + wb || 1;
       const ax = a.x - nx * push * (wa / tot) * 2, ay = a.y - ny * push * (wa / tot) * 2;
       const bx = b.x + nx * push * (wb / tot) * 2, by = b.y + ny * push * (wb / tot) * 2;
-      if (wa && G.walkable(ax, ay)) { a.x = ax; a.y = ay; }
-      if (wb && G.walkable(bx, by)) { b.x = bx; b.y = by; }
+      if (wa && G.walkable(ax, ay) && !sim.fireAt(ax, ay)) { a.x = ax; a.y = ay; }
+      if (wb && G.walkable(bx, by) && !sim.fireAt(bx, by)) { b.x = bx; b.y = by; }
     }
   }
 }

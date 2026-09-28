@@ -403,12 +403,15 @@ describe("fire on the street", () => {
     const u = sim.spawnUnit({ side: "pl", look: "pl", x: 98.1, y: 77.1, weapon: "sten" });
     // lit north-west of him: the middle of the cell he stands in, inside the van, is out of its harm
     sim.state.fires.push({ id: 984, x: 96.8, y: 76.4, r: 2, t: 6 });
-    let deeper = 0;
+    let deeper = 0, outAt = -1;
     for (let i = 0; i < 30 * 3; i++) {
       sim.step();
       if (!G.walkable(u.x, u.y) && (Math.floor(u.x) !== 98 || Math.floor(u.y) !== 77)) deeper++;
+      if (outAt < 0 && Math.hypot(u.x - 96.8, u.y - 76.4) > HARM(2)) outAt = i;
     }
     expect(deeper).toBe(0);
+    expect(outAt).toBeGreaterThanOrEqual(0);
+    expect(outAt).toBeLessThan(15); // off the van the near way, not through the fire
     expect(G.walkable(u.x, u.y)).toBe(true);
     expect(Math.hypot(u.x - 96.8, u.y - 76.4)).toBeGreaterThan(HARM(2));
   });
@@ -419,7 +422,7 @@ describe("fire on the street", () => {
     // clear only in the last 5 cm before the wall: looked for in steps, it is there from one
     // spot and not from the next
     const md = buildArsenalMap();
-    for (const at of [{ x: 125.53, y: 107.78 }, { x: 125.53, y: 108.071 }]) {
+    for (const at of [{ x: 125.53, y: 107.78 }, { x: 125.53, y: 108.174 }]) {
       const sim = new Sim(gridFromMap(md), 7);
       const u = sim.spawnUnit({ side: "pl", look: "pl", x: 124.04, y: 108.4, weapon: "sten" });
       const f = { id: 986, ...at, r: THROW.bottleR, t: THROW.bottleBurn };
@@ -438,9 +441,10 @@ describe("fire on the street", () => {
   });
 
   it("boxed where no straight way leads out, walks a man round the corner", () => {
-    // a bottle bursts in the doorway of a one-cell room whose passage turns: no straight line
-    // from the room comes out of the fire before a wall, so he goes out through the door and up
-    // the passage
+    // a big fire fills a one-cell room whose passage turns: no straight line from the room comes
+    // out of it before a wall, so he goes out through the door and up the passage. Out of the
+    // room's corner, where two walls meet only at a point, a second way starts shorter: nobody
+    // squeezes through there
     const G = new Grid(20, 20);
     G.flags.fill(F_SIGHT);
     const open = (cx: number, cy: number) => (G.flags[cy * 20 + cx] = F_WALK);
@@ -448,16 +452,118 @@ describe("fire on the street", () => {
     for (let y = 4; y <= 10; y++) open(12, y); // a passage south from it
     open(11, 10); // the doorway, west off its foot
     open(10, 10); // the room
+    for (let y = 4; y <= 9; y++) open(9, y); // the second way, from the room's corner
     const sim = new Sim(G);
-    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 10.3, y: 10.5, weapon: "sten" });
-    sim.state.fires.push({ id: 985, x: 11.5, y: 10.5, r: 2, t: 60 });
-    let outAt = -1;
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 10.4, y: 10.6, weapon: "sten" });
+    sim.state.fires.push({ id: 985, x: 10.5, y: 10.5, r: 3.5, t: 60 });
+    let outAt = -1, cut = 0, cx = 10, cy = 10;
     for (let i = 0; i < 30 * 3 && outAt < 0; i++) {
       sim.step();
-      if (Math.hypot(u.x - 11.5, u.y - 10.5) > HARM(2)) outAt = i;
+      if (Math.hypot(u.x - 10.5, u.y - 10.5) > HARM(3.5)) outAt = i;
+      const nx = Math.floor(u.x), ny = Math.floor(u.y);
+      if ((nx !== cx || ny !== cy) && !G.canStep(cx, cy, nx - cx, ny - cy)) cut++;
+      cx = nx;
+      cy = ny;
+    }
+    expect(cut).toBe(0);
+    expect(outAt).toBeGreaterThanOrEqual(0);
+    expect(outAt).toBeLessThan(60);
+  });
+
+  it("walks a squad's leader out of a bottle burst among his men, and pushes nobody back in", () => {
+    // review round 9: the men standing round him pushed him back into the fire as fast as he
+    // walked out of it, and a crowd pushed men who had just walked out back in. A bottle bursts by
+    // the leader of a squad at rest or on hold; harm is off: this is about where they walk
+    const names = ["Zośka", "Alek", "Rudy", "Anoda", "Słoń", "Bytny"];
+    let seed = 777;
+    const rnd = () => (seed = (seed * 1103515245 + 12345) & 0x7fffffff) / 0x7fffffff;
+    let stuck = 0, back = 0;
+    for (const [men, held] of [[4, false], [4, true], [6, true]] as const) {
+      for (let t = 0; t < 30; t++) {
+        const sim = new Sim(yard(), 100 + t);
+        sim.hurt = () => {};
+        const sq = makeSquad(sim, 0, "Zośka", 0);
+        const roster = names.slice(0, men).map((name, k) => ({ ...TROOPER, name, rank: k === 0 ? 5 : k === 1 ? 4 : 3 }));
+        const us = fieldSquad(sim, sq, roster, 12 + rnd() * 10, 12 + rnd() * 16, rnd() * Math.PI * 2);
+        if (held) {
+          const other = makeSquad(sim, 1, "Alek", 1);
+          fieldSquad(sim, other, [{ ...TROOPER, name: "Kuba", rank: 5 }], 45, 20, 0);
+          other.order = "follow";
+          sim.state.controlled = 1;
+          sq.order = "hold";
+        } else {
+          sq.order = "follow";
+          sim.state.controlled = 0;
+        }
+        run(sim, 2);
+        // lit ahead of him: his way out lies back through his men
+        const L = us[0], a = L.dir + (rnd() * 2 - 1) * (Math.PI / 6), d = 0.2 + rnd() * 1.3;
+        const f = { id: 983, x: L.x + Math.cos(a) * d, y: L.y + Math.sin(a) * d, r: THROW.bottleR, t: THROW.bottleBurn };
+        sim.state.fires.push(f);
+        const out = us.map(() => false);
+        let leaderIn = 0;
+        for (let i = 0; i < 30 * 6 && sim.state.fires.length; i++) {
+          sim.state.paused = false;
+          sim.step();
+          us.forEach((u, k) => {
+            const inHarm = Math.hypot(u.x - f.x, u.y - f.y) < HARM(f.r);
+            if (!inHarm) out[k] = true;
+            else if (out[k]) {
+              back++;
+              out[k] = false;
+            }
+          });
+          if (Math.hypot(L.x - f.x, L.y - f.y) < HARM(f.r)) leaderIn++;
+        }
+        if (leaderIn >= 30) stuck++; // not out within a second
+      }
+    }
+    expect({ stuck, back }).toEqual({ stuck: 0, back: 0 });
+  });
+
+  it("keeps a man who has walked out of a fire out of it, whoever stands by him", () => {
+    // review round 9: he stopped at its edge, and a comrade standing at the wall pushed him
+    // back in, over and over, until it burnt out
+    const sim = new Sim(yard());
+    sim.hurt = () => {}; // where they stand, not the dice
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 29.7, y: 20.3, weapon: "sten" });
+    sim.spawnUnit({ side: "pl", look: "pl", x: 29.96, y: 21.4, weapon: "sten" });
+    const f = { id: 982, x: 28.9, y: 20, r: 2.1, t: 8 };
+    sim.state.fires.push(f);
+    let outAt = -1, back = 0;
+    for (let i = 0; i < 30 * 8 && sim.state.fires.length; i++) {
+      sim.step();
+      const inHarm = Math.hypot(u.x - f.x, u.y - f.y) < HARM(f.r);
+      if (outAt < 0 && !inHarm) outAt = i;
+      else if (outAt >= 0 && inHarm) back++;
     }
     expect(outAt).toBeGreaterThanOrEqual(0);
     expect(outAt).toBeLessThan(30);
+    expect(back).toBe(0);
+  });
+
+  it("does not let a man slide along a van back into a fire he has walked out of", () => {
+    // review round 9: the step his order asked for was checked against the fire, but where a
+    // wall stood in the way he slid along one axis instead, and that slide took him back in
+    const md = buildArsenalMap();
+    const sim = new Sim(gridFromMap(md), 7);
+    const v = sim.spawnVehicle("prison_truck", 101.5, 78.9, 3.54);
+    v.state = "wreck";
+    sim.step();
+    sim.hurt = () => {};
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 98, y: 76.6, weapon: "sten" });
+    const f = { id: 981, x: 97.62, y: 75.68, r: THROW.bottleR, t: THROW.bottleBurn };
+    sim.state.fires.push(f);
+    goTo(sim, u, 105.26, 81.37); // along the van, past the fire
+    let outAt = -1, back = 0;
+    for (let i = 0; i < 30 * 8 && sim.state.fires.length; i++) {
+      sim.step();
+      const inHarm = Math.hypot(u.x - f.x, u.y - f.y) < HARM(f.r);
+      if (outAt < 0 && !inHarm) outAt = i;
+      else if (outAt >= 0 && inHarm) back++;
+    }
+    expect(outAt).toBeGreaterThanOrEqual(0);
+    expect(back).toBe(0);
   });
 
   it("on the real map, lit at the Arsenal's gate, holds the leader there until it is out", () => {
