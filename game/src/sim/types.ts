@@ -195,7 +195,9 @@ export interface Projectile {
 export type PropKindSim =
   | "phone_pole" | "phone_box" | "barrel" | "crates" | "kiosk" | "lamp" | "ad_column" | "bench" | "tree"
   | "sandbags" | "barrier" | "cart" | "hydrant" | "tram_stop" | "street_sign" | "snow_heap" | "dorozka"
-  | "ghetto_wall" | "bin" | "gate";
+  | "ghetto_wall" | "bin" | "gate"
+  // a fallen man's gear on the ground: anyone of ours who walks over it takes it
+  | "kit";
 
 export interface Prop {
   id: number;

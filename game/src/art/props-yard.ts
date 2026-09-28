@@ -3,7 +3,7 @@
 // 2 m tile, east-west or north-south), dirty snow heaps and bare late-winter trees.
 import type { PropArt, PropState } from "./types";
 import { type RGB, type Ramp } from "./palette";
-import { hash2, img, px, rng, vline, type PixelImage } from "./pixel";
+import { hash2, img, outline, px, rng, vline, type PixelImage } from "./pixel";
 import { Mesh, render, toneOf, type Mat, type Prof } from "./vehicles-3d";
 import { vnoise } from "./fx-noise";
 import { C, S, F, IRON, CHAR, GREY, RUST, flat, line3, mat, mound, P, renderProp, shadowPx } from "./props-kit";
@@ -456,4 +456,34 @@ export function tree(seed: number): PropArt {
   // a crust of old snow at the foot
   for (const [dx, c] of [[-3, C.dirty_snow[1]], [-2, C.dirty_snow[2]], [3, C.dirty_snow[1]], [4, C.dirty_snow[0]]] as [number, RGB][]) px(im, ax + dx, ay, c);
   return { image: im, ax, ay };
+}
+
+// ---------------------------------------------------------------- kit
+
+/**
+ * A fallen man's gear on the cobbles: a canvas satchel with its strap, and beside it his Sten
+ * when he had one (variant "sten"). Small on purpose: it is picked up by walking over it.
+ */
+export function kit(variant: number | string | undefined): PropArt {
+  const gun = variant === "sten";
+  const w = gun ? 16 : 10, h = 8;
+  const im = img(w, h);
+  const bag = BAG;
+  // the flap, lit from the north-west, over the body and its shaded south face
+  for (let x = 2; x < 8; x++) px(im, x, 2, bag[2]);
+  for (let y = 3; y < 6; y++) for (let x = 1; x < 8; x++) px(im, x, y, x === 7 || y === 5 ? bag[0] : bag[1]);
+  px(im, 4, 3, IRON[2]); // the buckle
+  // the strap, trailing west
+  px(im, 0, 4, bag[0]);
+  px(im, 1, 6, bag[0]);
+  if (gun) {
+    // the Sten on its side: tube, magazine sticking out, the wire stock
+    for (let x = 9; x < 15; x++) px(im, x, 4, IRON[1]);
+    px(im, 11, 3, IRON[2]);
+    px(im, 12, 5, IRON[1]);
+    px(im, 12, 6, IRON[1]);
+    px(im, 9, 3, IRON[1]);
+  }
+  outline(im, S.outline, "br");
+  return { image: im, ax: 4, ay: 6 };
 }

@@ -14,7 +14,7 @@ import { offPalette, opaqueCount } from "./helpers/palette-check";
 
 const ALL_KINDS: PropKind[] = [
   "lamp", "ad_column", "kiosk", "bench", "tree", "phone_pole", "phone_box", "sandbags", "barrier", "barrel",
-  "crates", "cart", "hydrant", "tram_stop", "street_sign", "gate", "ghetto_wall", "bin", "snow_heap", "dorozka",
+  "crates", "cart", "hydrant", "tram_stop", "street_sign", "gate", "ghetto_wall", "bin", "snow_heap", "dorozka", "kit",
 ];
 const ALL_STATES: PropState[] = ["intact", "destroyed", "burning"];
 const VARIANTS: Partial<Record<PropKind, (number | string)[]>> = {

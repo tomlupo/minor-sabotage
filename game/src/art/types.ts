@@ -155,7 +155,8 @@ export type PropKind =
   | "ghetto_wall" // brick wall segment with barbed wire, 2 m long, runs east-west
   | "bin"
   | "snow_heap"
-  | "dorozka"; // a parked horse cab (horse + carriage)
+  | "dorozka" // a parked horse cab (horse + carriage)
+  | "kit"; // a fallen man's gear on the ground (satchel, and the gun when he had a Sten)
 
 export type PropState = "intact" | "destroyed" | "burning";
 export interface PropArt {

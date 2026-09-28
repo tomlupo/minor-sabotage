@@ -16,12 +16,12 @@
 //   dorozka      0 faces east, 1 or "w" faces west
 import type { PropArt, PropBuilder, PropKind, PropState } from "./types";
 import { adColumn, bench, bin, hydrant, kiosk, lamp, phoneBox, phonePole, POLE_INSULATOR_PIXELS, streetSign, tramStop } from "./props-street";
-import { barrel, barrier, cart, crates, gate, ghettoWall, sandbags, snowHeap, tree } from "./props-yard";
+import { barrel, barrier, cart, crates, gate, ghettoWall, kit, sandbags, snowHeap, tree } from "./props-yard";
 import { dorozka } from "./props-dorozka";
 
 export const PROP_KINDS: readonly PropKind[] = [
   "lamp", "ad_column", "kiosk", "bench", "tree", "phone_pole", "phone_box", "sandbags", "barrier", "barrel",
-  "crates", "cart", "hydrant", "tram_stop", "street_sign", "gate", "ghetto_wall", "bin", "snow_heap", "dorozka",
+  "crates", "cart", "hydrant", "tram_stop", "street_sign", "gate", "ghetto_wall", "bin", "snow_heap", "dorozka", "kit",
 ];
 
 /** The states each prop is drawn in; any other state draws intact. */
@@ -46,6 +46,7 @@ export const PROP_STATES: Readonly<Record<PropKind, readonly PropState[]>> = {
   bin: ["intact"],
   snow_heap: ["intact"],
   dorozka: ["intact"],
+  kit: ["intact"],
 };
 
 /**
@@ -87,6 +88,7 @@ export const buildProp: PropBuilder = (kind, state, variant) => {
     case "bin": art = bin(); break;
     case "snow_heap": art = snowHeap(num(variant, 1)); break;
     case "dorozka": art = dorozka(variant); break;
+    case "kit": art = kit(variant); break;
   }
   return art;
 };
