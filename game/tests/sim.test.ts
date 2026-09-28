@@ -268,6 +268,79 @@ describe("fire on the street", () => {
     expect(worst).toBeLessThanOrEqual(0); // and he stays out
   });
 
+  it("catching a man in a corner, gets him out of it, however it lies", () => {
+    // review round 7: in a concave corner every step out ran into a wall, and he stood in it
+    const sim = new Sim(yard());
+    // the corner where the yard's wall (x 30) meets its south border (y 39); the fire lies
+    // towards the open side, so no step along the walls takes him out of it
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 29.7, y: 38.7, weapon: "sten" });
+    sim.state.fires.push({ id: 993, x: 28.9, y: 37.9, r: 2, t: 60 }); // 1.1 m from him
+    let outAt = -1;
+    for (let i = 0; i < 30 * 4 && outAt < 0; i++) {
+      sim.step();
+      if (Math.hypot(u.x - 28.9, u.y - 37.9) > HARM(2)) outAt = i;
+    }
+    expect(outAt).toBeGreaterThanOrEqual(0);
+    expect(outAt).toBeLessThan(45); // out of its harm within a second and a half
+  });
+
+  it("catching a man in a corner at its edge, keeps him there, whatever he was ordered", () => {
+    // review round 7: boxed in, a man outside the harm followed an order into it
+    const sim = new Sim(yard());
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 29.9, y: 38.9, weapon: "sten" });
+    sim.state.fires.push({ id: 990, x: 28.75, y: 37.75, r: 2, t: 4 }); // 1.63 m from him: near, not in its harm
+    goTo(sim, u, 24.5, 32.5); // his way runs through it
+    let closest = Infinity;
+    for (let i = 0; i < 30 * 10; i++) {
+      sim.step();
+      if (sim.state.fires.length) closest = Math.min(closest, Math.hypot(u.x - 28.75, u.y - 37.75));
+    }
+    expect(closest).toBeGreaterThan(HARM(2));
+    expect(Math.hypot(u.x - 24.5, u.y - 32.5)).toBeLessThan(1); // it burnt out and he went on
+  });
+
+  it("between two fires, walks a man out of both, never deeper into the second", () => {
+    // review round 7: stepping away from one, he walked into the other
+    const sim = new Sim(yard());
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 15, y: 20, weapon: "sten" });
+    sim.state.fires.push({ id: 992, x: 13.8, y: 20, r: 2, t: 60 }, { id: 991, x: 16.6, y: 20, r: 2, t: 60 });
+    const depth = () => Math.max(HARM(2) - Math.hypot(u.x - 13.8, u.y - 20), HARM(2) - Math.hypot(u.x - 16.6, u.y - 20));
+    const d0 = depth();
+    let worst = d0, outAt = -1;
+    for (let i = 0; i < 30 * 4; i++) {
+      sim.step();
+      worst = Math.max(worst, depth());
+      if (outAt < 0 && depth() < 0) outAt = i;
+    }
+    expect(worst).toBeLessThanOrEqual(d0 + 0.05); // never deeper than where he stood
+    expect(outAt).toBeGreaterThanOrEqual(0);
+    expect(outAt).toBeLessThan(30);
+  });
+
+  it("near a man by a stopped van but not on him, never brings him into its harm", () => {
+    // a van stopped at an angle has a stepped outline, all corners; a man outside the harm
+    // steps off from where he stands (a straight walk to the next cell can pass nearer the fire
+    // than either end), and not into the harm however little it is deeper than he stands
+    const md = buildArsenalMap();
+    const cases = [
+      { man: { x: 101.1, y: 77.5 }, fire: { x: 101.758, y: 75.911 } }, // 1.72 m off
+      { man: { x: 98.5, y: 76.7 }, fire: { x: 98.5, y: 75.08 } }, // 1.62 m off: a hair outside it
+    ];
+    for (const c of cases) {
+      const sim = new Sim(gridFromMap(md), 7);
+      sim.spawnVehicle("prison_truck", 101.5, 78.9, 3.54);
+      sim.step();
+      const u = sim.spawnUnit({ side: "pl", look: "pl", ...c.man, weapon: "sten" });
+      sim.state.fires.push({ id: 989, ...c.fire, r: 2, t: 6 });
+      let closest = Infinity;
+      for (let i = 0; i < 30 * 5; i++) {
+        sim.step();
+        if (sim.state.fires.length) closest = Math.min(closest, Math.hypot(u.x - c.fire.x, u.y - c.fire.y));
+      }
+      expect(closest, `man at ${c.man.x}, ${c.man.y}`).toBeGreaterThan(HARM(2));
+    }
+  });
+
   it("on the real map, lit at the Arsenal's gate, holds the leader there until it is out", () => {
     // review round 4's case: the fire shut the only way in; the leader was walked round to the
     // far side of the building and left there
