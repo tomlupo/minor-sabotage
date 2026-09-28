@@ -26,11 +26,24 @@ export function cmdPick(sim: Sim, id: number): boolean {
   return true;
 }
 
+/** The man a tap on the street moves: the one picked on the strip, else the squad's leader. The
+ *  route drawn, the camera and the street cut follow him too. */
+export function actorOf(sim: Sim): Unit | undefined {
+  const sq = sim.controlledSquad;
+  return pickedOf(sim) ?? (sq ? sim.leaderOf(sq) : undefined);
+}
+
+/** The picked man when he is free and fit for the job (`can`): a command gives it to him. */
+function freePicked(sim: Sim, can: (u: Unit) => boolean = () => true): Unit | undefined {
+  const p = pickedOf(sim);
+  return p && !p.task && can(p) ? p : undefined;
+}
+
 /** Walk the squad you lead to (x, y), or only the man picked on the strip. */
 export function cmdMove(sim: Sim, x: number, y: number): boolean {
   const sq = sim.controlledSquad;
   if (!sq) return false;
-  const L = pickedOf(sim) ?? sim.leaderOf(sq);
+  const L = actorOf(sim);
   if (!L) return false;
   if (L.task && L.task.kind !== "help") L.task = null;
   // a new walk cancels the squad's lock-on only if it was on something now out of sight
@@ -59,8 +72,7 @@ export function cmdTapEnemy(sim: Sim, targetId: number, knifeRange = 14): TapRes
   const v = sim.unit(targetId);
   if (!sq || !v || v.state === "dead" || v.side !== "de") return "none";
   const unaware = v.ai && v.ai.mode !== "alert" && !v.ai.blind;
-  const p = pickedOf(sim);
-  const k = p && !p.task ? p : pickKnifer(sim, sq, v.x, v.y);
+  const k = freePicked(sim) ?? pickKnifer(sim, sq, v.x, v.y);
   if (unaware && k && Math.hypot(k.x - v.x, k.y - v.y) <= knifeRange) {
     // one knifer goes in, the rest of the squad halts where it is
     for (const u of sim.membersOf(sq)) if (u !== k && !u.task) u.path = [];
@@ -95,9 +107,9 @@ export function cmdThrow(sim: Sim, x: number, y: number, what: "grenade" | "bott
   if (!sq) return null;
   let best: Unit | null = null, bd = Infinity, kind: "grenade" | "bottle" = "grenade";
   // the man picked on the strip throws, if he carries something to throw
-  const p = pickedOf(sim);
   const carries = (u: Unit) => (what !== "bottle" && u.grenades > 0) || (what !== "grenade" && u.bottles > 0);
-  for (const u of p && !p.task && carries(p) ? [p] : sim.membersOf(sq)) {
+  const p = freePicked(sim, carries);
+  for (const u of p ? [p] : sim.membersOf(sq)) {
     if (u.state !== "ok" || u.task) continue;
     const opts: ("grenade" | "bottle")[] = what === "any" ? ["bottle", "grenade"] : [what];
     for (const k of opts) {
@@ -128,8 +140,8 @@ export function cmdWork(sim: Sim, x: number, y: number, what: string, ref: strin
   let best: Unit | null = sim.membersOf(sq).find((u) => u.state === "ok" && u.task?.kind === "work" && u.task.what === what) ?? null;
   if (!best) {
     let bd = Infinity;
-    const p = pickedOf(sim);
-    for (const u of p && !p.task ? [p] : sim.membersOf(sq)) {
+    const p = freePicked(sim);
+    for (const u of p ? [p] : sim.membersOf(sq)) {
       if (u.state !== "ok" || u.task) continue;
       const d = Math.hypot(u.x - x, u.y - y) - (prefer ? prefer(u) : 0);
       if (d < bd) { bd = d; best = u; }
@@ -151,8 +163,8 @@ export function cmdHelp(sim: Sim, downId: number): Unit | null {
   const v = sim.unit(downId);
   if (!v || v.state !== "down") return null;
   let best: Unit | null = null, bd = Infinity;
-  const p = pickedOf(sim);
-  for (const u of p && !p.task ? [p] : sim.state.units) {
+  const p = freePicked(sim);
+  for (const u of p ? [p] : sim.state.units) {
     if (u.side !== "pl" || u.state !== "ok" || u.hidden || u.task) continue;
     if (u.squad !== sim.state.controlled && u.squad !== v.squad) continue;
     const d = Math.hypot(u.x - v.x, u.y - v.y);

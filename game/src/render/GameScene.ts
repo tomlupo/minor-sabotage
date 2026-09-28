@@ -5,7 +5,7 @@ import type { Sim } from "../sim/sim";
 import type { Unit } from "../sim/types";
 import type { MapData } from "../content/mapdata";
 import type { Phase, Interactable } from "../missions/types";
-import { cmdMove, cmdTapEnemy, cmdHelp, cmdThrow, cmdFireAt } from "../sim/commands";
+import { actorOf, cmdMove, cmdTapEnemy, cmdHelp, cmdThrow, cmdFireAt } from "../sim/commands";
 import { PAL, lightHex } from "../art/palette";
 import { allLooks } from "../content/arsenal/roster";
 import { WorldView } from "./world";
@@ -108,6 +108,11 @@ export class GameScene extends Phaser.Scene {
       this.fx.handle(sim, e);
       sound.event(sim, e);
       if (e.t === "explosion") this.cameras.main.shake(180, 0.006);
+      // ironman: a death or a man down reaches the save at once, so a reload cannot undo it
+      if ((e.t === "death" || e.t === "down") && this.flow) {
+        const u = sim.unit(e.unit);
+        if (u && u.side === "pl" && u.tag) this.flow.noteLoss(u.tag, e.t === "death" ? "dead" : "wounded");
+      }
     }
     if (events.length) this.events.emit("sim-events", events);
     this.world.update(sim, dt);
@@ -128,8 +133,8 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     if (this.mapView) return;
     const { sim } = this.run;
-    const sq = sim.controlledSquad;
-    const L = sq && sim.leaderOf(sq);
+    // the camera stays on whoever the next tap moves (the man picked on the strip goes alone)
+    const L = actorOf(sim);
     if (L) {
       // look ahead to where the squad is heading, then settle on it (the "calmer camera")
       let tx = sx(L.x), ty = sy(L.y) - 12;

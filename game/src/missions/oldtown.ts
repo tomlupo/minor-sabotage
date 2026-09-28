@@ -14,7 +14,7 @@ import { goTo } from "../sim/move";
 import { DLUGA, W } from "../content/arsenal/map";
 import type { Campaign, TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
-import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, silencePost, squadsBroken } from "./helpers";
+import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, silencePost, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
 
 const GATE_X = 211.5;
 const UNLOAD_S = 75;
@@ -54,9 +54,11 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
       sim.message("Długa, 17:15. A truck is coming to unload barrels.");
     },
 
+    banner: (sim: Sim) => taskClockBanner(sim),
+
     tick(sim: Sim, dt: number) {
       const s = sim.state;
-      if (s.outcome) return;
+      if (s.outcome || taskTimeUp(sim)) return;
       if (sim.anyAlarm()) setObjective(sim, "quiet", "failed");
       const t = s.time;
       // the Wehrmacht truck comes, unloads, and leaves

@@ -104,6 +104,26 @@ export function silencePost(sim: Sim, spawnerTag: string, sentryTags: string[], 
   return true;
 }
 
+/** The operation's clock (the three-tasks decision: about five minutes each). At TASK_LIMIT the
+ *  van is due and the squad leaves for the Arsenal, so a task always ends. */
+export const TASK_LIMIT = 420;
+
+/** Ends a task whose time is up: partial with any primary objective done, else failed. */
+export function taskTimeUp(sim: Sim): boolean {
+  const s = sim.state;
+  if (s.outcome || s.time < TASK_LIMIT) return false;
+  s.outcome = s.objectives.some((o) => o.primary && o.status === "done") ? "partial" : "fail";
+  sim.message("The van is due: leave for the Arsenal.", "bad");
+  sim.emit({ t: "phase", outcome: s.outcome });
+  return true;
+}
+
+/** The clock's last minute, for a task's banner. */
+export function taskClockBanner(sim: Sim): string | null {
+  const left = TASK_LIMIT - sim.state.time;
+  return left > 0 && left <= 60 ? `The van is due: leave in ${Math.ceil(left)} s` : null;
+}
+
 /** Every trooper of the fielded squads is dead, down or gone. */
 export function squadsBroken(sim: Sim): boolean {
   return !sim.state.units.some((u) => u.side === "pl" && u.squad >= 0 && u.state === "ok" && !u.hidden);

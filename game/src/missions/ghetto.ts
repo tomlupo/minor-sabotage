@@ -10,7 +10,7 @@ import { cmdWork } from "../sim/commands";
 import { DLUGA, PRZEJAZD, GHETTO_WALL_Y, ARSENAL } from "../content/arsenal/map";
 import type { Campaign, TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
-import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, silencePost, squadsBroken } from "./helpers";
+import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, silencePost, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
 
 const COVER = { x: ARSENAL.x - 4, y: DLUGA.n - 6, w: 14, h: 9 };
 
@@ -55,9 +55,11 @@ export function ghettoTask(md: MapData, c: Campaign): Phase {
       sim.message("Długa, 17:10. The police at the wall have a telephone.");
     },
 
+    banner: (sim: Sim) => taskClockBanner(sim),
+
     tick(sim: Sim) {
       const s = sim.state;
-      if (s.outcome) return;
+      if (s.outcome || taskTimeUp(sim)) return;
       if (sim.anyAlarm()) setObjective(sim, "quiet", "failed");
       silencePost(sim, "wall_post", postTags, "post");
       if (s.vars.lineCut === true) {

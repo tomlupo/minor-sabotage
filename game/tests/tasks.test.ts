@@ -11,6 +11,7 @@ import { oldtownTask } from "../src/missions/oldtown";
 import { cmdMove } from "../src/sim/commands";
 import type { Phase } from "../src/missions/types";
 import { fly } from "./helpers/autopilot";
+import { setObjective, TASK_LIMIT } from "../src/missions/helpers";
 
 function setup(make: (md: ReturnType<typeof buildArsenalMap>, c: ReturnType<typeof newCampaign>) => Phase, seed = 1234) {
   const md = buildArsenalMap();
@@ -70,4 +71,20 @@ describe("tasks", () => {
     expect(r.flags.truckDisabled).toBe(true);
     expect(r.flags.gateSilenced).toBe(true);
   });
+});
+
+describe("the operation's clock", () => {
+  // the three-tasks decision: about five minutes each; a task always ends, even one that
+  // cannot be won any more (a post nobody has anything left to silence)
+  const atLimit = (done: string[]) => {
+    const { sim } = setup(oldtownTask);
+    for (const id of done) setObjective(sim, id, "done");
+    sim.state.time = TASK_LIMIT - 1 / 60;
+    sim.state.paused = false;
+    sim.step();
+    sim.step();
+    return sim.state.outcome;
+  };
+  it("ends a task still open when the van is due", () => expect(atLimit([])).toBe("fail"));
+  it("counts what was done by then", () => expect(atLimit(["truck"])).toBe("partial"));
 });

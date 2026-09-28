@@ -6,7 +6,7 @@ import tmjText from "../../maps/arsenal.tmj?raw";
 import { mapFromTiled, type TiledMap } from "../content/tiled";
 import { gridFromMap, type MapData } from "../content/mapdata";
 import { Sim } from "../sim/sim";
-import { newCampaign, settleAbandoned, tasksLeft, type Campaign, type TaskId, type TaskResult, type FinaleResult } from "../missions/campaign";
+import { newCampaign, recordLoss, settleAbandoned, tasksLeft, type Campaign, type TaskId, type TaskResult, type FinaleResult } from "../missions/campaign";
 import type { Phase } from "../missions/types";
 import { signalTask } from "../missions/signal";
 import { ghettoTask } from "../missions/ghetto";
@@ -100,6 +100,11 @@ export class Flow {
     };
     // the chapter card first: it covers the moment the phase's art takes to draw
     this.start("card", { phase: run.phase, next: () => this.game.scene.start("game", { run: { ...run, onEnd }, flow: this }) });
+  }
+
+  /** A man of ours falls or goes down: the save hears of it at once (ironman). */
+  noteLoss(key: string, state: "dead" | "wounded") {
+    if (recordLoss(this.campaign, key, state)) void store.saveCampaign(this.campaign);
   }
 
   /** After the three tasks: settle the wounded and the taken, then the Arsenal. */

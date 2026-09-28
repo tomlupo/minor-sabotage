@@ -22,7 +22,7 @@ export function goTo(sim: Sim, u: Unit, x: number, y: number, maxNodes = 12000):
   u.goalX = x;
   u.goalY = y;
   if (Math.hypot(x - u.x, y - u.y) < 0.2) { u.path = []; return true; }
-  if (sim.grid.walkLine(u.x, u.y, x, y, 0.3) && sim.inBounds(x, y)) {
+  if (sim.grid.walkLine(u.x, u.y, x, y, 0.3) && sim.inBounds(x, y) && sim.clearOfFire(u.x, u.y, x, y)) {
     u.path = [{ x, y }];
     return true;
   }
@@ -170,7 +170,11 @@ export function stepSquads(sim: Sim, dt: number): void {
       sq.signalRoute = null;
       sq.order = "hold";
     }
-    if (L.moving || L.path.length) {
+    // the leader picked on the strip goes alone: the column stays where it stood
+    const alone = s.picked === L.id;
+    if (alone) {
+      // (the rest point is where the squad stood when he left)
+    } else if (L.moving || L.path.length) {
       sq.restX = L.x; sq.restY = L.y; sq.restDir = L.dir;
     } else if (Math.hypot(sq.restX - L.x, sq.restY - L.y) > 0.6) {
       sq.restX = L.x; sq.restY = L.y; sq.restDir = L.dir;
@@ -178,7 +182,7 @@ export function stepSquads(sim: Sim, dt: number): void {
 
     // Followers.
     const followers = sim.membersOf(sq).filter((u) => u !== L && u.state === "ok");
-    const moving = L.moving || L.path.length > 0;
+    const moving = !alone && (L.moving || L.path.length > 0);
     const slots = moving ? null : restSlots(sim, sq.restX, sq.restY, sq.restDir, followers.length);
     followers.forEach((u, k) => {
       // the man picked on the strip goes where he is sent, not back into the column
@@ -188,7 +192,7 @@ export function stepSquads(sim: Sim, dt: number): void {
       if (d < (moving ? 0.35 : 0.25)) { if (!moving) u.path = []; return; }
       // catch up if the column stretched (stepMovement applies the wound slowdown)
       u.speed = SPEED.partisan * (d > 3 ? 1.25 : 1);
-      if (sim.grid.walkLine(u.x, u.y, target.x, target.y, 0.25)) {
+      if (sim.grid.walkLine(u.x, u.y, target.x, target.y, 0.25) && sim.clearOfFire(u.x, u.y, target.x, target.y)) {
         u.path = [target];
       } else {
         // off the trail (pushed round a corner): route, but not every tick

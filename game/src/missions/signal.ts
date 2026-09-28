@@ -11,7 +11,7 @@ import { cmdWork } from "../sim/commands";
 import { BIEL, DLUGA, TLOM } from "../content/arsenal/map";
 import type { Campaign, TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
-import { civilians, fieldFromCampaign, guard, objective, patrol, recordSoldiers, setObjective, squadsBroken } from "./helpers";
+import { civilians, fieldFromCampaign, guard, objective, patrol, recordSoldiers, setObjective, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
 import { path } from "../content/mapdata";
 
 const POSTS = [
@@ -57,9 +57,11 @@ export function signalTask(md: MapData, c: Campaign): Phase {
       sim.message("Bielańska, 17:05. The van leaves Szucha soon.");
     },
 
+    banner: (sim: Sim) => taskClockBanner(sim),
+
     tick(sim: Sim) {
       const s = sim.state;
-      if (s.outcome) return;
+      if (s.outcome || taskTimeUp(sim)) return;
       if (sim.anyAlarm()) setObjective(sim, "quiet", "failed");
       if (POSTS.every((p) => s.vars[`post_${p.id}`] === true)) {
         if (!sim.anyAlarm()) setObjective(sim, "quiet", "done");

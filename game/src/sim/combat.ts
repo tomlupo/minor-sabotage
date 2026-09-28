@@ -272,17 +272,22 @@ export function explode(sim: Sim, x: number, y: number, owner: number, power = 1
     if (d > 2.8 * power) continue;
     damageProp(sim, pr.id, 3);
   }
-  for (const sp of s.spawners) {
-    if (!sp.destroyed && Math.hypot(sp.x - x, sp.y - y) <= 2.8 * power) {
+  silencePostsAt(sim, x, y, 2.8 * power);
+  for (const v of s.vehicles) {
+    const d = Math.hypot(v.x - x, v.y - y) - v.len / 2;
+    if (d <= 2.5 * power) vehicleHit(sim, v, x, y, owner, 10);
+  }
+}
+
+/** A guard post within `r` of a blast or a burst of petrol is silenced: it sends no one more. */
+function silencePostsAt(sim: Sim, x: number, y: number, r: number): void {
+  for (const sp of sim.state.spawners) {
+    if (!sp.destroyed && Math.hypot(sp.x - x, sp.y - y) <= r) {
       sp.destroyed = true;
       sp.active = false;
       sim.message("Guard post silenced", "good");
       sim.emit({ t: "prop", id: sp.id, state: "destroyed" });
     }
-  }
-  for (const v of s.vehicles) {
-    const d = Math.hypot(v.x - x, v.y - y) - v.len / 2;
-    if (d <= 2.5 * power) vehicleHit(sim, v, x, y, owner, 10);
   }
 }
 
@@ -293,6 +298,9 @@ function bottle(sim: Sim, x: number, y: number, owner: number): void {
   const f = { id: s.nextId++, x, y, r: THROW.bottleR, t: THROW.bottleBurn };
   s.fires.push(f);
   sim.emit({ t: "fire", id: f.id, x, y, on: true });
+  // a bottle through a post's door burns it out, as a grenade blows it: a squad's bottles are
+  // its commonest charge, and a post must always be possible to silence
+  silencePostsAt(sim, x, y, 1.8);
   for (const v of s.vehicles) {
     if (pointNearVehicle(v, x, y, 1.4)) {
       if (v.state === "intact" || v.state === "doors_open") setVehicleState(sim, v, "burning");

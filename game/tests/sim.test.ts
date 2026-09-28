@@ -193,6 +193,35 @@ describe("snapshot", () => {
   });
 });
 
+describe("fire on the street", () => {
+  it("is walked round, not through, in the open", () => {
+    const sim = new Sim(yard());
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 10, y: 20, weapon: "sten" });
+    sim.state.fires.push({ id: 999, x: 15, y: 20, r: 2, t: 60 });
+    goTo(sim, u, 20, 20);
+    let closest = Infinity;
+    for (let i = 0; i < 30 * 8; i++) {
+      sim.step();
+      closest = Math.min(closest, Math.hypot(u.x - 15, u.y - 20));
+    }
+    expect(Math.hypot(u.x - 20, u.y - 20)).toBeLessThan(1);
+    expect(closest).toBeGreaterThan(1.6); // a fire hurts inside 0.8 of its radius
+  });
+});
+
+describe("a guard post", () => {
+  it("burns out when a petrol bottle bursts at its door", () => {
+    const sim = new Sim(yard());
+    const { us } = squadOf4(sim, 10, 20);
+    const sp = sim.addSpawner({ x: 18, y: 20, ox: 18, oy: 22, district: 1, interval: 6, left: -1, maxAlive: 2, tag: "post", look: "de" });
+    for (const u of us) { u.grenades = 0; u.bottles = 0; }
+    us[1].bottles = 1;
+    cmdThrow(sim, sp.x, sp.y, "bottle");
+    run(sim, 4);
+    expect(sp.destroyed).toBe(true);
+  });
+});
+
 describe("gear", () => {
   it("stays where a man falls, and the first of ours over it takes it", () => {
     const sim = new Sim(yard());
@@ -236,6 +265,23 @@ describe("picking a man on the strip", () => {
     expect(cmdPick(sim, him.id)).toBe(false);
     run(sim, 8);
     expect(Math.hypot(him.x - us[0].x, him.y - us[0].y)).toBeLessThan(4);
+  });
+
+  it("sends the leader alone too: the column stays where it stood", () => {
+    const sim = new Sim(yard());
+    const { us } = squadOf4(sim, 10, 20);
+    run(sim, 1);
+    const at = us.map((u) => [u.x, u.y]);
+    const L = us[0];
+    expect(cmdPick(sim, L.id)).toBe(true);
+    cmdMove(sim, 22, 32);
+    run(sim, 7);
+    expect(Math.hypot(L.x - 22, L.y - 32)).toBeLessThan(1.5);
+    for (const k of [1, 2, 3]) expect(Math.hypot(us[k].x - at[k][0], us[k].y - at[k][1])).toBeLessThan(1.5);
+    // let go, the column walks to him
+    cmdPick(sim, L.id);
+    run(sim, 8);
+    for (const k of [1, 2, 3]) expect(Math.hypot(us[k].x - L.x, us[k].y - L.y)).toBeLessThan(4);
   });
 });
 

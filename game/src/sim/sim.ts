@@ -165,6 +165,7 @@ export class Sim {
     for (const sq of s.squads) {
       if (!sq || !sq.inPlay || !this.leaderOf(sq)) continue;
       s.controlled = sq.id;
+      s.picked = -1;
       sq.order = "follow";
       sq.signalRoute = null;
       this.message(`You lead ${sq.name}'s squad now.`, "info");
@@ -410,12 +411,26 @@ export class Sim {
       for (const f of fires) if (Math.hypot(cx + 0.5 - f.x, cy + 0.5 - f.y) < f.r * 0.8 + 0.5) c += 40;
       return c;
     };
-    return this.pf.find(from, clamp(to), maxNodes, full && !fires.length ? undefined : cost);
+    const clear = fires.length ? (x0: number, y0: number, x1: number, y1: number) => this.clearOfFire(x0, y0, x1, y1) : undefined;
+    return this.pf.find(from, clamp(to), maxNodes, full && !fires.length ? undefined : cost, clear);
   }
 
   /** The fire burning where it would hurt someone at (x, y), grown by `margin`, or null. */
   fireAt(x: number, y: number, margin = 0) {
     return this.state.fires.find((f) => Math.hypot(x - f.x, y - f.y) < f.r * 0.8 + margin) ?? null;
+  }
+
+  /** Whether a straight walk from (x0, y0) to (x1, y1) keeps out of every fire, leaving aside a
+   *  fire it starts or ends in: a man walks out of one, or is sent into one on purpose. */
+  clearOfFire(x0: number, y0: number, x1: number, y1: number): boolean {
+    for (const f of this.state.fires) {
+      const r = f.r * 0.8 + 0.4;
+      if (Math.hypot(x0 - f.x, y0 - f.y) < r || Math.hypot(x1 - f.x, y1 - f.y) < r) continue;
+      const dx = x1 - x0, dy = y1 - y0, l2 = dx * dx + dy * dy;
+      const t = l2 ? Math.max(0, Math.min(1, ((f.x - x0) * dx + (f.y - y0) * dy) / l2)) : 0;
+      if (Math.hypot(x0 + dx * t - f.x, y0 + dy * t - f.y) < r) return false;
+    }
+    return true;
   }
 
   // ------------------------------------------------------------------ harm

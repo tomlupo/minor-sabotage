@@ -10,6 +10,7 @@
 // edge and no blending inside the overlay; the buffer goes to the GPU once a frame.
 import Phaser from "phaser";
 import type { Sim } from "../sim/sim";
+import { actorOf } from "../sim/commands";
 import { PAL, SQUAD_COLOURS, type RGB } from "../art/palette";
 import type { PixelImage } from "../art/pixel";
 import { buildHoldFlag, buildRouteEnd, buildSelection, buildTapRing, buildWaitMark, MARKER_ANCHORS, TAP_FRAMES } from "../art/hud";
@@ -286,7 +287,8 @@ export class Overlay {
     const C = s.squads[s.controlled];
     if (C) {
       for (const u of sim.membersOf(C)) R.stamp(this.selection, X(u.x), Y(u.y), MARKER_ANCHORS.selection.x, MARKER_ANCHORS.selection.y);
-      const L = sim.leaderOf(C);
+      // the route of whoever the next tap moves: the leader, or the man picked on the strip
+      const L = actorOf(sim);
       if (L && L.path.length) {
         this.dotted([{ x: L.x, y: L.y }, ...L.path], X, Y, word(PAL.shared.select_gold));
         const e = L.path[L.path.length - 1];

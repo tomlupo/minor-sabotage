@@ -3,6 +3,7 @@
 // their feet, and dotted silhouettes for anyone, and any vehicle, behind a roof.
 import Phaser from "phaser";
 import type { Sim } from "../sim/sim";
+import { actorOf } from "../sim/commands";
 import type { Unit, Vehicle, Prop } from "../sim/types";
 import type { MapData, MapBuilding } from "../content/mapdata";
 import type { TrooperLook, GroundGrid, PropKind, VehicleState } from "../art/types";
@@ -148,10 +149,10 @@ export class WorldView {
     }
   }
 
-  /** The street the squad is in, or heading into on the next stretch of its route. */
+  /** The street the squad is in, or heading into on the next stretch of its route (the man
+   *  picked on the strip, when he goes alone: the screen follows him). */
   private streetFor(sim: Sim): number {
-    const sq = sim.controlledSquad;
-    const L = sq && sim.leaderOf(sq);
+    const L = actorOf(sim);
     if (!L) return -1;
     const G = sim.grid;
     const here = G.streetAt(L.x, L.y);

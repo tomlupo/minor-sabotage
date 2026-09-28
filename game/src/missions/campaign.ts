@@ -76,6 +76,18 @@ export function settleAbandoned(c: Campaign): TaskId | "finale" | null {
   return id;
 }
 
+/**
+ * A man of ours falls, or goes down, during a phase. The save hears of it at once (ironman):
+ * a reload cannot bring him back. A wound never overwrites a death or a capture. Returns
+ * whether the record changed.
+ */
+export function recordLoss(c: Campaign, key: string, state: "dead" | "wounded"): boolean {
+  const s = c.soldiers[key];
+  if (!s || s.state === "dead" || s.state === "captured" || s.state === state) return false;
+  s.state = state;
+  return true;
+}
+
 export function tasksLeft(c: Campaign): TaskId[] {
   return TASKS.filter((t) => !c.results[t]);
 }
