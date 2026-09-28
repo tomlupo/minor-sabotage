@@ -14,7 +14,7 @@ import { zone, path, inZone } from "../content/mapdata";
 import { cmdWork } from "../sim/commands";
 import { goTo } from "../sim/move";
 import { SPEED } from "../sim/tuning";
-import { makeSquad } from "../sim/setup";
+import { makeSquad, germanWeapon } from "../sim/setup";
 import { SQUADS } from "../content/arsenal/roster";
 import { BIEL, DLUGA, NAL, W, PRZEJAZD, GHETTO_WALL_Y } from "../content/arsenal/map";
 import { fit, type Campaign, type FinaleResult } from "./campaign";
@@ -63,7 +63,7 @@ export function finale(md: MapData, c: Campaign): Phase {
     const end = route[route.length - 1];
     looks.forEach((look, k) => {
       const u = sim.spawnUnit({
-        side: "de", look, x: route[0].x + (k % 2) * 1.2, y: route[0].y + k * 1.1, weapon: look.includes("mp40") ? "mp40" : look.includes("officer") ? "pistol" : "rifle",
+        side: "de", look, x: route[0].x + (k % 2) * 1.2, y: route[0].y + k * 1.1, weapon: germanWeapon(look),
         tag, ai: { mode: "alert", district, lastX: end.x, lastY: end.y, lastT: sim.state.time, react: 0.8 },
       });
       u.glyph = "alert";

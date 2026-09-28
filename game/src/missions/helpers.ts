@@ -3,7 +3,7 @@
 import type { Sim } from "../sim/sim";
 import type { GuardAI, Unit, ObjectiveStatus } from "../sim/types";
 import type { MapZone } from "../content/mapdata";
-import { makeSquad, fieldSquad } from "../sim/setup";
+import { makeSquad, fieldSquad, germanWeapon } from "../sim/setup";
 import { SPEED, WOUND } from "../sim/tuning";
 import { SQUADS, PEOPLE } from "../content/arsenal/roster";
 import { fit, type Campaign } from "./campaign";
@@ -39,7 +39,7 @@ export function guard(sim: Sim, x: number, y: number, dir: number, o: GuardOpts 
   const look = o.look ?? "de_rifle";
   return sim.spawnUnit({
     side: "de", look, name: o.name ?? "", x, y, dir,
-    weapon: o.weapon ?? (look.includes("mp40") ? "mp40" : look.includes("officer") || look.includes("gestapo") ? "pistol" : "rifle"),
+    weapon: o.weapon ?? germanWeapon(look),
     speed: SPEED.guardPatrol, tag: o.tag,
     ai: { mode: "post", district: o.district ?? 1, coneR: o.coneR ?? 14, coneHalf: o.coneHalf ?? 0.58, homeDir: dir } as Partial<GuardAI>,
   });

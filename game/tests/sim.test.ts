@@ -192,3 +192,21 @@ describe("snapshot", () => {
     expect(pick(b)).toEqual(pick(a));
   });
 });
+
+describe("events", () => {
+  it("reach the mission once each, however many ticks a frame runs", () => {
+    const sim = new Sim(yard());
+    squadOf4(sim, 10, 20);
+    sim.spawnUnit({ side: "de", look: "de", x: 20, y: 20, dir: Math.PI, weapon: "rifle", ai: { district: 1, mode: "alert" } });
+    const seen = new Map<object, number>();
+    sim.mission = { id: "t", setup() {}, tick() {}, onEvent: (_s, e) => { seen.set(e, (seen.get(e) ?? 0) + 1); } };
+    let emitted = 0;
+    for (let i = 0; i < 40; i++) {
+      sim.state.paused = false;
+      sim.advance(0.25); // a slow frame: several ticks before the game scene drains the events
+      emitted += sim.drainEvents().length;
+    }
+    expect(emitted).toBeGreaterThan(5);
+    expect([...seen.values()].filter((n) => n > 1)).toEqual([]);
+  });
+});

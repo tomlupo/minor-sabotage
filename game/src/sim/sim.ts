@@ -106,6 +106,8 @@ export class Sim {
   step(): void {
     const s = this.state;
     const dt = TICK;
+    // events are drained once a frame, and a frame may run several ticks: remember where this one's start
+    const from = s.events.length;
     s.tick++;
     s.time += dt;
     for (const u of s.units) { u.px = u.x; u.py = u.y; u.animT += dt; if (u.animLock > 0) u.animLock -= dt; u.sinceShot += dt; }
@@ -123,11 +125,11 @@ export class Sim {
     stepSpawners(this, dt);
     this.stepWounds(dt);
     this.ensureControl();
+    const upto = s.events.length;
     this.mission?.tick(this, dt);
     if (this.mission?.onEvent) {
-      // events emitted by the mission itself are not re-fed to avoid loops
-      const evs = s.events.slice();
-      for (const e of evs) this.mission.onEvent(this, e);
+      // this tick's events from the rules only: the mission's own are not fed back to it
+      for (const e of s.events.slice(from, upto)) this.mission.onEvent(this, e);
     }
   }
 

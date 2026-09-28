@@ -59,8 +59,8 @@ export const SQUADS: SquadDef[] = [
       P("kolczan", "Kołczan", "Eugeniusz Koecher", "Sten I", 4, "leader", "pistol", {}, { jacket: 1, headgear: "cap", weapon: "pistol", kit: "none", seed: 21 }, "First to reach the van. He opened the tailgate."),
       P("maciek", "Maciek", "Sławomir Bittner", "Sten I", 4, "sten", "sten", {}, { jacket: 0, headgear: "beret", weapon: "sten", kit: "none", seed: 22 }, "The Sten gunner of Sten I."),
       P("buzdygan", "Buzdygan", "Tadeusz Krzyżewicz", "Sten II", 3, "pistol", "pistol", {}, { jacket: 3, headgear: "bare", weapon: "pistol", kit: "none", seed: 23 }, "Pistol cover for Sten II. The youngest of the attack group."),
-      P("hubert", "Hubert", "Hubert Lenk", "Granaty", 2, "grenades", "pistol", { g: 1 }, { jacket: 2, headgear: "cap", weapon: "pistol", kit: "grenade_pouch", seed: 24 }, "Granaty section, with Alek on Nalewki."),
-      P("mirski", "Mirski", "Jerzy Zapadko", "Granaty", 2, "grenades", "pistol", { g: 1 }, { jacket: 0, headgear: "hat", weapon: "pistol", kit: "grenade_pouch", seed: 25 }, "Granaty section. Later the last commander of the Parasol battalion."),
+      P("hubert", "Hubert", "Hubert Lenk", "Granaty", 3, "grenades", "pistol", { g: 1 }, { jacket: 2, headgear: "cap", weapon: "pistol", kit: "grenade_pouch", seed: 24 }, "Granaty section, with Alek on Nalewki."),
+      P("mirski", "Mirski", "Jerzy Zapadko", "Granaty", 3, "grenades", "pistol", { g: 1 }, { jacket: 0, headgear: "hat", weapon: "pistol", kit: "grenade_pouch", seed: 25 }, "Granaty section. Later the last commander of the Parasol battalion."),
     ],
   },
   {
@@ -70,8 +70,8 @@ export const SQUADS: SquadDef[] = [
     people: [
       P("giewont", "Giewont", "Władysław Cieplak", "Ubezpieczenie, commander", 5, "leader", "pistol", { g: 1 }, { jacket: 3, headgear: "hat", weapon: "pistol", kit: "none", seed: 31 }, "Commanded the cover group."),
       P("kuba", "Kuba", "Konrad Okolski", "Sygnalizacja", 3, "scout", "pistol", {}, { jacket: 1, headgear: "cap", weapon: "pistol", kit: "binoculars", seed: 32 }, "Had been driven in the van himself and knew its route. He waved his cap."),
-      P("kadlubek", "Kadłubek", "Witold Bartnicki", "Sygnalizacja", 2, "scout", "pistol", {}, { jacket: 0, headgear: "hat", weapon: "pistol", kit: "binoculars", seed: 33 }, "In a Tyrolean hat by the Bank Polski. He bowed as the van passed."),
-      P("jur", "Jur", "Andrzej Wolski", "Sygnalizacja", 2, "pistol", "pistol", {}, { jacket: 2, headgear: "cap", weapon: "pistol", kit: "none", seed: 34 }, "Held the telephone in the restaurant on the corner."),
+      P("kadlubek", "Kadłubek", "Witold Bartnicki", "Sygnalizacja", 3, "scout", "pistol", {}, { jacket: 0, headgear: "hat", weapon: "pistol", kit: "binoculars", seed: 33 }, "In a Tyrolean hat by the Bank Polski. He bowed as the van passed."),
+      P("jur", "Jur", "Andrzej Wolski", "Sygnalizacja", 3, "pistol", "pistol", {}, { jacket: 2, headgear: "cap", weapon: "pistol", kit: "none", seed: 34 }, "Held the telephone in the restaurant on the corner."),
       P("kopec", "Kopeć", "Stanisław Jastrzębski", "Stare Miasto", 3, "pistol", "pistol", { g: 1 }, { jacket: 3, headgear: "beret", weapon: "pistol", kit: "none", seed: 35 }, "Covered the Old Town end of Długa."),
     ],
   },

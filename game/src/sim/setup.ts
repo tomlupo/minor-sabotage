@@ -1,6 +1,6 @@
 // Helpers missions (and tests) use to put people on the street.
 import type { Sim, SpawnOpts } from "./sim";
-import type { Squad, Unit } from "./types";
+import type { Squad, Unit, WeaponId } from "./types";
 import { restSlots } from "./move";
 
 export function makeSquad(sim: Sim, i: number, name: string, colour: number): Squad {
@@ -43,4 +43,9 @@ export function fieldSquad(sim: Sim, sq: Squad, members: Omit<SpawnOpts, "x" | "
   sq.restDir = dir;
   sq.trail = [];
   return out;
+}
+
+/** What a German look carries: MP40 men their MP40, officers and the Gestapo a pistol, the rest a rifle. */
+export function germanWeapon(look: string): WeaponId {
+  return look.includes("mp40") ? "mp40" : look.includes("officer") || look.includes("gestapo") ? "pistol" : "rifle";
 }

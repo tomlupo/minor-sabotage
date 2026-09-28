@@ -6,6 +6,7 @@ import type { Sim } from "./sim";
 import type { Unit } from "./types";
 import { angDiff } from "./combat";
 import { goTo } from "./move";
+import { germanWeapon } from "./setup";
 import { DETECT, SPEED } from "./tuning";
 
 const GERMAN_ALERT = ["Halt!", "Alarm!", "Banditen!", "Hände hoch!"];
@@ -290,7 +291,7 @@ export function stepSpawners(sim: Sim, dt: number): void {
     sp.cd = sp.interval;
     const at = s.alarm[sp.district] !== undefined ? nearestPartisan(sim, sp.ox, sp.oy) : null;
     const g = sim.spawnUnit({
-      side: "de", look: sp.look, x: sp.x, y: sp.y, weapon: sp.look.includes("mp40") ? "mp40" : "rifle", tag,
+      side: "de", look: sp.look, x: sp.x, y: sp.y, weapon: germanWeapon(sp.look), tag,
       ai: { mode: "alert", district: sp.district, lastX: at ? at.x : sp.ox, lastY: at ? at.y : sp.oy, lastT: s.time, react: 0.8 },
     });
     g.glyph = "alert";
