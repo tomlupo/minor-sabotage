@@ -39,6 +39,8 @@ export const HINTS: Hint[] = [
   { id: "knife", text: "Tap a guard from behind: the knife. From the front: the squad fires.", when: (s) => s.state.time > 9 && guardOnScreenish(s) },
   { id: "job", text: "Tap the gold circle: the right man does the job.", when: (s, p) => s.state.time > 14 && p.interactables(s).some((i) => i.ready(s)) },
   { id: "alarm", text: "Alarm! Guard posts send men until you blow them up: hold on one to throw.", when: (s) => s.anyAlarm() },
+  { id: "pick", text: "Tap a man's tag to send him alone. Tap it again to call him back.", when: (s) => s.state.time > 24 },
+  { id: "kit", text: "A fallen man's kit: walk over it to take his grenades, bottles or Sten.", when: (s) => s.state.props.some((p) => p.kind === "kit") },
   { id: "down", text: "A veteran is down. Tap him and a friend gets him up.", when: (s) => s.state.units.some((u) => u.side === "pl" && u.state === "down") },
   { id: "squads", text: "Tap a squad tag to lead that squad. Hold it for its orders.", when: (s, p) => p.kind === "finale" && s.state.time > 2 },
   { id: "go", text: "GO gives the signal: the van comes, and squads on 'signal' move.", when: (s, p) => p.kind === "finale" && s.state.signalReady && !s.state.signalGiven && s.state.time > 7 },

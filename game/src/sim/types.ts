@@ -221,6 +221,8 @@ export interface Prop {
   blocks: boolean;
   hp: number;
   tag: string;
+  /** A fallen man's kit: what the first of ours to walk over it takes. */
+  contents?: { grenades: number; bottles: number; sten: boolean; owner: string };
 }
 
 /** Fodder's huts: a guard post or barracks door that sends soldiers once the alarm is up. */

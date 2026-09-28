@@ -193,6 +193,33 @@ describe("snapshot", () => {
   });
 });
 
+describe("gear", () => {
+  it("stays where a man falls, and the first of ours over it takes it", () => {
+    const sim = new Sim(yard());
+    const { us } = squadOf4(sim, 10, 20);
+    const alek = us[1]; // two bottles
+    sim.kill(alek, -1, false);
+    const kit = sim.state.props.find((p) => p.kind === "kit");
+    expect(kit?.contents).toMatchObject({ bottles: 2, owner: "Alek" });
+    expect(alek.bottles).toBe(0);
+    const rudy = us[2];
+    const before = rudy.bottles;
+    goTo(sim, rudy, kit!.x, kit!.y);
+    cmdPick(sim, rudy.id); // he goes alone, so the column does not pull him back
+    run(sim, 4);
+    expect(rudy.bottles).toBe(before + 2);
+    // he has a Sten of his own: Alek's stays in the kit, for a man with only a pistol
+    expect(kit!.contents).toMatchObject({ bottles: 0, sten: true });
+    const anoda = us[3];
+    anoda.weapon = "pistol";
+    cmdPick(sim, anoda.id);
+    goTo(sim, anoda, kit!.x, kit!.y);
+    run(sim, 4);
+    expect(anoda.weapon).toBe("sten");
+    expect(sim.state.props.some((p) => p.kind === "kit")).toBe(false);
+  });
+});
+
 describe("picking a man on the strip", () => {
   it("sends him alone while the squad stays, and tapping him again brings him back", () => {
     const sim = new Sim(yard());

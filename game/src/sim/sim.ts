@@ -7,6 +7,7 @@ import { TICK, SPEED, WOUND } from "./tuning";
 import type {
   GuardAI, Prop, SimEvent, SimState, Spawner, Squad, Unit, Vehicle, VehicleKind, WeaponId, Role, Side, PropKindSim,
 } from "./types";
+import { UF_SILENT_DEATH } from "./types";
 import { stepMovement, stepSquads, recordTrails } from "./move";
 import { stepCombat, stepProjectiles, stepFires } from "./combat";
 import { stepAI, stepSpawners, processNoises } from "./ai";
@@ -117,6 +118,7 @@ export class Sim {
     stepSquads(this, dt);
     stepTasks(this, dt);
     stepMovement(this, dt);
+    this.stepKits();
     recordTrails(this);
     stepAI(this, dt);
     stepCombat(this, dt);
@@ -132,6 +134,27 @@ export class Sim {
       // this tick's events from the rules only: the mission's own are not fed back to it
       for (const e of s.events.slice(from, upto)) this.mission.onEvent(this, e);
     }
+  }
+
+  /** A fallen man's kit goes to the first of ours who walks over it: his grenades and
+   *  bottles, and his Sten to a man who has only a pistol. An emptied kit is gone. */
+  private stepKits() {
+    const s = this.state;
+    for (const p of s.props) {
+      const c = p.contents;
+      if (p.kind !== "kit" || !c) continue;
+      // everyone standing on it takes what he can use
+      for (const u of s.units) {
+        if (u.side !== "pl" || u.squad < 0 || u.state !== "ok" || u.hidden || Math.hypot(u.x - p.x, u.y - p.y) >= 0.9) continue;
+        const took: string[] = [];
+        if (c.grenades) { u.grenades += c.grenades; took.push(c.grenades === 1 ? "a grenade" : `${c.grenades} grenades`); c.grenades = 0; }
+        if (c.bottles) { u.bottles += c.bottles; took.push(c.bottles === 1 ? "a bottle" : `${c.bottles} bottles`); c.bottles = 0; }
+        if (c.sten && u.weapon === "pistol") { u.weapon = "sten"; took.push("the Sten"); c.sten = false; p.variant = ""; }
+        if (took.length) this.message(`${u.name} takes ${took.join(" and ")} from ${c.owner}'s kit.`, "info");
+      }
+      if (!c.grenades && !c.bottles && !c.sten) p.contents = undefined;
+    }
+    if (s.props.some((p) => p.kind === "kit" && !p.contents)) s.props = s.props.filter((p) => p.kind !== "kit" || p.contents);
   }
 
   /** If the squad you lead has nobody left standing, you take over one that has. */
@@ -439,11 +462,18 @@ export class Sim {
     u.anim = "death";
     u.animT = 0;
     u.glyph = "none";
-    if (silent) u.flags |= 1;
+    if (silent) u.flags |= UF_SILENT_DEATH;
     const k = this.unit(by);
     if (k) k.kills++;
     this.emit({ t: "death", unit: u.id, x: u.x, y: u.y, silent });
     if (!silent) this.noise(u.x, u.y, 9, false);
+    // his gear stays where he fell, for anyone of ours to take (veterans decision, design brief)
+    const sten = u.weapon === "sten";
+    if (u.side === "pl" && (u.grenades > 0 || u.bottles > 0 || sten)) {
+      this.addProp("kit", u.x, u.y, { variant: sten ? "sten" : "", tag: "kit", contents: { grenades: u.grenades, bottles: u.bottles, sten, owner: u.name } });
+      u.grenades = 0;
+      u.bottles = 0;
+    }
     const sq = this.squad(u.squad);
     if (sq && u.squad !== this.state.controlled && sq.inPlay && u.side === "pl" && u.rank >= WOUND.vetRank) {
       const street = this.streetNames[this.grid.streetAt(u.x, u.y)] ?? "the street";
