@@ -251,6 +251,23 @@ describe("fire on the street", () => {
     expect(worst).toBeLessThanOrEqual(0);
   });
 
+  it("catching a man against a wall, lets him slide out along it", () => {
+    // review round 6: the straight way out ran into the wall, and he stood in the fire
+    const sim = new Sim(yard());
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 29.6, y: 20, weapon: "sten" }); // the wall is at x 30
+    sim.state.fires.push({ id: 994, x: 28.7, y: 20, r: 2, t: 60 }); // 0.9 m from him, on his open side: straight out, the wall stops him still in it
+    let outAt = -1, worst = 0;
+    for (let i = 0; i < 30 * 4; i++) {
+      sim.step();
+      const d = Math.hypot(u.x - 28.7, u.y - 20);
+      if (outAt < 0 && d > HARM(2)) outAt = i;
+      if (outAt >= 0) worst = Math.max(worst, HARM(2) - d);
+    }
+    expect(outAt).toBeGreaterThanOrEqual(0);
+    expect(outAt).toBeLessThan(30); // out within a second
+    expect(worst).toBeLessThanOrEqual(0); // and he stays out
+  });
+
   it("on the real map, lit at the Arsenal's gate, holds the leader there until it is out", () => {
     // review round 4's case: the fire shut the only way in; the leader was walked round to the
     // far side of the building and left there

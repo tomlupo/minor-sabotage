@@ -48,6 +48,8 @@ function entersFire(sim: Sim, x0: number, y0: number, x1: number, y1: number): b
 
 /** How far outside a fire's harm (0.8 of its radius) a man keeps. */
 const FIRE_MARGIN = 0.3;
+/** The ways out of a fire a man tries, turned from straight out: slanting, then sideways. */
+const ESCAPE_TURNS = [0, 0.6, -0.6, 1.2, -1.2, Math.PI / 2, -Math.PI / 2];
 
 export function stepMovement(sim: Sim, dt: number): void {
   const G = sim.grid;
@@ -56,16 +58,26 @@ export function stepMovement(sim: Sim, dt: number): void {
     if (u.state !== "ok" || u.hidden) continue;
     const kneeling = u.task && (u.task.kind === "work" || u.task.kind === "help") && u.task.phase === "work";
     const sp = u.speed * (u.wounded ? 0.75 : 1);
-    // a man a fire catches steps straight out of it, onto open ground (at a job he kneels at,
-    // the job itself waits for the fire: tasks.ts)
+    // a man a fire catches steps out of it onto open ground: straight out, or slanting or
+    // sideways where a wall or a vehicle stands in the way (sideways still takes him further
+    // from its centre). A man kneeling at a job stays put here (the work task moves him to the
+    // fire's edge itself: tasks.ts work)
     const f = kneeling ? null : sim.fireAt(u.x, u.y, FIRE_MARGIN);
     if (f) {
       const d = Math.hypot(u.x - f.x, u.y - f.y) || 0.01;
-      const ox = u.x + ((u.x - f.x) / d) * sp * dt, oy = u.y + ((u.y - f.y) / d) * sp * dt;
-      if (G.walkable(ox, oy)) {
+      const ux = (u.x - f.x) / d, uy = (u.y - f.y) / d, step = sp * dt;
+      let out = false;
+      for (const a of ESCAPE_TURNS) {
+        const c = Math.cos(a), sn = Math.sin(a);
+        const ox = u.x + (ux * c - uy * sn) * step, oy = u.y + (ux * sn + uy * c) * step;
+        if (!G.walkable(ox, oy)) continue;
         if (u.animLock <= 0) u.dir = Math.atan2(oy - u.y, ox - u.x);
         u.x = ox;
         u.y = oy;
+        out = true;
+        break;
+      }
+      if (out) {
         u.moving = true;
         if (u.animLock <= 0) setAnim(u, "walk");
         continue;
@@ -78,8 +90,9 @@ export function stepMovement(sim: Sim, dt: number): void {
       const stepLen = sp * dt;
       const arrive = d <= stepLen || d < 0.04;
       const nx = arrive ? p.x : u.x + (dx / d) * stepLen, ny = arrive ? p.y : u.y + (dy / d) * stepLen;
-      if (entersFire(sim, u.x, u.y, nx, ny)) {
-        // he waits at the fire's edge until it is out
+      // he waits at the fire's edge until it is out; but a man boxed in where it caught him
+      // follows his orders even towards it, rather than stand in it
+      if (!f && entersFire(sim, u.x, u.y, nx, ny)) {
         u.moving = false;
       } else if (arrive) {
         u.x = p.x;
