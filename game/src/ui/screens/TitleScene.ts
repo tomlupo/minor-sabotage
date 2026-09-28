@@ -12,7 +12,7 @@ import { buildLogo, buildTurtle } from "../../art/hud";
 import { txt, PX, PXS } from "../text";
 import { sx, sy } from "../../render/iso";
 import { readSafeInsets } from "../../render/view";
-import { screen, fitCamera } from "../../render/screen";
+import { COVER, screen, fitCamera } from "../../render/screen";
 import { sound } from "../../render/sound";
 import { store, type Bookmark } from "../../game/store";
 
@@ -43,9 +43,9 @@ export class TitleScene extends Phaser.Scene {
     this.mapW = sx(md.w);
     this.mapH = sy(md.h);
     // the street at dusk (style guide §5: the ambient multiplies the finished frame), then soot
-    this.add.rectangle(0, 0, screen.w, screen.h, lightHex(PAL.light.ambient.dusk))
+    this.add.rectangle(0, 0, COVER, COVER, lightHex(PAL.light.ambient.dusk))
       .setOrigin(0).setScrollFactor(0).setDepth(3e6).setBlendMode(Phaser.BlendModes.MULTIPLY);
-    this.add.rectangle(0, 0, screen.w, screen.h, hex(PAL.city_1943.soot[0]), 0.45).setOrigin(0).setScrollFactor(0).setDepth(3e6 + 1);
+    this.add.rectangle(0, 0, COVER, COVER, hex(PAL.city_1943.soot[0]), 0.45).setOrigin(0).setScrollFactor(0).setDepth(3e6 + 1);
     this.bookmark = await store.takeBookmark();
     const saved = await store.loadCampaign();
     this.hasSave = !!saved && saved.stage !== "note";

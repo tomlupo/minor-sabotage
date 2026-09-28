@@ -7,6 +7,10 @@ import type { ViewSize } from "./view";
 
 export const screen = { w: 480, h: 270, zoom: 1, s: 1 };
 
+/** Art px a full-screen layer is drawn to: more than any view, so neither the view's floor to
+ *  whole art pixels nor a resize bares a strip along its edge. */
+export const COVER = 4096;
+
 export function setScreen(v: ViewSize): void {
   screen.w = v.w;
   screen.h = v.h;

@@ -5,7 +5,7 @@ import Phaser from "phaser";
 import type { Phase } from "../../missions/types";
 import { PAL, hex } from "../../art/palette";
 import { txt, setFace, PX, PXB } from "../text";
-import { screen, fitCamera } from "../../render/screen";
+import { COVER, screen, fitCamera } from "../../render/screen";
 
 const HOLD = 0.15;
 const FADE = 0.35;
@@ -31,7 +31,7 @@ export class CardScene extends Phaser.Scene {
     fitCamera(this);
     setFace(this, "type");
     const W = screen.w, H = screen.h;
-    const bg = this.add.rectangle(0, 0, W, H, hex(PAL.hud.paper[0])).setOrigin(0);
+    const bg = this.add.rectangle(0, 0, COVER, COVER, hex(PAL.hud.paper[0])).setOrigin(0);
     const title = txt(this, W / 2, H / 2 - 16, this.phase.title, { font: PXB, color: PAL.hud.paper_ink, align: 0.5 });
     const line = txt(this, W / 2, H / 2 + 8, `${this.phase.place}. ${this.phase.time}`, { font: PX, color: PAL.city_1943.brick[0], align: 0.5 });
     this.layer = this.add.container(0, 0, [bg, title, line]);

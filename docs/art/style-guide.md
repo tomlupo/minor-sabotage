@@ -24,7 +24,8 @@ building fronts, long shadows, guard cones, and a silhouette when someone is beh
 | | value |
 |---|---|
 | Art pixel on an iPhone | 1.5 pt, so an iPhone 15 held sideways (852 × 393 pt) shows **568 × 262 art px** |
-| Art pixel elsewhere | the largest step that still shows **480 × 240 art px**: a whole number of the screen's own pixels where one can be seen (below 2× density), so 1080p and a laptop at 125 % or 150 % all show the same **480 × 270**, each art pixel 4 pixels wide; on a denser screen 1, 1.5, 2, 3… pt |
+| Art pixel on a PC | the same map in any window (Tom, 2026-09-28): the full-screen 1080p view, **480 × 270 art px**, fitted to the window. Full screen at 1080p, 125 % or 150 % that is 4 screen pixels to an art pixel; a window of another height gets art pixels a screen pixel wider or narrower by turns |
+| Art pixel on other dense screens | tablets and Macs (2× density or more): 1, 1.5, 2, 3… pt, the largest that still shows **480 × 240 art px** |
 | World scale | **12 art px per metre** across, **9 px per metre** into the screen (depth factor 0.75) |
 | Height | **7.5 px per metre** up. A storey is 3.2 m = **24 px** |
 | Ground tile | **2 m × 2 m = 24 × 18 px**. The screen holds about 23.7 × 14.5 tiles |
@@ -37,12 +38,13 @@ so that a tile is a whole number of pixels.
 
 A point on the ground at `(x, y)` metres and height `z` lands at
 `sx = x·12`, `sy = y·9 − z·7.5` (art px, before the camera offset). Everything is drawn at 1× in art
-pixels and scaled up by an integer or by 1.5 with nearest-neighbour sampling, never smoothed.
+pixels and scaled up with nearest-neighbour sampling, never smoothed: by a step in points on a
+phone or another dense screen, and on a PC by whatever fits the 1080p view to the window.
 
 **Text is the exception** (Tom, 2026-09-28: the pixel faces could not be read on a PC). Words are
 set in two bundled faces and drawn at the screen's own resolution, not in art pixels: the typewriter
 Courier Prime on the paper screens (intro, chapter card, briefing, decision, history note), and the
-condensed sans Barlow Semi Condensed in the HUD, on the map and on buttons. They keep the pixel
+condensed sans Barlow Semi Condensed in the HUD, on the street and on buttons. They keep the pixel
 faces' three sizes and line pitches (`game/src/ui/text.ts`). Lettering that is part of a picture,
 such as the logo and the shop signs, stays pixel.
 

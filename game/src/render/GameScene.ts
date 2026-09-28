@@ -169,9 +169,11 @@ export class GameScene extends Phaser.Scene {
     if (on) {
       const Z = this.run.md.zones.find((z) => z.name === this.run.phase.zone)!;
       const zx = screen.w / sx(Z.w), zy = screen.h / (sy(Z.h) + 60);
-      // a whole fraction (1/2, 1/3, 1/4) of the street's zoom, so the overview keeps every n-th
-      // art pixel evenly
-      cam.setZoom(screen.s / Math.min(4, Math.ceil(1 / Math.min(1, zx, zy))));
+      // at most a whole fraction (1/2, 1/3, 1/4) of the street's zoom, and even on the screen: a
+      // whole number of physical pixels to an art pixel, or one physical pixel to a whole number
+      // of art pixels (review round 11: 4/3 drew art pixels 1 and 2 pixels wide by turns)
+      const fit = screen.s / Math.min(4, Math.ceil(1 / Math.min(1, zx, zy)));
+      cam.setZoom(fit >= 1 ? Math.floor(fit) : 1 / Math.ceil(1 / fit));
       cam.centerOn(sx(Z.x + Z.w / 2), sy(Z.y + Z.h / 2));
     } else {
       cam.setZoom(screen.s);
@@ -182,7 +184,7 @@ export class GameScene extends Phaser.Scene {
 
   // ------------------------------------------------------------------ input (from the HUD)
 
-  /** Screen art px to world metres. */
+  /** A point on the canvas (physical px, as the pointer gives it) to world metres. */
   toWorld(px: number, py: number): { x: number; y: number } {
     const p = this.cameras.main.getWorldPoint(px, py);
     return { x: wx(p.x), y: wy(p.y) };
