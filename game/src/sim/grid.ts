@@ -52,6 +52,11 @@ export class Grid {
     return this.walkableCell(Math.floor(x), Math.floor(y));
   }
 
+  /** Whether one step from cell (cx, cy) to its neighbour (cx + dx, cy + dy) is open: onto open ground, cutting no corner. */
+  canStep(cx: number, cy: number, dx: number, dy: number): boolean {
+    return this.walkableCell(cx + dx, cy + dy) && (!dx || !dy || (this.walkableCell(cx + dx, cy) && this.walkableCell(cx, cy + dy)));
+  }
+
   blocksSightCell(cx: number, cy: number): boolean {
     if (!this.inBounds(cx, cy)) return true;
     return (this.flags[cy * this.w + cx] & (F_SIGHT | F_VEH)) !== 0;

@@ -48,63 +48,109 @@ function entersFire(sim: Sim, x0: number, y0: number, x1: number, y1: number): b
 
 /** How far outside a fire's harm (0.8 of its radius) a man keeps. */
 const FIRE_MARGIN = 0.3;
-
 /**
- * How deep a walk straight from (x0, y0) to (x1, y1) goes into the fires' reach, at its deepest,
- * or where (x0, y0) lies alone: above 0 inside a fire's reach, above FIRE_MARGIN inside its harm.
+ * How far past a fire's harm a man it has caught aims. His step stops short of a point under
+ * 1 cm off (stepMovement), so aiming at the edge itself would leave him standing just inside it.
  */
-function fireDepth(sim: Sim, x0: number, y0: number, x1 = x0, y1 = y0): number {
-  const dx = x1 - x0, dy = y1 - y0, dd = dx * dx + dy * dy;
-  let deep = -Infinity;
-  for (const f of sim.state.fires) {
-    const t = dd ? Math.max(0, Math.min(1, ((f.x - x0) * dx + (f.y - y0) * dy) / dd)) : 0;
-    deep = Math.max(deep, f.r * 0.8 + FIRE_MARGIN - Math.hypot(x0 + t * dx - f.x, y0 + t * dy - f.y));
-  }
-  return deep;
-}
+const FIRE_CLEAR = 0.05;
+/** How far round him, in metres and in cells, a man a fire has caught looks for the way out. */
+const FIRE_LOOK = 5;
 
+/** The 32 directions a man a fire has caught looks along for a straight way out of it. */
+const RAYS = Array.from({ length: 32 }, (_, k): [number, number] => [Math.cos((k * Math.PI) / 16), Math.sin((k * Math.PI) / 16)]);
 const STEPS8: [number, number][] = [[1, 0], [-1, 0], [0, 1], [0, -1], [1, 1], [1, -1], [-1, 1], [-1, -1]];
 
 /**
- * Where a man a fire has caught heads: the centre of the next cell on the shortest walk over
- * open ground (no wall, no vehicle, no corner cut), within 5 m of him, out of every fire's reach,
- * never going deeper into the fires than he stands (give or take the grid's few centimetres),
- * nor into their harm if he is not burning. Failing that, a burning man (inside a fire's harm)
- * takes the shortest walk out of the harm, through the fire if need be: standing in it he dies
- * (combat.ts stepFires). Null when there is neither: he waits where he is, the pause in
- * stepMovement keeping him from going deeper.
+ * Where a man a fire has caught (inside its harm) heads: FIRE_CLEAR past every fire's harm, by
+ * the shortest walk over open ground, through the fire where that is shortest. Standing in it he
+ * dies (combat.ts stepFires), and how deep he goes on the way matters less than how long he
+ * takes. He stops once out. Null when there is no way out: he stays, and the pause in
+ * stepMovement keeps him from going deeper.
  */
 function wayOutOfFire(sim: Sim, u: Unit): Pt | null {
+  return straightOut(sim, u) ?? wayRound(sim, u);
+}
+
+/**
+ * Where the shortest straight walk out (see wayOutOfFire) along RAYS, cutting no corner, comes
+ * clear; null if none does within FIRE_LOOK. Where each ray comes clear is worked out exactly:
+ * from any point on the one he takes, the rest of it is still open and a step shorter, so the
+ * way left only shortens and he cannot turn back and forth.
+ */
+function straightOut(sim: Sim, u: Unit): Pt | null {
   const G = sim.grid;
-  const sx = Math.floor(u.x), sy = Math.floor(u.y), start = sy * G.w + sx;
-  const here = fireDepth(sim, u.x, u.y), burning = here > FIRE_MARGIN;
-  const walks = [{ deepest: burning ? here + 0.05 : Math.min(here + 0.05, FIRE_MARGIN), out: 0 }];
-  if (burning) walks.push({ deepest: Infinity, out: FIRE_MARGIN });
-  for (const { deepest, out } of walks) {
-    const from = new Map<number, number>([[start, start]]);
-    const queue = [start];
-    for (let i = 0; i < queue.length; i++) {
-      const k = queue[i], cx = k % G.w, cy = (k - cx) / G.w;
-      // the walk on from here: out of his own cell from where he stands, else from its centre
-      const x0 = k === start ? u.x : cx + 0.5, y0 = k === start ? u.y : cy + 0.5;
-      if (fireDepth(sim, cx + 0.5, cy + 0.5) <= out && fireDepth(sim, x0, y0, cx + 0.5, cy + 0.5) <= deepest) {
-        // out: head for the walk's first cell
-        let step = k;
-        while (from.get(step) !== start) step = from.get(step)!;
-        const fx = step % G.w;
-        return { x: fx + 0.5, y: (step - fx) / G.w + 0.5 };
-      }
-      for (const [dx, dy] of STEPS8) {
-        const nx = cx + dx, ny = cy + dy, nk = ny * G.w + nx;
-        if (Math.abs(nx - sx) > 5 || Math.abs(ny - sy) > 5 || from.has(nk) || !G.walkableCell(nx, ny)) continue;
-        if (dx && dy && (!G.walkableCell(cx + dx, cy) || !G.walkableCell(cx, cy + dy))) continue;
-        if (fireDepth(sim, x0, y0, nx + 0.5, ny + 0.5) > deepest) continue;
-        from.set(nk, k);
-        queue.push(nk);
+  let best: Pt | null = null, bestS = FIRE_LOOK;
+  for (const [dx, dy] of RAYS) {
+    const end = clearAlong(sim, u.x, u.y, dx, dy);
+    if (end >= bestS) continue;
+    // over open ground all the way from his own cell (a man standing in a vehicle's outline is
+    // walked off it by wayRound); steps shorter than a cell miss none it crosses
+    let cx = Math.floor(u.x), cy = Math.floor(u.y), open = G.walkableCell(cx, cy);
+    for (let s = 0; open && s < end; ) {
+      s = Math.min(s + 0.1, end);
+      const nx = Math.floor(u.x + dx * s), ny = Math.floor(u.y + dy * s);
+      open = (nx === cx && ny === cy) || G.canStep(cx, cy, nx - cx, ny - cy);
+      cx = nx;
+      cy = ny;
+    }
+    if (open) {
+      best = { x: u.x + dx * end, y: u.y + dy * end };
+      bestS = end;
+    }
+  }
+  return best;
+}
+
+/** How far along the line from (x, y) in the direction (dx, dy) (of length 1) it comes FIRE_CLEAR past every fire's harm. */
+function clearAlong(sim: Sim, x: number, y: number, dx: number, dy: number): number {
+  let s = 0;
+  for (let on = true; on; ) {
+    on = false;
+    for (const f of sim.state.fires) {
+      const R = f.r * 0.8 + FIRE_CLEAR, wx = x + dx * s - f.x, wy = y + dy * s - f.y;
+      const b = wx * dx + wy * dy, c = wx * wx + wy * wy - R * R;
+      if (c >= 0) continue;
+      // inside this one: on to where the line leaves it
+      s += Math.sqrt(b * b - c) - b + 1e-6;
+      on = true;
+    }
+  }
+  return s;
+}
+
+/**
+ * Where a man a fire has caught heads when walls or a vehicle leave him no straight way out: the
+ * centre of the first cell of the shortest walk, in metres, round them to a cell clear of the
+ * fires (see wayOutOfFire), within FIRE_LOOK cells; null if there is none.
+ */
+function wayRound(sim: Sim, u: Unit): Pt | null {
+  const G = sim.grid, n = 2 * FIRE_LOOK + 1;
+  const ox = Math.floor(u.x) - FIRE_LOOK, oy = Math.floor(u.y) - FIRE_LOOK, start = FIRE_LOOK * n + FIRE_LOOK;
+  const dist = new Array<number>(n * n).fill(Infinity), first = new Array<number>(n * n).fill(-1);
+  const done = new Array<boolean>(n * n).fill(false);
+  dist[start] = 0;
+  for (;;) {
+    let k = -1;
+    for (let i = 0; i < n * n; i++) if (!done[i] && dist[i] < (k < 0 ? Infinity : dist[k])) k = i;
+    if (k < 0) return null;
+    done[k] = true;
+    const cx = ox + (k % n), cy = oy + Math.floor(k / n);
+    if (k !== start && !sim.fireAt(cx + 0.5, cy + 0.5, FIRE_CLEAR)) {
+      const f = first[k];
+      return { x: ox + (f % n) + 0.5, y: oy + Math.floor(f / n) + 0.5 };
+    }
+    // out of his own cell from where he stands, on from a cell's centre
+    const x0 = k === start ? u.x : cx + 0.5, y0 = k === start ? u.y : cy + 0.5;
+    for (const [dx, dy] of STEPS8) {
+      const i = k + dy * n + dx;
+      if (cx + dx < ox || cy + dy < oy || cx + dx >= ox + n || cy + dy >= oy + n || done[i] || !G.canStep(cx, cy, dx, dy)) continue;
+      const d = dist[k] + Math.hypot(cx + dx + 0.5 - x0, cy + dy + 0.5 - y0);
+      if (d < dist[i]) {
+        dist[i] = d;
+        first[i] = k === start ? i : first[k];
       }
     }
   }
-  return null;
 }
 
 export function stepMovement(sim: Sim, dt: number): void {
@@ -114,12 +160,12 @@ export function stepMovement(sim: Sim, dt: number): void {
     if (u.state !== "ok" || u.hidden) continue;
     const kneeling = u.task && (u.task.kind === "work" || u.task.kind === "help") && u.task.phase === "work";
     const sp = u.speed * (u.wounded ? 0.75 : 1);
-    // a man a fire catches walks out of its reach first (wayOutOfFire), whatever he was doing;
-    // his orders wait. A man kneeling at a job stays put here (the work task moves him to the
-    // fire's edge itself: tasks.ts work)
-    const out = !kneeling && fireDepth(sim, u.x, u.y) > 0 ? wayOutOfFire(sim, u) : null;
-    if (out) {
-      const dx = out.x - u.x, dy = out.y - u.y, d = Math.hypot(dx, dy), step = sp * dt;
+    // a man a fire has caught walks clear of it first (wayOutOfFire), whatever he was doing; his
+    // orders wait. A man kneeling at a job stays put here (the work task moves him to the fire's
+    // edge itself: tasks.ts work)
+    const way = !kneeling && sim.fireAt(u.x, u.y) ? wayOutOfFire(sim, u) : null;
+    if (way) {
+      const dx = way.x - u.x, dy = way.y - u.y, d = Math.hypot(dx, dy), step = sp * dt;
       if (d > 0.01) {
         const k = Math.min(1, step / d);
         if (u.animLock <= 0) u.dir = Math.atan2(dy, dx);

@@ -4,6 +4,7 @@ import { Sim } from "../src/sim/sim";
 import { makeSquad, fieldSquad } from "../src/sim/setup";
 import { cmdMove, cmdTapEnemy, cmdThrow, cmdHelp, cmdSelectSquad, cmdOrder, cmdPick, cmdWork } from "../src/sim/commands";
 import { goTo } from "../src/sim/move";
+import { SPEED, THROW } from "../src/sim/tuning";
 import { buildArsenalMap } from "../src/content/arsenal/map";
 import { gridFromMap } from "../src/content/mapdata";
 
@@ -197,7 +198,7 @@ describe("snapshot", () => {
 
 describe("fire on the street", () => {
   // a fire is a pause, not a wall: nobody steps into burning petrol; a man waits at its edge
-  // until it burns out, and a man it catches steps out of it (move.ts entersFire)
+  // until it burns out, and a man it catches walks clear of it (move.ts entersFire, wayOutOfFire)
   const HARM = (r: number) => r * 0.8;
 
   it("is waited out at its edge, never walked through", () => {
@@ -268,6 +269,32 @@ describe("fire on the street", () => {
     expect(worst).toBeLessThanOrEqual(0); // and he stays out
   });
 
+  it("on open ground, walks a man it catches straight out, whichever side it lies", () => {
+    // review round 8: the way out counted cells, not metres, and took men along the flames
+    // rather than out of them
+    const step = SPEED.partisan / 30;
+    let worst = { over: -Infinity, at: "" };
+    for (const d of [0.9, 1.2, 1.45]) {
+      for (let k = 0; k < 32; k++) {
+        const a = (k / 32) * Math.PI * 2 + 0.05;
+        const sim = new Sim(yard());
+        const u = sim.spawnUnit({ side: "pl", look: "pl", x: 15 + Math.cos(a) * d, y: 20.3 + Math.sin(a) * d, weapon: "sten" });
+        sim.state.fires.push({ id: 988, x: 15, y: 20.3, r: 2, t: 60 });
+        let steps = 60;
+        for (let i = 0; i < 60; i++) {
+          sim.step();
+          if (Math.hypot(u.x - 15, u.y - 20.3) > HARM(2)) {
+            steps = i + 1;
+            break;
+          }
+        }
+        const over = steps - Math.ceil((HARM(2) - d) / step);
+        if (over > worst.over) worst = { over, at: `${d} m from it, at ${Math.round((a * 180) / Math.PI)}°` };
+      }
+    }
+    expect(worst.over, worst.at).toBeLessThanOrEqual(1); // at most a step more than straight out
+  });
+
   it("catching a man in a corner, gets him out of it, however it lies", () => {
     // review round 7: in a concave corner every step out ran into a wall, and he stood in it
     const sim = new Sim(yard());
@@ -290,16 +317,19 @@ describe("fire on the street", () => {
     const u = sim.spawnUnit({ side: "pl", look: "pl", x: 29.9, y: 38.9, weapon: "sten" });
     sim.state.fires.push({ id: 990, x: 28.75, y: 37.75, r: 2, t: 4 }); // 1.63 m from him: near, not in its harm
     goTo(sim, u, 24.5, 32.5); // his way runs through it
-    let closest = Infinity;
+    let closest = Infinity, moved = 0;
     for (let i = 0; i < 30 * 10; i++) {
       sim.step();
-      if (sim.state.fires.length) closest = Math.min(closest, Math.hypot(u.x - 28.75, u.y - 37.75));
+      if (!sim.state.fires.length) continue;
+      closest = Math.min(closest, Math.hypot(u.x - 28.75, u.y - 37.75));
+      moved = Math.max(moved, Math.hypot(u.x - 29.9, u.y - 38.9));
     }
     expect(closest).toBeGreaterThan(HARM(2));
+    expect(moved).toBeLessThan(0.05); // he stands while it burns, neither in nor along its edge
     expect(Math.hypot(u.x - 24.5, u.y - 32.5)).toBeLessThan(1); // it burnt out and he went on
   });
 
-  it("between two fires, walks a man out of both, never deeper into the second", () => {
+  it("between two fires, walks a man clear of both, the short way", () => {
     // review round 7: stepping away from one, he walked into the other
     const sim = new Sim(yard());
     const u = sim.spawnUnit({ side: "pl", look: "pl", x: 15, y: 20, weapon: "sten" });
@@ -319,8 +349,7 @@ describe("fire on the street", () => {
 
   it("near a man by a stopped van but not on him, never brings him into its harm", () => {
     // a van stopped at an angle has a stepped outline, all corners; a man outside the harm
-    // steps off from where he stands (a straight walk to the next cell can pass nearer the fire
-    // than either end), and not into the harm however little it is deeper than he stands
+    // waits there, and nothing walks him into it
     const md = buildArsenalMap();
     const cases = [
       { man: { x: 101.1, y: 77.5 }, fire: { x: 101.758, y: 75.911 } }, // 1.72 m off
@@ -339,6 +368,96 @@ describe("fire on the street", () => {
       }
       expect(closest, `man at ${c.man.x}, ${c.man.y}`).toBeGreaterThan(HARM(2));
     }
+  });
+
+  it("walks a man out beside a van stopped at an angle without cutting its corners", () => {
+    // the shortest straight way out ran between two of its cells that touch only at a corner
+    const md = buildArsenalMap();
+    const sim = new Sim(gridFromMap(md), 7);
+    sim.spawnVehicle("prison_truck", 101.5, 78.9, 3.54);
+    sim.step();
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 99.682, y: 79.711, weapon: "sten" });
+    sim.state.fires.push({ id: 987, x: 99.198, y: 79.925, r: 2, t: 6 });
+    const G = sim.grid;
+    let cx = Math.floor(u.x), cy = Math.floor(u.y), cut = 0;
+    for (let i = 0; i < 30 * 3; i++) {
+      sim.step();
+      const nx = Math.floor(u.x), ny = Math.floor(u.y);
+      if ((nx !== cx || ny !== cy) && !G.canStep(cx, cy, nx - cx, ny - cy)) cut++;
+      cx = nx;
+      cy = ny;
+    }
+    expect(cut).toBe(0);
+    expect(Math.hypot(u.x - 99.198, u.y - 79.925)).toBeGreaterThan(HARM(2)); // and he got out
+  });
+
+  it("caught standing in a stopped van's footprint, walks him off it, not further in", () => {
+    // review round 8: the way out took the centre of his own cell, inside the van
+    const md = buildArsenalMap();
+    const sim = new Sim(gridFromMap(md), 7);
+    const v = sim.spawnVehicle("prison_truck", 101.5, 78.9, 3.54);
+    v.state = "wreck"; // burnt out: the fire beside it cannot light it
+    sim.step();
+    const G = sim.grid;
+    expect(G.walkable(98.1, 77.1)).toBe(false); // inside its outline, by its north-west corner
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 98.1, y: 77.1, weapon: "sten" });
+    // lit north-west of him: the middle of the cell he stands in, inside the van, is out of its harm
+    sim.state.fires.push({ id: 984, x: 96.8, y: 76.4, r: 2, t: 6 });
+    let deeper = 0;
+    for (let i = 0; i < 30 * 3; i++) {
+      sim.step();
+      if (!G.walkable(u.x, u.y) && (Math.floor(u.x) !== 98 || Math.floor(u.y) !== 77)) deeper++;
+    }
+    expect(deeper).toBe(0);
+    expect(G.walkable(u.x, u.y)).toBe(true);
+    expect(Math.hypot(u.x - 96.8, u.y - 76.4)).toBeGreaterThan(HARM(2));
+  });
+
+  it("caught by a bottle in a building's corner, walks clear and stays clear", () => {
+    // review round 8: two ways out, each weighed afresh every tick from where he stood, took
+    // turns, and held him in the harm until it burnt out. The second fire leaves the way south
+    // clear only in the last 5 cm before the wall: looked for in steps, it is there from one
+    // spot and not from the next
+    const md = buildArsenalMap();
+    for (const at of [{ x: 125.53, y: 107.78 }, { x: 125.53, y: 108.071 }]) {
+      const sim = new Sim(gridFromMap(md), 7);
+      const u = sim.spawnUnit({ side: "pl", look: "pl", x: 124.04, y: 108.4, weapon: "sten" });
+      const f = { id: 986, ...at, r: THROW.bottleR, t: THROW.bottleBurn };
+      sim.state.fires.push(f);
+      let outAt = -1, back = 0;
+      for (let i = 0; i < 30 * 8 && sim.state.fires.length; i++) {
+        sim.step();
+        const inHarm = Math.hypot(u.x - f.x, u.y - f.y) < HARM(f.r);
+        if (outAt < 0 && !inHarm) outAt = i;
+        else if (outAt >= 0 && inHarm) back++;
+      }
+      expect(outAt, `lit at ${at.x}, ${at.y}`).toBeGreaterThanOrEqual(0);
+      expect(outAt, `lit at ${at.x}, ${at.y}`).toBeLessThan(10);
+      expect(back, `lit at ${at.x}, ${at.y}`).toBe(0);
+    }
+  });
+
+  it("boxed where no straight way leads out, walks a man round the corner", () => {
+    // a bottle bursts in the doorway of a one-cell room whose passage turns: no straight line
+    // from the room comes out of the fire before a wall, so he goes out through the door and up
+    // the passage
+    const G = new Grid(20, 20);
+    G.flags.fill(F_SIGHT);
+    const open = (cx: number, cy: number) => (G.flags[cy * 20 + cx] = F_WALK);
+    for (let y = 1; y < 4; y++) for (let x = 2; x < 18; x++) open(x, y); // a yard
+    for (let y = 4; y <= 10; y++) open(12, y); // a passage south from it
+    open(11, 10); // the doorway, west off its foot
+    open(10, 10); // the room
+    const sim = new Sim(G);
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 10.3, y: 10.5, weapon: "sten" });
+    sim.state.fires.push({ id: 985, x: 11.5, y: 10.5, r: 2, t: 60 });
+    let outAt = -1;
+    for (let i = 0; i < 30 * 3 && outAt < 0; i++) {
+      sim.step();
+      if (Math.hypot(u.x - 11.5, u.y - 10.5) > HARM(2)) outAt = i;
+    }
+    expect(outAt).toBeGreaterThanOrEqual(0);
+    expect(outAt).toBeLessThan(30);
   });
 
   it("on the real map, lit at the Arsenal's gate, holds the leader there until it is out", () => {

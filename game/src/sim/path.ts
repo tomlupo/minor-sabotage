@@ -112,8 +112,7 @@ export class PathFinder {
       if (hc < bestH) { bestH = hc; bestId = cur; }
       for (const [dx, dy, cost] of DIRS) {
         const nx = cx + dx, ny = cy + dy;
-        if (!G.walkableCell(nx, ny)) continue;
-        if (dx && dy && (!G.walkableCell(cx + dx, cy) || !G.walkableCell(cx, cy + dy))) continue;
+        if (!G.canStep(cx, cy, dx, dy)) continue;
         const n = ny * W + nx;
         if (this.closed[n] === gen) continue;
         const ng = this.g[cur] + cost + (extraCost ? extraCost(nx, ny) : 0);
