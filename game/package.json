@@ -10,7 +10,8 @@
     "preview": "vite preview --host",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "shot": "node tools/shot.mjs"
+    "shot": "node tools/shot.mjs",
+    "flow": "node tools/shot.mjs --steps tools/flow.json"
   },
   "dependencies": {
     "phaser": "4.2.1"

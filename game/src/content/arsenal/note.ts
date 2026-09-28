@@ -40,3 +40,34 @@ export const FATES: Record<string, string> = {
   jur: "Survived the war; died in 2011.",
   kopec: "Survived the war; died in 2000.",
 };
+
+/** The same, in Polish, for the note's Polish page. */
+export const FATES_PL: Record<string, string> = {
+  zoska: "Poległ pod Sieczychami, 20 sierpnia 1943.",
+  slon: "Poległ w Powstaniu Warszawskim, 23 września 1944.",
+  anoda: "Zmarł w śledztwie komunistycznej bezpieki, 7 stycznia 1949.",
+  bolec: "Przeżył wojnę; zmarł w 2007 roku.",
+  alek: "Postrzelony podczas odwrotu; zmarł 30 marca 1943.",
+  kolczan: "Poległ w Powstaniu Warszawskim, 8 sierpnia 1944.",
+  maciek: "Aresztowany 18 lutego 1944; zaginął.",
+  buzdygan: "Zmarł z ran, 2 kwietnia 1943.",
+  hubert: "Schwytany podczas odwrotu; zabity przez Niemców.",
+  mirski: "Przeżył wojnę; zmarł w 1998 roku.",
+  giewont: "Poległ w Powstaniu Warszawskim, 30 sierpnia 1944.",
+  kuba: "Poległ w Powstaniu Warszawskim, 11 sierpnia 1944.",
+  kadlubek: "Przeżył wojnę; zmarł w 2008 roku.",
+  jur: "Przeżył wojnę; zmarł w 2011 roku.",
+  kopec: "Przeżył wojnę; zmarł w 2000 roku.",
+};
+
+/** Polish captions for the photos (the English ones are the subjects in credits.json). */
+export const PHOTO_PL: Record<string, string> = {
+  "rudy.jpg": "Jan Bytnar „Rudy” (1921–1943)",
+  "alek.jpg": "Maciej Aleksy Dawidowski „Alek” (1920–1943)",
+  "zoska.jpg": "Tadeusz Zawadzki „Zośka” (1921–1943)",
+  "orsza.jpg": "Stanisław Broniewski „Orsza” (1915–2000)",
+  "arsenal-1938.jpg": "Arsenał od rogu Długiej i Nalewek, 1938: sgraffito i arkady od strony Nalewek",
+  "dluga-1939.jpg": "Ulica Długa spod Arsenału w stronę wschodnią, jesień 1939: Arsenał i wypalony Pasaż Simonsa (po lewej), Długa 53–45 do rogu Bielańskiej (po prawej)",
+  "arsenal-plaque.jpg": "Tablica z 1968 roku na murze Arsenału, Długa 52 (podaną na niej liczbę 25 uwolnionych więźniów poprawiono później na 21)",
+  "arsenal-memorial-stone.jpg": "Kamień pamiątkowy ze znakiem Polski Walczącej przed Arsenałem, odsłonięty w 1993 roku; za nim, na murze, tablica z 1968 roku",
+};

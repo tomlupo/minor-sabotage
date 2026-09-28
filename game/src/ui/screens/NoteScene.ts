@@ -4,8 +4,11 @@
 // the note is an HTML page over the game.
 import Phaser from "phaser";
 import type { Flow } from "../../game/flow";
-import { NOTE_EN, NOTE_PL, NOTE_PHOTOS, FATES } from "../../content/arsenal/note";
+import { NOTE_EN, NOTE_PL, NOTE_PHOTOS, FATES, FATES_PL, PHOTO_PL } from "../../content/arsenal/note";
 import { SQUADS, PEOPLE } from "../../content/arsenal/roster";
+
+/** "Drużyna Zośki": the squad's name after "drużyna" takes the genitive. */
+const SQUAD_GENITIVE: Record<string, string> = { "Zośka": "Zośki", "Kołczan": "Kołczana", "Giewont": "Giewonta" };
 import { PAL, css, mix } from "../../art/palette";
 import { sound } from "../../render/sound";
 import { PRISONERS } from "../../missions/finale";
@@ -41,14 +44,28 @@ export class NoteScene extends Phaser.Scene {
     const f = c.finale;
     const lines: string[] = [];
     if (!f) return "";
-    lines.push(f.rudy === "escaped" ? "In your operation the DKW got Rudy away." : f.rudy === "killed" ? "In your operation Rudy was killed." : "In your operation Rudy was not freed.");
-    if (f.freed > 0) lines.push(`${f.freed} of the ${PRISONERS} other prisoners in the van reached safety${f.prisonersKilled ? `, and ${f.prisonersKilled} were killed in the street` : ""}.`);
     const fallen = Object.values(c.soldiers).filter((s) => s.state === "dead").map((s) => PEOPLE[s.key]);
     const taken = Object.values(c.soldiers).filter((s) => s.state === "captured").map((s) => PEOPLE[s.key]);
-    if (fallen.length) lines.push(`Fell: ${fallen.map((p) => `${p.name} “${p.pseudonym}”`).join(", ")}.`);
-    if (taken.length) lines.push(`Taken by the Germans: ${taken.map((p) => `${p.name} “${p.pseudonym}”`).join(", ")}.`);
-    if (!fallen.length && !taken.length) lines.push("None of your men was lost.");
-    lines.push(`German losses: ${f.germansKilled} killed.`);
+    if (this.lang === "pl") {
+      const who = (ps: typeof fallen) => ps.map((p) => `${p.name} „${p.pseudonym}”`).join(", ");
+      lines.push(f.rudy === "escaped" ? "W twojej akcji DKW wywiózł Rudego." : f.rudy === "killed" ? "W twojej akcji Rudy zginął." : "W twojej akcji nie udało się odbić Rudego.");
+      if (f.freed > 0) {
+        const k = f.prisonersKilled;
+        lines.push(`${f.freed} z ${PRISONERS} pozostałych więźniów z więźniarki ${f.freed === 1 ? "ocalał" : "ocalało"}${k ? `, a ${k} ${k === 1 ? "zginął" : "zginęło"} na ulicy` : ""}.`);
+      }
+      if (fallen.length) lines.push(`${fallen.length === 1 ? "Poległ" : "Polegli"}: ${who(fallen)}.`);
+      if (taken.length) lines.push(`${taken.length === 1 ? "Wzięty" : "Wzięci"} przez Niemców: ${who(taken)}.`);
+      if (!fallen.length && !taken.length) lines.push("Nikt z twoich ludzi nie zginął ani nie wpadł w ręce Niemców.");
+      lines.push(`Straty niemieckie: ${f.germansKilled} ${f.germansKilled === 1 ? "zabity" : "zabitych"}.`);
+    } else {
+      const who = (ps: typeof fallen) => ps.map((p) => `${p.name} “${p.pseudonym}”`).join(", ");
+      lines.push(f.rudy === "escaped" ? "In your operation the DKW got Rudy away." : f.rudy === "killed" ? "In your operation Rudy was killed." : "In your operation Rudy was not freed.");
+      if (f.freed > 0) lines.push(`${f.freed} of the ${PRISONERS} other prisoners in the van reached safety${f.prisonersKilled ? `, and ${f.prisonersKilled} were killed in the street` : ""}.`);
+      if (fallen.length) lines.push(`Fell: ${who(fallen)}.`);
+      if (taken.length) lines.push(`Taken by the Germans: ${who(taken)}.`);
+      if (!fallen.length && !taken.length) lines.push("None of your men was lost.");
+      lines.push(`German losses: ${f.germansKilled} killed.`);
+    }
     return lines.map((l) => `<p>${esc(l)}</p>`).join("");
   }
 
@@ -59,13 +76,18 @@ export class NoteScene extends Phaser.Scene {
     const el = document.createElement("div");
     el.id = "note";
     el.style.cssText = `position:fixed;inset:0;overflow-y:auto;-webkit-overflow-scrolling:touch;touch-action:pan-y;background:${paper0};color:${ink};z-index:5;`;
-    const text = (this.lang === "pl" ? NOTE_PL : NOTE_EN).map((p) => `<p>${esc(p)}</p>`).join("");
+    const pl = this.lang === "pl";
+    const text = (pl ? NOTE_PL : NOTE_EN).map((p) => `<p>${esc(p)}</p>`).join("");
+    // the subject of a photo in the page's language; the licence stays as its source states it
+    const subject = (c: Credit | undefined, f: string) => (pl ? PHOTO_PL[f] : undefined) ?? c?.subject ?? "";
     const photos = NOTE_PHOTOS.map((f) => {
       const cr = credits.find((c) => c.file === f);
-      return `<figure><img src="./history/${f}" alt="${esc(cr?.subject ?? f)}"><figcaption>${esc(cr?.subject ?? "")}</figcaption></figure>`;
+      return `<figure><img src="./history/${f}" alt="${esc(subject(cr, f) || f)}"><figcaption>${esc(subject(cr, f))}</figcaption></figure>`;
     }).join("");
-    const roll = SQUADS.map((sq) => `<div class="sq"><h3>${esc(sq.name)}'s squad</h3>${sq.people.map((p) => `<div class="p"><b>${esc(p.pseudonym)}</b> ${esc(p.name)}<br><span>${esc(p.section)}. ${esc(FATES[p.key] ?? "")}</span></div>`).join("")}</div>`).join("");
-    const creditList = credits.map((c) => `<li>${esc(c.file)}: ${esc(c.subject)}. ${esc(c.author)}, ${esc(c.year)}. ${esc(c.licence)}. <a href="${esc(c.sourcePage)}" target="_blank" rel="noopener">Source</a></li>`).join("");
+    const squadHead = (name: string) => (pl ? `Drużyna ${SQUAD_GENITIVE[name] ?? name}` : `${name}'s squad`);
+    const section = (s: string) => (pl ? s.replace("commander", "dowódca") : s);
+    const roll = SQUADS.map((sq) => `<div class="sq"><h3>${esc(squadHead(sq.name))}</h3>${sq.people.map((p) => `<div class="p"><b>${esc(p.pseudonym)}</b> ${esc(p.name)}<br><span>${esc(section(p.section))}. ${esc((pl ? FATES_PL : FATES)[p.key] ?? "")}</span></div>`).join("")}</div>`).join("");
+    const creditList = credits.map((c) => `<li>${esc(c.file)}: ${esc(subject(c, c.file))}. ${esc(c.author)}, ${esc(c.year)}. ${esc(c.licence)}. <a href="${esc(c.sourcePage)}" target="_blank" rel="noopener">${pl ? "Źródło" : "Source"}</a></li>`).join("");
     el.innerHTML = `
 <style>
   #note .page{max-width:680px;margin:0 auto;padding:max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 40px max(18px, env(safe-area-inset-left));font:16px/1.55 Georgia,"Times New Roman",serif;background:${paper};min-height:100%;box-shadow:0 0 0 1px ${faint}}
@@ -88,7 +110,7 @@ export class NoteScene extends Phaser.Scene {
   #note button.alt{background:transparent;color:${ink};border-color:${faint}}
 </style>
 <div class="page">
-  <div class="date">Warsaw, 26 March 1943</div>
+  <div class="date">${pl ? "Warszawa, 26 marca 1943" : "Warsaw, 26 March 1943"}</div>
   <h1>Akcja pod Arsenałem</h1>
   <h2>${this.lang === "pl" ? "Twoja akcja" : "Your operation"}</h2>
   ${this.yourOperation()}

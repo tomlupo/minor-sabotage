@@ -129,7 +129,8 @@ export function hudArt(scene: Phaser.Scene): HudArt {
         const alive = sim.membersOf(sq).filter((u) => u.state !== "dead").length;
         const sel = s.controlled === i;
         const order = sel ? "follow" : sq.order === "tail" ? "follow" : (sq.order as "hold" | "cover" | "signal");
-        const key = `hud:sq:${i}:${sel}:${order}:${alive}:${sq.members.length}`;
+        // keyed by what it shows: squad indices and unit ids are numbered afresh in every phase
+        const key = `hud:sq:${sq.name}:${sq.colour}:${sel}:${order}:${alive}:${sq.members.length}`;
         return tex(key, () => (buildSquadTag ? buildSquadTag({ leader: sq.name, colour: ((sq.colour % 3) + 1) as 1 | 2 | 3, selected: sel, order, alive, total: sq.members.length }) : standInSquad(sq.colour % 3, sel)));
       }
       if (b.id.startsWith("chip")) {
@@ -138,7 +139,7 @@ export function hudArt(scene: Phaser.Scene): HudArt {
         const u = sq ? sim.unit(sq.members[k]) : undefined;
         if (!u) return null;
         const hp = hpOf(u);
-        const key = `hud:tag:${u.id}:${hp}:${u.rank}`;
+        const key = `hud:tag:${u.look}:${u.name}:${hp}:${u.rank}`;
         return tex(key, () => (buildTag ? buildTag({ name: u.name, rank: Math.min(7, u.rank), face: faceOf(u), hp, selected: false }) : standInTag(u, false)));
       }
       const kind = b.id.startsWith("order_") ? b.id.slice(6) : b.id === "pause" && s.paused ? "play" : b.id;

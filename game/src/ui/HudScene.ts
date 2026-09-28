@@ -341,6 +341,18 @@ export class HudScene extends Phaser.Scene {
     this.gfx.fillStyle(hex(PAL.shared.outline), alpha).fillRect(Math.floor(b.x - pad), Math.floor(b.y - pad + 1), Math.ceil(b.width + pad * 2), Math.ceil(b.height + pad * 2 - 2));
   }
 
+  /** A 7-pixel box beside an objective: empty while open, a tick when done, a cross when failed. */
+  private checkbox(x: number, y: number, status: string, col: RGB) {
+    const g = this.gfx;
+    g.fillStyle(hex(col), 1);
+    g.fillRect(x, y, 7, 1).fillRect(x, y + 6, 7, 1).fillRect(x, y, 1, 7).fillRect(x + 6, y, 1, 7);
+    const marks: Record<string, number[][]> = {
+      done: [[1, 3], [2, 4], [3, 3], [4, 2], [5, 1]],
+      failed: [[1, 1], [2, 2], [3, 3], [4, 4], [5, 5], [5, 1], [4, 2], [2, 4], [1, 5]],
+    };
+    for (const [px, py] of marks[status] ?? []) g.fillRect(x + px, y + py, 1, 1);
+  }
+
   private hideTextsExcept(keep: Set<string>) {
     for (const [k, t] of this.texts) if (!keep.has(k)) t.setVisible(false);
   }
@@ -361,11 +373,13 @@ export class HudScene extends Phaser.Scene {
     const objs = s.objectives.filter((o) => o.primary || o.status !== "open");
     const ox = W - this.safe.right - 6;
     objs.forEach((o, k) => {
-      const mark = o.status === "done" ? "+" : o.status === "failed" ? "x" : "-";
       const col = o.status === "done" ? PAL.hud.hp_ok : o.status === "failed" ? PAL.hud.hp_low : PAL.shared.chalk;
       keep.add(`obj${k}`);
-      const t = this.text(`obj${k}`, ox, this.safe.top + 40 + k * 10, `${o.text} ${mark}`, { color: col, align: 1 });
-      this.panelBehind(t, 2, 0.55);
+      const y = this.safe.top + 40 + k * 10;
+      const t = this.text(`obj${k}`, ox - 10, y, o.text, { color: col, align: 1 });
+      const b = t.getBounds();
+      this.gfx.fillStyle(hex(PAL.shared.outline), 0.55).fillRect(Math.floor(b.x - 2), y - 1, Math.ceil(b.width) + 14, 9);
+      this.checkbox(ox - 7, y, o.status, col);
     });
     const banner = this.g.run.phase.banner?.(sim);
     if (banner && !s.paused) { keep.add("banner"); const t = this.text("banner", W / 2, this.safe.top + 92, banner, { align: 0.5 }); this.panelBehind(t, 3, 0.7); }

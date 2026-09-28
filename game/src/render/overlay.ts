@@ -23,6 +23,8 @@ export class Overlay {
     this.canvas = document.createElement("canvas");
     this.ctx = this.canvas.getContext("2d")!;
     this.resize();
+    // the scene starts once per phase; the last phase's overlay texture is still registered
+    if (scene.textures.exists("overlay")) scene.textures.remove("overlay");
     this.tex = scene.textures.addCanvas("overlay", this.canvas)!;
     this.image = scene.add.image(0, 0, "overlay").setOrigin(0).setScrollFactor(0).setDepth(-4e5);
     this.checker = this.pattern(PAL.shared.cone_yellow, 0.42);
