@@ -6,7 +6,7 @@ import tmjText from "../../maps/arsenal.tmj?raw";
 import { mapFromTiled, type TiledMap } from "../content/tiled";
 import { gridFromMap, type MapData } from "../content/mapdata";
 import { Sim } from "../sim/sim";
-import { newCampaign, tasksLeft, type Campaign, type TaskId, type TaskResult, type FinaleResult } from "../missions/campaign";
+import { newCampaign, settleAbandoned, tasksLeft, type Campaign, type TaskId, type TaskResult, type FinaleResult } from "../missions/campaign";
 import type { Phase } from "../missions/types";
 import { signalTask } from "../missions/signal";
 import { ghettoTask } from "../missions/ghetto";
@@ -85,7 +85,11 @@ export class Flow {
   /** Start a phase in the game scene (or resume one from a bookmark's snapshot). */
   play(id: string, restore?: string) {
     const run = this.makeRun(id, restore);
+    // ironman: the save names the phase from its first moment, so a reload cannot replay it
+    this.campaign.inPhase = id as TaskId | "finale";
+    void store.saveCampaign(this.campaign);
     const onEnd = (sim: Sim) => {
+      this.campaign.inPhase = undefined;
       const res = run.phase.finish(sim, this.campaign);
       if (run.phase.kind === "task") this.campaign.results[id as TaskId] = res as TaskResult;
       else this.campaign.finale = res as FinaleResult;
@@ -121,6 +125,7 @@ export class Flow {
     const c = await store.loadCampaign();
     if (!c) return this.newOperation();
     this.campaign = c;
+    if (settleAbandoned(c)) void store.saveCampaign(c);
     if (tasksLeft(c).length) this.start("briefing", { flow: this });
     else if (!c.finale) this.toFinale();
     else this.start("note", { flow: this });

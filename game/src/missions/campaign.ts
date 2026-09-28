@@ -48,12 +48,32 @@ export interface Campaign {
   benched: number[];
   finale?: FinaleResult;
   started: number;
+  /** The phase being played, saved when it starts and cleared when it ends: a save that still
+   *  names one was left mid-phase. */
+  inPhase?: TaskId | "finale";
 }
 
 export function newCampaign(seed = 260343): Campaign {
   const soldiers: Record<string, SoldierStatus> = {};
   for (const s of SQUADS) for (const p of s.people) soldiers[p.key] = { key: p.key, state: "ok", kills: 0 };
   return { version: 1, seed, stage: "briefing", assign: { signal: 2, ghetto: 1, oldtown: 0 }, soldiers, results: {}, decisions: {}, benched: [], started: 0 };
+}
+
+/**
+ * Ironman (vault decision: no loading during a phase). A phase left without its one-time
+ * bookmark, by a closed tab or a reload, is not played again: it counts as failed, with nothing
+ * gained. Returns the phase it settled, or null when none was open.
+ */
+export function settleAbandoned(c: Campaign): TaskId | "finale" | null {
+  const id = c.inPhase;
+  if (!id) return null;
+  c.inPhase = undefined;
+  if (id === "finale") {
+    if (!c.finale) c.finale = { outcome: "fail", rudy: "lost", freed: 0, prisonersKilled: 0, fallen: [], germansKilled: 0, seconds: 0 };
+  } else if (!c.results[id]) {
+    c.results[id] = { outcome: "fail", silent: false, flags: {}, seconds: 0 };
+  }
+  return id;
 }
 
 export function tasksLeft(c: Campaign): TaskId[] {
