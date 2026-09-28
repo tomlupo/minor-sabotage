@@ -1,6 +1,6 @@
 // Saves in the game's own IndexedDB database "minor-sabotage" (ADR-0001), never the
-// prototype's shared /Saves. Two records: the campaign (between phases) and a one-time
-// bookmark of the phase in progress, written when the phone is locked.
+// prototype's shared /Saves. Two records: the campaign (between phases, and a phase's losses as
+// they happen) and a one-time bookmark of the phase in progress, written when the phone is locked.
 import type { Campaign } from "../missions/campaign";
 
 const DB = "minor-sabotage";

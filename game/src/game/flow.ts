@@ -1,6 +1,7 @@
 // The operation from title to history note. Holds the campaign, builds each phase's rules
 // from the Tiled map, and moves between screens. Saves between phases (IndexedDB
-// "minor-sabotage", ADR-0001), never during one; a locked phone gets one resume.
+// "minor-sabotage", ADR-0001), and during one only its losses (ironman); a locked phone gets
+// one resume.
 import Phaser from "phaser";
 import tmjText from "../../maps/arsenal.tmj?raw";
 import { mapFromTiled, type TiledMap } from "../content/tiled";
@@ -102,8 +103,8 @@ export class Flow {
     this.start("card", { phase: run.phase, next: () => this.game.scene.start("game", { run: { ...run, onEnd }, flow: this }) });
   }
 
-  /** A man of ours falls or goes down: the save hears of it at once (ironman). */
-  noteLoss(key: string, state: "dead" | "wounded") {
+  /** A man of ours falls, goes down or is got up: the save hears of it at once (ironman). */
+  noteLoss(key: string, state: "dead" | "down" | "wounded") {
     if (recordLoss(this.campaign, key, state)) void store.saveCampaign(this.campaign);
   }
 

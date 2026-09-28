@@ -19,6 +19,8 @@ export function setAnim(u: Unit, a: Unit["anim"], lock = 0): void {
 
 /** Send a unit along a route to (x, y). Returns false if no route. */
 export function goTo(sim: Sim, u: Unit, x: number, y: number, maxNodes = 12000): boolean {
+  // nobody walks into burning petrol: sent into it, he stops at its edge
+  ({ x, y } = sim.outOfFire(x, y, u.x, u.y));
   u.goalX = x;
   u.goalY = y;
   if (Math.hypot(x - u.x, y - u.y) < 0.2) { u.path = []; return true; }
@@ -38,6 +40,11 @@ export function stepMovement(sim: Sim, dt: number): void {
   for (const u of units) {
     if (u.state !== "ok" || u.hidden) continue;
     const kneeling = u.task && (u.task.kind === "work" || u.task.kind === "help") && u.task.phase === "work";
+    // a fire lit across his way since the route was made: he goes round it, or stops at its edge
+    if (u.path.length && !kneeling && sim.state.fires.length && (sim.state.tick + u.id) % 5 === 0 && !sim.clearOfFire(u.x, u.y, u.path[0].x, u.path[0].y)) {
+      const last = u.path[u.path.length - 1];
+      goTo(sim, u, last.x, last.y, 4000);
+    }
     if (u.path.length && !kneeling) {
       const p = u.path[0];
       const dx = p.x - u.x, dy = p.y - u.y;
@@ -170,13 +177,9 @@ export function stepSquads(sim: Sim, dt: number): void {
       sq.signalRoute = null;
       sq.order = "hold";
     }
-    // the leader picked on the strip goes alone: the column stays where it stood
+    // the leader picked on the strip goes alone: the column keeps the rest point it had
     const alone = s.picked === L.id;
-    if (alone) {
-      // (the rest point is where the squad stood when he left)
-    } else if (L.moving || L.path.length) {
-      sq.restX = L.x; sq.restY = L.y; sq.restDir = L.dir;
-    } else if (Math.hypot(sq.restX - L.x, sq.restY - L.y) > 0.6) {
+    if (!alone && (L.moving || L.path.length || Math.hypot(sq.restX - L.x, sq.restY - L.y) > 0.6)) {
       sq.restX = L.x; sq.restY = L.y; sq.restDir = L.dir;
     }
 
@@ -234,7 +237,7 @@ function stepFollowers(sim: Sim, _dt: number): void {
     const d = Math.hypot(bx - u.x, by - u.y);
     if (d < 0.6) { u.path = []; continue; }
     if ((s.tick + u.id) % 5 !== 0 && u.path.length) continue;
-    if (sim.grid.walkLine(u.x, u.y, bx, by, 0.25)) u.path = [{ x: bx, y: by }];
+    if (sim.grid.walkLine(u.x, u.y, bx, by, 0.25) && sim.clearOfFire(u.x, u.y, bx, by)) u.path = [{ x: bx, y: by }];
     else goTo(sim, u, bx, by, 2500);
   }
 }

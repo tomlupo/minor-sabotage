@@ -149,9 +149,10 @@ export function cmdWork(sim: Sim, x: number, y: number, what: string, ref: strin
     if (!best) return null;
     best.task = { kind: "work", what, ref, x, y, t: 0, dur, phase: "approach" };
   }
-  // the squad goes with him (it moves as one); he detaches for the last few metres
+  // the squad goes with him (it moves as one) and he detaches for the last few metres; a man
+  // picked on the strip goes alone, and the squad stays
   const L = sim.leaderOf(sq);
-  if (L && L !== best) {
+  if (L && L !== best && best.id !== sim.state.picked) {
     const d = Math.hypot(x - L.x, y - L.y);
     if (d > 4) goTo(sim, L, x - ((x - L.x) / d) * 3, y - ((y - L.y) / d) * 3);
   }

@@ -420,17 +420,34 @@ export class Sim {
     return this.state.fires.find((f) => Math.hypot(x - f.x, y - f.y) < f.r * 0.8 + margin) ?? null;
   }
 
-  /** Whether a straight walk from (x0, y0) to (x1, y1) keeps out of every fire, leaving aside a
-   *  fire it starts or ends in: a man walks out of one, or is sent into one on purpose. */
+  /** Whether a straight walk from (x0, y0) to (x1, y1) keeps out of every fire. Nobody walks
+   *  into one, so a walk that ends in a fire is not clear; a man standing in one may walk out,
+   *  so a walk that starts in a fire is clear when it heads away from its centre. */
   clearOfFire(x0: number, y0: number, x1: number, y1: number): boolean {
     for (const f of this.state.fires) {
       const r = f.r * 0.8 + 0.4;
-      if (Math.hypot(x0 - f.x, y0 - f.y) < r || Math.hypot(x1 - f.x, y1 - f.y) < r) continue;
+      if (Math.hypot(x1 - f.x, y1 - f.y) < r) return false;
       const dx = x1 - x0, dy = y1 - y0, l2 = dx * dx + dy * dy;
+      if (Math.hypot(x0 - f.x, y0 - f.y) < r) {
+        if ((x0 - f.x) * dx + (y0 - f.y) * dy < 0) return false;
+        continue;
+      }
       const t = l2 ? Math.max(0, Math.min(1, ((f.x - x0) * dx + (f.y - y0) * dy) / l2)) : 0;
       if (Math.hypot(x0 + dx * t - f.x, y0 + dy * t - f.y) < r) return false;
     }
     return true;
+  }
+
+  /** (x, y), or when it lies in a fire, the spot at the fire's edge on the side of (fromX,
+   *  fromY): where a man sent into burning petrol stops. */
+  outOfFire(x: number, y: number, fromX: number, fromY: number): Pt {
+    for (const f of this.state.fires) {
+      const r = f.r * 0.8 + 0.6;
+      if (Math.hypot(x - f.x, y - f.y) >= r - 0.2) continue;
+      const a = fromX === f.x && fromY === f.y ? 0 : Math.atan2(fromY - f.y, fromX - f.x);
+      return this.grid.nearestWalkable(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r, 2) ?? { x, y };
+    }
+    return { x, y };
   }
 
   // ------------------------------------------------------------------ harm

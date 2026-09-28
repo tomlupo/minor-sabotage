@@ -131,7 +131,10 @@ function work(sim: Sim, u: Unit): void {
   const d = Math.hypot(t.x - u.x, t.y - u.y);
   // petrol burning on the spot: he waits at its edge, facing the job, until it goes out
   const f = sim.fireAt(t.x, t.y, 0.4);
-  if (f && (t.phase === "work" || d <= WORK_DETACH || isLeader(sim, u))) {
+  // (the leader and the man picked on the strip walk to a job themselves; the column carries
+  // anyone else until it is close)
+  const ownWay = isLeader(sim, u) || u.id === sim.state.picked;
+  if (f && (t.phase === "work" || d <= WORK_DETACH || ownWay)) {
     if (t.phase === "work") { t.phase = "approach"; setAnim(u, "idle"); }
     const a = Math.atan2(u.y - f.y, u.x - f.x);
     const wx = f.x + Math.cos(a) * (f.r * 0.8 + 1), wy = f.y + Math.sin(a) * (f.r * 0.8 + 1);
@@ -154,7 +157,7 @@ function work(sim: Sim, u: Unit): void {
       return;
     }
     // he walks in the column until the job is close, then goes to it
-    if (d > WORK_DETACH && !isLeader(sim, u)) return;
+    if (d > WORK_DETACH && !ownWay) return;
     if (!u.path.length) goTo(sim, u, t.x, t.y, 6000);
     return;
   }

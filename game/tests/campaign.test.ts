@@ -26,12 +26,19 @@ describe("campaign", () => {
   it("keeps a death recorded during a phase through the settling of it", () => {
     const c = newCampaign();
     c.inPhase = "signal";
-    // a man falls, another goes down, in the phase that is then left by a reload
+    // in the phase that is then left by a reload: one man falls, one goes down and is left
+    // lying, one goes down and is got up
     expect(recordLoss(c, "kuba", "dead")).toBe(true);
-    expect(recordLoss(c, "jur", "wounded")).toBe(true);
+    expect(recordLoss(c, "jur", "down")).toBe(true);
+    expect(recordLoss(c, "kadlubek", "down")).toBe(true);
+    expect(recordLoss(c, "kadlubek", "wounded")).toBe(true);
     settleAbandoned(c);
     expect(c.soldiers.kuba.state).toBe("dead");
-    expect(c.soldiers.jur.state).toBe("wounded");
+    // left where he lay, a veteran is taken: a reload cannot save him (as at a phase's end)
+    expect(c.soldiers.jur.state).toBe("captured");
+    expect(c.soldiers.kadlubek.state).toBe("wounded");
+    // being got up needs having been down
+    expect(recordLoss(c, "giewont", "wounded")).toBe(false);
     // a wound never overwrites a death or a capture
     expect(recordLoss(c, "kuba", "wounded")).toBe(false);
     c.soldiers.kopec.state = "captured";

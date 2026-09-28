@@ -39,11 +39,11 @@ export class GameScene extends Phaser.Scene {
     super("game");
   }
 
-  flow: Flow | null = null;
+  flow!: Flow;
 
-  init(data: { run: PhaseRun; flow?: Flow }) {
+  init(data: { run: PhaseRun; flow: Flow }) {
     this.run = data.run;
-    this.flow = data.flow ?? null;
+    this.flow = data.flow;
     this.ended = 0;
     this.mapView = false;
   }
@@ -54,7 +54,7 @@ export class GameScene extends Phaser.Scene {
     if (document.hidden) {
       if (sim.state.outcome) return;
       sim.state.paused = true;
-      if (this.flow) void store.saveBookmark({ phase: phase.id, campaign: this.flow.campaign, sim: sim.snapshot(), at: Date.now() });
+      void store.saveBookmark({ phase: phase.id, campaign: this.flow.campaign, sim: sim.snapshot(), at: Date.now() });
     } else {
       void store.takeBookmark();
     }
@@ -108,10 +108,10 @@ export class GameScene extends Phaser.Scene {
       this.fx.handle(sim, e);
       sound.event(sim, e);
       if (e.t === "explosion") this.cameras.main.shake(180, 0.006);
-      // ironman: a death or a man down reaches the save at once, so a reload cannot undo it
-      if ((e.t === "death" || e.t === "down") && this.flow) {
+      // ironman: a man falling, going down or being got up reaches the save at once
+      if (e.t === "death" || e.t === "down" || e.t === "up") {
         const u = sim.unit(e.unit);
-        if (u && u.side === "pl" && u.tag) this.flow.noteLoss(u.tag, e.t === "death" ? "dead" : "wounded");
+        if (u && u.side === "pl" && u.tag) this.flow.noteLoss(u.tag, e.t === "death" ? "dead" : e.t === "down" ? "down" : "wounded");
       }
     }
     if (events.length) this.events.emit("sim-events", events);

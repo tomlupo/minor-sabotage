@@ -1,12 +1,14 @@
 // The operation as the player lives it: who is alive, wounded or taken, which squad took
-// which task, what each task left behind for the finale. Saved between phases (never during
-// one); ironman, one save.
-import { SQUADS } from "../content/arsenal/roster";
+// which task, what each task left behind for the finale. Saved between phases, and during one
+// only what a reload must not undo: a man falling, going down, being got up. Ironman, one save.
+import { PEOPLE, SQUADS } from "../content/arsenal/roster";
+import { WOUND } from "../sim/tuning";
 
 export type TaskId = "signal" | "ghetto" | "oldtown";
 export const TASKS: TaskId[] = ["signal", "ghetto", "oldtown"];
 
-export type SoldierState = "ok" | "wounded" | "dead" | "captured" | "evacuated";
+/** "down" only while a phase runs: he lies wounded and has not been got up yet. */
+export type SoldierState = "ok" | "wounded" | "down" | "dead" | "captured" | "evacuated";
 
 export interface SoldierStatus {
   key: string;
@@ -68,6 +70,10 @@ export function settleAbandoned(c: Campaign): TaskId | "finale" | null {
   const id = c.inPhase;
   if (!id) return null;
   c.inPhase = undefined;
+  // a man still lying where he fell was left, as at any phase's end: a veteran is taken
+  for (const s of Object.values(c.soldiers)) {
+    if (s.state === "down") s.state = (PEOPLE[s.key]?.rank ?? 0) >= WOUND.vetRank ? "captured" : "dead";
+  }
   if (id === "finale") {
     if (!c.finale) c.finale = { outcome: "fail", rudy: "lost", freed: 0, prisonersKilled: 0, fallen: [], germansKilled: 0, seconds: 0 };
   } else if (!c.results[id]) {
@@ -77,13 +83,15 @@ export function settleAbandoned(c: Campaign): TaskId | "finale" | null {
 }
 
 /**
- * A man of ours falls, or goes down, during a phase. The save hears of it at once (ironman):
- * a reload cannot bring him back. A wound never overwrites a death or a capture. Returns
- * whether the record changed.
+ * A man of ours falls ("dead"), goes down ("down") or is got up ("wounded") during a phase.
+ * The save hears of it at once (ironman): a reload can neither bring him back nor save him
+ * from being left where he lay. Nothing overwrites a death or a capture, and only a man who
+ * was down is got up. Returns whether the record changed.
  */
-export function recordLoss(c: Campaign, key: string, state: "dead" | "wounded"): boolean {
+export function recordLoss(c: Campaign, key: string, state: "dead" | "down" | "wounded"): boolean {
   const s = c.soldiers[key];
   if (!s || s.state === "dead" || s.state === "captured" || s.state === state) return false;
+  if (state === "wounded" && s.state !== "down") return false;
   s.state = state;
   return true;
 }

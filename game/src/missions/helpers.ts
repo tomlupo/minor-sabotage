@@ -91,7 +91,8 @@ export function objectiveDone(sim: Sim, id: string): boolean {
 
 /**
  * A guard post is silenced when its door is blown, or when every sentry at it is dead before
- * it has begun sending men: once it sends them, only blowing it up stops it (mission-shape
+ * it has begun sending men: once it sends them, only destroying it stops it, with a grenade
+ * or a petrol bottle at its door (mission-shape
  * decision). Marks its objective done and the post quiet; returns whether it is silenced.
  */
 export function silencePost(sim: Sim, spawnerTag: string, sentryTags: string[], objectiveId: string): boolean {

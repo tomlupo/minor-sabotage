@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Grid, F_SIGHT, F_WALK } from "../src/sim/grid";
 import { Sim } from "../src/sim/sim";
 import { makeSquad, fieldSquad } from "../src/sim/setup";
-import { cmdMove, cmdTapEnemy, cmdThrow, cmdHelp, cmdSelectSquad, cmdOrder, cmdPick } from "../src/sim/commands";
+import { cmdMove, cmdTapEnemy, cmdThrow, cmdHelp, cmdSelectSquad, cmdOrder, cmdPick, cmdWork } from "../src/sim/commands";
 import { goTo } from "../src/sim/move";
 
 /** An open 60 x 40 m yard with a wall across the middle, gap at the north end. */
@@ -207,6 +207,34 @@ describe("fire on the street", () => {
     expect(Math.hypot(u.x - 20, u.y - 20)).toBeLessThan(1);
     expect(closest).toBeGreaterThan(1.6); // a fire hurts inside 0.8 of its radius
   });
+
+  it("is walked round when it is lit ahead on a route already being walked", () => {
+    const sim = new Sim(yard());
+    const { us } = squadOf4(sim, 6, 20);
+    cmdMove(sim, 26, 20);
+    run(sim, 1);
+    // a bottle bursts on the column's way, a few metres ahead of the leader
+    sim.state.fires.push({ id: 998, x: us[0].x + 5, y: 20, r: 2, t: 60 });
+    const fx = us[0].x + 5;
+    let closest = Infinity;
+    for (let i = 0; i < 30 * 10; i++) {
+      sim.step();
+      for (const u of us) closest = Math.min(closest, Math.hypot(u.x - fx, u.y - 20));
+    }
+    expect(closest).toBeGreaterThan(1.6);
+    expect(us.every((u) => u.state === "ok" && !u.wounded)).toBe(true);
+    expect(Math.hypot(us[0].x - 26, us[0].y - 20)).toBeLessThan(1.5);
+  });
+
+  it("is not crossed by a man standing at its edge", () => {
+    const sim = new Sim(yard());
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 13.1, y: 20, weapon: "sten" });
+    sim.state.fires.push({ id: 997, x: 15, y: 20, r: 2.1, t: 60 }); // he stands 1.9 m from it
+    goTo(sim, u, 20, 20);
+    let closest = Infinity;
+    for (let i = 0; i < 30 * 8; i++) { sim.step(); closest = Math.min(closest, Math.hypot(u.x - 15, u.y - 20)); }
+    expect(closest).toBeGreaterThan(2.1 * 0.8);
+  });
 });
 
 describe("a guard post", () => {
@@ -265,6 +293,24 @@ describe("picking a man on the strip", () => {
     expect(cmdPick(sim, him.id)).toBe(false);
     run(sim, 8);
     expect(Math.hypot(him.x - us[0].x, him.y - us[0].y)).toBeLessThan(4);
+  });
+
+  it("sends him alone to a job, however far, while the squad stays", () => {
+    const sim = new Sim(yard());
+    const { us } = squadOf4(sim, 10, 20);
+    run(sim, 1);
+    const at = us.map((u) => [u.x, u.y]);
+    const him = us[2];
+    cmdPick(sim, him.id);
+    cmdWork(sim, 22, 32, "test_job", "", 1.2);
+    let done = false;
+    for (let i = 0; i < 30 * 15 && !done; i++) {
+      sim.state.paused = false;
+      sim.step();
+      done = sim.drainEvents().some((e) => e.t === "work" && e.done && e.unit === him.id);
+    }
+    expect(done).toBe(true);
+    for (const k of [0, 1, 3]) expect(Math.hypot(us[k].x - at[k][0], us[k].y - at[k][1])).toBeLessThan(1.5);
   });
 
   it("sends the leader alone too: the column stays where it stood", () => {
