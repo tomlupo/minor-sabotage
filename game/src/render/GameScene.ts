@@ -85,7 +85,9 @@ export class GameScene extends Phaser.Scene {
     this.events.once("shutdown", () => {
       this.scale.off("resize", this.onResize, this);
       document.removeEventListener("visibilitychange", this.onVisibility);
+      sound.endPhase();
     });
+    sound.beginPhase();
     sound.music(phase.music === "finale" ? "finale" : "stealth");
     sound.ambience(true);
     this.scene.launch("hud", { game: this });
