@@ -8,8 +8,9 @@ import { SQUADS } from "../../content/arsenal/roster";
 import { PAL, SQUAD_COLOURS, hex, mix } from "../../art/palette";
 import { toCanvas } from "../../art/pixel";
 import { drawPlan } from "../plan";
-import { registerFonts, txt, PX, PXS, PXB } from "../text";
+import { txt, setFace, PX, PXS, PXB } from "../text";
 import { readSafeInsets } from "../../render/view";
+import { screen, fitCamera } from "../../render/screen";
 import { sound } from "../../render/sound";
 
 const INFO: Record<TaskId, { letter: string; title: string; place: string; job: string; helps?: string; at: [number, number] }> = {
@@ -38,7 +39,8 @@ export class BriefingScene extends Phaser.Scene {
   }
 
   create() {
-    registerFonts(this);
+    fitCamera(this);
+    setFace(this, "type");
     this.cameras.main.setBackgroundColor(hex(PAL.city_1943.soot[0]));
     this.draw();
     this.scale.on("resize", this.draw, this);
@@ -52,8 +54,8 @@ export class BriefingScene extends Phaser.Scene {
     this.children.removeAll(true);
     this.layer = this.add.container(0, 0);
     const c = this.flow.campaign;
-    const W = this.scale.width, H = this.scale.height;
-    const S = readSafeInsets(1.5);
+    const W = screen.w, H = screen.h;
+    const S = readSafeInsets(screen.zoom);
     const L = S.left + 6, R = W - S.right - 6, T = S.top + 6, B = H - S.bottom - 6;
     const planW = Math.min(310, Math.floor((R - L) * 0.55)), planH = B - T;
     const md = mapData();
@@ -61,6 +63,11 @@ export class BriefingScene extends Phaser.Scene {
     const key = `plan:${planW}x${planH}`;
     if (!this.textures.exists(key)) this.textures.addCanvas(key, toCanvas(plan.image));
     this.add.image(L, T, key).setOrigin(0);
+    // the street names, typed over the plan; a vertical one letter under letter
+    for (const l of plan.labels) {
+      const text = l.vertical ? [...l.text].join("\n") : l.text;
+      txt(this, L + l.x, T + l.y, text, { font: PXS, color: PAL.hud.paper_ink, align: 0.5, lineGap: l.vertical ? -1 : 0 });
+    }
     this.add.rectangle(L + 3, T + 3, planW - 6, 26, hex(PAL.hud.paper[1])).setOrigin(0);
     txt(this, L + 6, T + 5, "AKCJA POD ARSENAŁEM", { font: PXB, color: PAL.hud.paper_ink });
     txt(this, L + 6, T + 19, "Warsaw, 26 March 1943. The van leaves Szucha about five.", { font: PXS, color: PAL.hud.paper_ink });
@@ -76,7 +83,8 @@ export class BriefingScene extends Phaser.Scene {
       txt(this, x, y - 4, info.letter, { color: col, align: 0.5 });
     }
     const fx = plan.sx(104) + L, fy = plan.sy(77) + T;
-    txt(this, fx + 5, fy + 3, "the van", { font: PXS, color: PAL.shared.poppy_red });
+    // left of the cross: to its right runs Bielańska's name
+    txt(this, fx - 5, fy + 3, "the van", { font: PXS, color: PAL.shared.poppy_red, align: 1 });
 
     // task cards
     const cx = L + planW + 8, cw = R - cx;
@@ -111,8 +119,8 @@ export class BriefingScene extends Phaser.Scene {
       const used = TASKS.find((t) => c.assign[t] === i)!;
       const done = !!c.results[used];
       const r = this.add.rectangle(x, ty, Math.floor(cw / 3) - 4, 26, hex(SQUAD_COLOURS[sq.colour])).setOrigin(0).setStrokeStyle(1, hex(PAL.shared.outline));
-      txt(this, x + 4, ty + 3, sq.name.toUpperCase(), { font: PX, color: PAL.shared.outline });
-      txt(this, x + 4, ty + 15, `${alive}/${sq.people.length} fit`, { font: PXS, color: PAL.shared.outline });
+      txt(this, x + 4, ty + 3, sq.name.toUpperCase(), { font: PX, face: "sans", color: PAL.shared.outline });
+      txt(this, x + 4, ty + 15, `${alive}/${sq.people.length} fit`, { font: PXS, face: "sans", color: PAL.shared.outline });
       if (!done && !c.results[this.sel]) {
         r.setInteractive({ useHandCursor: true }).on("pointerup", () => this.assign(i));
       }
@@ -123,7 +131,7 @@ export class BriefingScene extends Phaser.Scene {
     const label = allDone ? "TO THE ARSENAL" : `GO: ${INFO[this.sel].title.toUpperCase()}`;
     const bw = Math.min(cw, 150), bx = R - bw;
     const go = this.add.rectangle(bx, B - 58 - 2, bw, 28, hex(PAL.hud.button_olive[1])).setOrigin(0).setStrokeStyle(1, hex(PAL.hud.button_rim));
-    txt(this, bx + bw / 2, B - 58 + 7, label, { align: 0.5, color: PAL.hud.button_ink });
+    txt(this, bx + bw / 2, B - 58 + 7, label, { align: 0.5, face: "sans", color: PAL.hud.button_ink });
     go.setInteractive({ useHandCursor: true }).on("pointerup", () => {
       sound.unlock();
       sound.ui("ui_go");

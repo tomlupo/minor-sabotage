@@ -9,9 +9,10 @@ import { allLooks } from "../../content/arsenal/roster";
 import { PAL, hex, lightHex } from "../../art/palette";
 import { toCanvas } from "../../art/pixel";
 import { buildLogo, buildTurtle } from "../../art/hud";
-import { registerFonts, txt, PX, PXS } from "../text";
+import { txt, PX, PXS } from "../text";
 import { sx, sy } from "../../render/iso";
 import { readSafeInsets } from "../../render/view";
+import { screen, fitCamera } from "../../render/screen";
 import { sound } from "../../render/sound";
 import { store, type Bookmark } from "../../game/store";
 
@@ -22,6 +23,9 @@ export class TitleScene extends Phaser.Scene {
   private world!: WorldView;
   private bookmark: Bookmark | null = null;
   private hasSave = false;
+  /** The map's extent in art px, which the drift stays inside. */
+  private mapW = 0;
+  private mapH = 0;
 
   constructor() {
     super("title");
@@ -31,16 +35,17 @@ export class TitleScene extends Phaser.Scene {
   }
 
   async create() {
-    registerFonts(this);
+    // the menu is fixed to the screen from its top-left, so the drift below scrolls by hand
+    fitCamera(this);
     const md = mapData();
     this.sim = simForMap(md, 1);
     this.world = new WorldView(this, md, allLooks());
-    const cam = this.cameras.main;
-    cam.setBounds(0, 0, sx(md.w), sy(md.h));
+    this.mapW = sx(md.w);
+    this.mapH = sy(md.h);
     // the street at dusk (style guide §5: the ambient multiplies the finished frame), then soot
-    this.add.rectangle(0, 0, this.scale.width, this.scale.height, lightHex(PAL.light.ambient.dusk))
+    this.add.rectangle(0, 0, screen.w, screen.h, lightHex(PAL.light.ambient.dusk))
       .setOrigin(0).setScrollFactor(0).setDepth(3e6).setBlendMode(Phaser.BlendModes.MULTIPLY);
-    this.add.rectangle(0, 0, this.scale.width, this.scale.height, hex(PAL.city_1943.soot[0]), 0.45).setOrigin(0).setScrollFactor(0).setDepth(3e6 + 1);
+    this.add.rectangle(0, 0, screen.w, screen.h, hex(PAL.city_1943.soot[0]), 0.45).setOrigin(0).setScrollFactor(0).setDepth(3e6 + 1);
     this.bookmark = await store.takeBookmark();
     const saved = await store.loadCampaign();
     this.hasSave = !!saved && saved.stage !== "note";
@@ -49,8 +54,8 @@ export class TitleScene extends Phaser.Scene {
   }
 
   private drawUi() {
-    const W = this.scale.width, H = this.scale.height;
-    const S = readSafeInsets(1.5);
+    const W = screen.w, H = screen.h;
+    const S = readSafeInsets(screen.zoom);
     const cx = W / 2;
     const d = 3e6 + 10;
     let y = S.top + 18;
@@ -87,7 +92,8 @@ export class TitleScene extends Phaser.Scene {
     const cam = this.cameras.main;
     // a slow drift along Długa towards the Arsenal
     const x = 200 - ((this.t * 2.2) % 150);
-    cam.centerOn(Math.round(sx(x)), Math.round(sy(74)));
+    const left = Math.round(sx(x)) - Math.round(screen.w / 2), top = Math.round(sy(74)) - Math.round(screen.h / 2);
+    cam.setScroll(Math.max(0, Math.min(left, this.mapW - screen.w)), Math.max(0, Math.min(top, this.mapH - screen.h)));
     this.world.update(this.sim, delta / 1000);
   }
 }

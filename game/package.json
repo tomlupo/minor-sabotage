@@ -14,6 +14,8 @@
     "flow": "node tools/shot.mjs --steps tools/flow.json"
   },
   "dependencies": {
+    "@fontsource/barlow-semi-condensed": "^5.3.0",
+    "@fontsource/courier-prime": "^5.3.0",
     "phaser": "4.2.1"
   },
   "devDependencies": {

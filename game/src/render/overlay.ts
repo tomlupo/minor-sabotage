@@ -9,6 +9,7 @@
 // pixel is set whole, in one colour at the opacity its mark is drawn at, with no anti-aliased
 // edge and no blending inside the overlay; the buffer goes to the GPU once a frame.
 import Phaser from "phaser";
+import { screen } from "./screen";
 import type { Sim } from "../sim/sim";
 import { actorOf } from "../sim/commands";
 import { PAL, SQUAD_COLOURS, type RGB } from "../art/palette";
@@ -206,16 +207,19 @@ export class Overlay {
   }
 
   draw(sim: Sim, cam: Phaser.Cameras.Scene2D.Camera, time: number) {
-    // the map view shows the whole zone at a fraction of a pixel: the marks are for the street
-    if (cam.zoom !== 1) { this.image.setVisible(false); return; }
+    // the map view shows the whole zone at a fraction of an art pixel: the marks are for the street
+    if (cam.zoom !== screen.s) { this.image.setVisible(false); return; }
     this.image.setVisible(true);
     const R = this.r;
-    const W = this.scene.scale.width + MARGIN * 2, H = this.scene.scale.height + MARGIN * 2;
+    // the view in art px, and its top left in the world: the camera zooms about its centre, and
+    // was moved this frame (its worldView is only brought up to date when it renders)
+    const vw = cam.width / cam.zoom, vh = cam.height / cam.zoom;
+    const W = Math.ceil(vw) + MARGIN * 2, H = Math.ceil(vh) + MARGIN * 2;
     if (R.size(W, H)) {
       this.tex.setSize(W, H);
       this.image.setTexture("overlay");
     }
-    const ox = Math.floor(cam.scrollX) - MARGIN, oy = Math.floor(cam.scrollY) - MARGIN;
+    const ox = Math.floor(cam.scrollX + (cam.width - vw) / 2) - MARGIN, oy = Math.floor(cam.scrollY + (cam.height - vh) / 2) - MARGIN;
     R.begin(ox, oy);
     this.image.setPosition(ox, oy);
     const X = (x: number) => Math.round(sx(x));

@@ -1,12 +1,12 @@
 // The briefing's city plan (style guide §9): the operation's map drawn like an underground
 // sketch on paper, from the same map data the game plays on. Buildings hatched in pencil,
-// streets left white with their names, the van's route dotted, the S-bend marked.
+// streets left white with their names, the van's route dotted, the S-bend marked. The names
+// come back as labels, which the briefing sets in type over the plan.
 import type { MapData } from "../content/mapdata";
 import { F_SIGHT } from "../content/mapdata";
 import type { PixelImage } from "../art/pixel";
 import { img, px, line, hash2, blit } from "../art/pixel";
 import { PAL, mix } from "../art/palette";
-import { FONT_SMALL, drawText, measure } from "../art/font";
 import { buildPaper } from "../art/hud";
 
 export interface PlanView {
@@ -14,6 +14,15 @@ export interface PlanView {
   /** metres -> plan px */
   sx: (x: number) => number;
   sy: (y: number) => number;
+  /** The street names, in plan px: a line's centre and top, or a column of letters from its top. */
+  labels: PlanLabel[];
+}
+
+export interface PlanLabel {
+  text: string;
+  x: number;
+  y: number;
+  vertical: boolean;
 }
 
 export function drawPlan(md: MapData, w: number, h: number): PlanView {
@@ -27,6 +36,7 @@ export function drawPlan(md: MapData, w: number, h: number): PlanView {
   const ox = Math.round((w - md.w * k) / 2), oy = Math.round((h - md.h * k) / 2);
   const sx = (x: number) => ox + x * k;
   const sy = (y: number) => oy + y * k;
+  const labels: PlanLabel[] = [];
   // buildings: pencil hatching inside, ink outline
   for (let py = 0; py < h; py++) {
     for (let pxx = 0; pxx < w; pxx++) {
@@ -52,8 +62,7 @@ export function drawPlan(md: MapData, w: number, h: number): PlanView {
       const x0 = sx(ars.x) + t, y0 = sy(ars.y) + t, x1 = sx(ars.x + ars.w) - 1 - t, y1 = sy(ars.y + ars.d) - 1 - t;
       line(im, x0, y0, x1, y0, ink); line(im, x1, y0, x1, y1, ink); line(im, x1, y1, x0, y1, ink); line(im, x0, y1, x0, y0, ink);
     }
-    const lbl = "ARSENAŁ";
-    drawText(im, FONT_SMALL, Math.round(sx(ars.x + ars.w / 2) - measure(FONT_SMALL, lbl) / 2), Math.round(sy(ars.y + ars.d / 2) - 3), lbl, ink);
+    labels.push({ text: "ARSENAŁ", x: Math.round(sx(ars.x + ars.w / 2)), y: Math.round(sy(ars.y + ars.d / 2) - 3), vertical: false });
   }
   const ruins = md.streets.find((s) => s.name === "the ruins");
   if (ruins) {
@@ -64,9 +73,9 @@ export function drawPlan(md: MapData, w: number, h: number): PlanView {
   }
   // street names along the streets
   const label = (text: string, x: number, y: number, vertical = false) => {
-    if (!vertical) { drawText(im, FONT_SMALL, Math.round(sx(x) - measure(FONT_SMALL, text) / 2), Math.round(sy(y) - 2), text, ink); return; }
-    let yy = Math.round(sy(y) - (text.length * 6) / 2);
-    for (const ch of text) { drawText(im, FONT_SMALL, Math.round(sx(x) - 2), yy, ch, ink); yy += 6; }
+    labels.push(vertical
+      ? { text, x: Math.round(sx(x)), y: Math.round(sy(y) - (text.length * 6) / 2), vertical }
+      : { text, x: Math.round(sx(x)), y: Math.round(sy(y) - 2), vertical });
   };
   label("DŁUGA", 40, 79);
   label("DŁUGA", 226, 79);
@@ -94,5 +103,5 @@ export function drawPlan(md: MapData, w: number, h: number): PlanView {
     const cx = Math.round(sx(104)), cy = Math.round(sy(77));
     for (let t = -3; t <= 3; t++) { px(im, cx + t, cy + t, PAL.shared.poppy_red); px(im, cx + t, cy - t, PAL.shared.poppy_red); px(im, cx + t + 1, cy + t, PAL.shared.poppy_red); px(im, cx + t + 1, cy - t, PAL.shared.poppy_red); }
   }
-  return { image: im, sx, sy };
+  return { image: im, sx, sy, labels };
 }

@@ -1,5 +1,6 @@
 import Phaser from "phaser";
 import { computeView } from "./render/view";
+import { setScreen } from "./render/screen";
 import { GameScene } from "./render/GameScene";
 import { HudScene } from "./ui/HudScene";
 import { TitleScene } from "./ui/screens/TitleScene";
@@ -9,11 +10,13 @@ import { NoteScene } from "./ui/screens/NoteScene";
 import { IntroScene } from "./ui/screens/IntroScene";
 import { CardScene } from "./ui/screens/CardScene";
 import { Flow, fakeResults, bootDone } from "./game/flow";
-import { registerFonts } from "./ui/text";
+import { loadFonts } from "./ui/fonts";
 import { PAL, hex } from "./art/palette";
 
 const parent = document.getElementById("game")!;
-const v0 = computeView(window.innerWidth, window.innerHeight);
+const dpr = () => window.devicePixelRatio || 1;
+const v0 = computeView(window.innerWidth, window.innerHeight, dpr());
+setScreen(v0);
 
 // Debug entry points (the headless playtest harness uses them):
 //   ?phase=signal|ghetto|oldtown|finale   straight into a phase
@@ -22,7 +25,12 @@ const v0 = computeView(window.innerWidth, window.innerHeight);
 class Boot extends Phaser.Scene {
   constructor() { super("boot"); }
   create() {
-    registerFonts(this);
+    // both faces are in before any text is measured (a text set in a face still loading keeps
+    // the fallback's size)
+    void loadFonts().then(() => this.start());
+  }
+
+  private start() {
     const q = new URLSearchParams(location.search);
     const flow = new Flow(this.game);
     const ms = (window as unknown as { __ms: Record<string, unknown> }).__ms;
@@ -48,7 +56,8 @@ const game = new Phaser.Game({
   pixelArt: true,
   antialias: false,
   roundPixels: true,
-  scale: { mode: Phaser.Scale.NONE, width: v0.w, height: v0.h, zoom: v0.zoom },
+  // the canvas at the screen's own resolution, shown at the window's CSS size
+  scale: { mode: Phaser.Scale.NONE, width: v0.canvasW, height: v0.canvasH, zoom: 1 / dpr() },
   input: { activePointers: 3 },
   audio: { noAudio: true },
   disableContextMenu: true,
@@ -60,9 +69,11 @@ let pending = 0;
 function relayout() {
   cancelAnimationFrame(pending);
   pending = requestAnimationFrame(() => {
-    const v = computeView(window.innerWidth, window.innerHeight);
-    game.scale.resize(v.w, v.h);
-    game.scale.setZoom(v.zoom);
+    const v = computeView(window.innerWidth, window.innerHeight, dpr());
+    // the scenes read the new view on the resize event, so it is set first
+    setScreen(v);
+    game.scale.resize(v.canvasW, v.canvasH);
+    game.scale.setZoom(1 / dpr());
   });
 }
 window.addEventListener("resize", relayout);

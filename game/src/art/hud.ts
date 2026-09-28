@@ -128,12 +128,39 @@ const BIRCH_CROSS = maskFrom([
 const BIRCH_MARKS: [number, number][] = [[5, 1], [2, 3], [7, 2], [4, 5], [5, 7]];
 
 /**
+ * A line of a HUD image's lettering. The game sets it in its own type over the image
+ * (ui/HudScene), sharp at any screen size; the art lab stamps it in the pixel face. x and y
+ * as drawText takes them: the line's top, and its left edge or centre.
+ */
+export interface Label {
+  text: string;
+  x: number;
+  y: number;
+  size: "px" | "pxs" | "pxb";
+  colour: RGB;
+  align: "left" | "center";
+  shadow?: RGB;
+  /** The widest it may run in art px; past that it is cut, ending in a full stop. */
+  max?: number;
+}
+
+/** Stamp a label in the pixel face, or hand it back (`out`) for the caller to set in type. */
+function letter(im: PixelImage, l: Label, out?: Label[]): void {
+  if (out) {
+    out.push(l);
+    return;
+  }
+  const font = l.size === "pxs" ? FONT_SMALL : l.size === "pxb" ? FONT_BIG : FONT;
+  drawText(im, font, l.x, l.y, l.max === undefined ? l.text : fitText(font, l.text, l.max), l.colour, { align: l.align, shadow: l.shadow });
+}
+
+/**
  * The roster chip (style guide §8): a stamped steel identity tag, 34 x 28, with the chain hole,
  * the face in a pressed window, rank marks, a health notch and the name. "down" adds the
  * wounded cross; "dead" darkens the steel into a grave marker with a birch cross, a mourning
  * band and a poppy, and paints the name so it stays readable.
  */
-export function buildTag(o: TagSpec): PixelImage {
+export function buildTag(o: TagSpec, out?: Label[]): PixelImage {
   const { w, h } = TAG_SIZE;
   const dead = o.hp === "dead";
   const im = img(w, h);
@@ -167,9 +194,7 @@ export function buildTag(o: TagSpec): PixelImage {
     stamp(im, roundBox(8, 4, 1), 22, 11, HUD.ink);
     stamp(im, roundBox(6, 2, 0), 23, 12, o.hp === "ok" ? HUD.hpOk : HUD.hpLow);
   }
-  const name = fitText(FONT_SMALL, o.name.toUpperCase(), w - 6);
-  if (dead) drawText(im, FONT_SMALL, 17, 16, name, HUD.steelHi, { align: "center", shadow: HUD.ink });
-  else drawText(im, FONT_SMALL, 17, 16, name, HUD.ink, { align: "center", shadow: lit });
+  letter(im, { text: o.name.toUpperCase(), x: 17, y: 16, size: "pxs", colour: dead ? HUD.steelHi : HUD.ink, align: "center", shadow: dead ? HUD.ink : lit, max: w - 6 }, out);
   return im;
 }
 
@@ -191,7 +216,7 @@ export const SQUAD_TAG_SIZE = { w: 56, h: 22 } as const;
  * slot (its number when it has none, as the squad you lead does), the leader's nom de guerre,
  * and a pip per trooper, crossed out for the fallen. The selected squad gets a gold frame.
  */
-export function buildSquadTag(o: SquadTagSpec): PixelImage {
+export function buildSquadTag(o: SquadTagSpec, out?: Label[]): PixelImage {
   const { w, h } = SQUAD_TAG_SIZE;
   const base = HUD.squad[o.colour - 1], shade = HUD.squadShade[o.colour - 1];
   const im = img(w, h);
@@ -201,9 +226,8 @@ export function buildSquadTag(o: SquadTagSpec): PixelImage {
   stamp(im, slot, 3, 4, HUD.rim);
   recess(im, slot, 3, 4, shade, HUD.ghost);
   if (o.order) stamp(im, ICONS.get(o.order)!, 4, 5, base);
-  else drawText(im, FONT_BIG, 10, 5 - FONT_BIG.top + 1, String(o.colour), base, { align: "center" });
-  const name = fitText(FONT, o.leader.toUpperCase(), w - 23);
-  drawText(im, FONT, 20, 4 - FONT.top, name, HUD.ink);
+  else letter(im, { text: String(o.colour), x: 10, y: 5 - FONT_BIG.top + 1, size: "pxb", colour: base, align: "center" }, out);
+  letter(im, { text: o.leader.toUpperCase(), x: 20, y: 4 - FONT.top, size: "px", colour: HUD.ink, align: "left", max: w - 23 }, out);
   if (o.total <= 8) {
     for (let i = 0; i < o.total; i++) {
       const x = 20 + i * 4, y = 14;
@@ -211,7 +235,7 @@ export function buildSquadTag(o: SquadTagSpec): PixelImage {
       else for (const [dx, dy] of [[0, 0], [2, 0], [1, 1], [0, 2], [2, 2]]) px(im, x + dx, y + dy, HUD.ink);
     }
   } else {
-    drawText(im, FONT_SMALL, 20, 14 - FONT_SMALL.top, `${o.alive}/${o.total}`, HUD.ink);
+    letter(im, { text: `${o.alive}/${o.total}`, x: 20, y: 14 - FONT_SMALL.top, size: "pxs", colour: HUD.ink, align: "left" }, out);
   }
   return im;
 }
@@ -330,7 +354,7 @@ const WHISTLE = maskFrom([
  * round, GRENADE and petrol BOTTLE 36 round with a count badge (extra.count), the go-code
  * 48 x 30 (whistle and GO), and 30 x 30 pause, map, the four orders, ok and close.
  */
-export function buildButton(kind: ButtonKind, pressed = false, extra: { count?: number } = {}): PixelImage {
+export function buildButton(kind: ButtonKind, pressed = false, extra: { count?: number } = {}, out?: Label[]): PixelImage {
   const { w, h } = BUTTON_SIZE[kind];
   const im = img(w, h);
   const round = kind === "fire" || kind === "grenade" || kind === "bottle";
@@ -345,13 +369,13 @@ export function buildButton(kind: ButtonKind, pressed = false, extra: { count?: 
   const centre = (m: Mask, dy = 0) => stampShadowed(im, m, fx + Math.floor((fw - m.w) / 2), fy + Math.floor((fh - m.h) / 2) + dy, HUD.bink, drop);
   if (kind === "fire") {
     stampShadowed(im, CROSSHAIR, fx + Math.floor((fw - CROSSHAIR.w) / 2), fy + 6, HUD.bink, drop);
-    drawText(im, FONT_SMALL, Math.floor(w / 2), fy + 26 - FONT_SMALL.top, "FIRE", HUD.bink, { align: "center", shadow: drop });
+    letter(im, { text: "FIRE", x: Math.floor(w / 2), y: fy + 26 - FONT_SMALL.top, size: "pxs", colour: HUD.bink, align: "center", shadow: drop }, out);
   } else if (kind === "grenade" || kind === "bottle") {
     centre(kind === "grenade" ? GRENADE_BIG : BOTTLE_BIG, 1);
-    if (extra.count !== undefined) countBadge(im, w - 12, 0, extra.count);
+    if (extra.count !== undefined) countBadge(im, w - 12, 0, extra.count, out);
   } else if (kind === "go") {
     stampShadowed(im, WHISTLE, 7, fy + 7, HUD.bink, drop);
-    drawText(im, FONT_BIG, 22, fy + 7 - FONT_BIG.top, "GO", HUD.bink, { shadow: drop });
+    letter(im, { text: "GO", x: 22, y: fy + 7 - FONT_BIG.top, size: "pxb", colour: HUD.bink, align: "left", shadow: drop }, out);
   } else {
     centre(ICONS.get(kind as IconName)!);
   }
@@ -359,11 +383,11 @@ export function buildButton(kind: ButtonKind, pressed = false, extra: { count?: 
 }
 
 /** A stamped steel disc with a number: grenades or bottles left (red at none). */
-function countBadge(im: PixelImage, x: number, y: number, n: number): void {
+function countBadge(im: PixelImage, x: number, y: number, n: number, out?: Label[]): void {
   const d = 12;
   plate(im, shift(discMask(d), x, y, im.w, im.h), HUD.ink, HUD.steel, HUD.steelHi, HUD.steelLo);
   const t = n > 99 ? "99" : String(Math.max(0, n));
-  drawText(im, FONT_SMALL, x + d / 2, y + 4 - FONT_SMALL.top, t, n > 0 ? HUD.ink : HUD.hpLow, { align: "center" });
+  letter(im, { text: t, x: x + d / 2, y: y + 4 - FONT_SMALL.top, size: "pxs", colour: n > 0 ? HUD.ink : HUD.hpLow, align: "center" }, out);
 }
 
 // ---------------------------------------------------------------- map markers

@@ -10,6 +10,7 @@ import { PAL, lightHex } from "../art/palette";
 import { allLooks } from "../content/arsenal/roster";
 import { WorldView } from "./world";
 import { Overlay } from "./overlay";
+import { screen } from "./screen";
 import { Fx } from "./fx";
 import { sx, sy, wx, wy } from "./iso";
 import { sound } from "./sound";
@@ -74,6 +75,8 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     cam.setBounds(sx(Z.x), sy(Z.y) - 60, sx(Z.w), sy(Z.h) + 60);
     cam.setRoundPixels(true);
+    // the street is laid out in art px and drawn at the screen's own resolution (render/screen.ts)
+    cam.setZoom(screen.s);
     const st = phase.start(sim);
     this.camX = sx(st.x);
     this.camY = sy(st.y);
@@ -81,6 +84,7 @@ export class GameScene extends Phaser.Scene {
     // the light over the finished frame (style guide §5)
     this.light = this.add.rectangle(this.scale.width / 2, this.scale.height / 2, this.scale.width, this.scale.height, lightHex(PAL.light.ambient[phase.light]))
       .setScrollFactor(0).setDepth(3e6).setBlendMode(Phaser.BlendModes.MULTIPLY);
+    this.light.setScale(1 / cam.zoom);
     this.scale.on("resize", this.onResize, this);
     document.addEventListener("visibilitychange", this.onVisibility);
     this.events.once("shutdown", () => {
@@ -97,6 +101,8 @@ export class GameScene extends Phaser.Scene {
 
   private onResize() {
     this.light.setPosition(this.scale.width / 2, this.scale.height / 2).setSize(this.scale.width, this.scale.height);
+    // the zoom (the street's, or the map view's fraction of it) follows the screen
+    this.toggleMap(this.mapView);
   }
 
   override update(time: number, delta: number) {
@@ -162,12 +168,13 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     if (on) {
       const Z = this.run.md.zones.find((z) => z.name === this.run.phase.zone)!;
-      const zx = this.scale.width / sx(Z.w), zy = this.scale.height / (sy(Z.h) + 60);
-      // a whole fraction (1/2, 1/3, 1/4), so the overview keeps every n-th art pixel evenly
-      cam.setZoom(1 / Math.min(4, Math.ceil(1 / Math.min(1, zx, zy))));
+      const zx = screen.w / sx(Z.w), zy = screen.h / (sy(Z.h) + 60);
+      // a whole fraction (1/2, 1/3, 1/4) of the street's zoom, so the overview keeps every n-th
+      // art pixel evenly
+      cam.setZoom(screen.s / Math.min(4, Math.ceil(1 / Math.min(1, zx, zy))));
       cam.centerOn(sx(Z.x + Z.w / 2), sy(Z.y + Z.h / 2));
     } else {
-      cam.setZoom(1);
+      cam.setZoom(screen.s);
     }
     // the light is fixed to the screen, but the camera's zoom still scales it about the centre
     this.light.setScale(1 / cam.zoom);
@@ -184,7 +191,8 @@ export class GameScene extends Phaser.Scene {
   /** The unit under a tap, with a generous radius (troopers are 33 pt, under Apple's 44). */
   private unitAt(px: number, py: number, pred: (u: Unit) => boolean): Unit | null {
     const cam = this.cameras.main;
-    const r = 14 / cam.zoom;
+    // 14 art px on the street, wider in the map view
+    const r = (14 * screen.s) / cam.zoom;
     let best: Unit | null = null, bd = r * r;
     for (const u of this.run.sim.state.units) {
       if (u.hidden || !pred(u)) continue;

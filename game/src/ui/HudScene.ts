@@ -6,11 +6,12 @@ import Phaser from "phaser";
 import type { GameScene } from "../render/GameScene";
 import type { SimEvent, Unit } from "../sim/types";
 import { cmdSelectSquad, cmdOrder, cmdPause, cmdSignal, cmdTapEnemy, cmdHelp, cmdPick } from "../sim/commands";
-import { PAL, hex } from "../art/palette";
+import { PAL, hex, css } from "../art/palette";
 import { readSafeInsets } from "../render/view";
+import { screen, fitCamera, artPoint } from "../render/screen";
 import { sound } from "../render/sound";
-import { hudArt, type HudArt } from "./hudart";
-import { registerFonts, PX, PXS, PXB } from "./text";
+import { hudArt, type HudArt, type HudImage } from "./hudart";
+import { txt, capsOf, capShift, fitLine, PX, PXS, PXB } from "./text";
 import { nextHint, markSeen, type Hint } from "./hints";
 import type { RGB } from "../art/palette";
 
@@ -44,7 +45,7 @@ export class HudScene extends Phaser.Scene {
   g!: GameScene;
   private art!: HudArt;
   private gfx!: Phaser.GameObjects.Graphics;
-  private texts = new Map<string, Phaser.GameObjects.BitmapText>();
+  private texts = new Map<string, Phaser.GameObjects.Text>();
   private images = new Map<string, Phaser.GameObjects.Image>();
   private btns: Btn[] = [];
   private gestures = new Map<number, Gesture>();
@@ -79,10 +80,9 @@ export class HudScene extends Phaser.Scene {
   }
 
   create() {
-    registerFonts(this);
+    fitCamera(this);
     this.art = hudArt(this);
     this.gfx = this.add.graphics().setDepth(10);
-    this.safe = readSafeInsets(this.scale.displayScale.x ? 1 / this.scale.displayScale.x : 1.5);
     this.layout();
     this.scale.on("resize", this.layout, this);
     this.events.once("shutdown", () => this.scale.off("resize", this.layout, this));
@@ -100,7 +100,8 @@ export class HudScene extends Phaser.Scene {
   // ------------------------------------------------------------------ layout
 
   private layout() {
-    const W = this.scale.width, H = this.scale.height;
+    this.safe = readSafeInsets(screen.zoom);
+    const W = screen.w, H = screen.h;
     const S = this.safe;
     const L = S.left + 6, R = W - S.right - 6, B = H - S.bottom - 6;
     const sim = () => this.g.run.sim;
@@ -252,15 +253,17 @@ export class HudScene extends Phaser.Scene {
 
   private down(p: Phaser.Input.Pointer) {
     sound.unlock();
+    // the HUD is laid out in art px; the street (this.g) takes the canvas point as it came
+    const a = artPoint(p);
     const hb = this.hintBox;
-    if (this.hint && hb && p.x >= hb.x && p.y >= hb.y && p.x < hb.x + hb.w && p.y < hb.y + hb.h) {
+    if (this.hint && hb && a.x >= hb.x && a.y >= hb.y && a.x < hb.x + hb.w && a.y < hb.y + hb.h) {
       markSeen(this.hint.h.id);
       this.hint = null;
       sound.ui("ui_tap");
       return;
     }
-    const btn = this.btnAt(p.x, p.y);
-    const g: Gesture = { id: p.id, x0: p.x, y0: p.y, t0: this.time.now, moved: false, btn, held: false, lastDrag: 0 };
+    const btn = this.btnAt(a.x, a.y);
+    const g: Gesture = { id: p.id, x0: a.x, y0: a.y, t0: this.time.now, moved: false, btn, held: false, lastDrag: 0 };
     this.gestures.set(p.id, g);
     if (btn?.onDown) btn.onDown(p);
     if (!btn && this.fireHeld) this.g.fireAt(p.x, p.y);
@@ -269,7 +272,8 @@ export class HudScene extends Phaser.Scene {
   private move(p: Phaser.Input.Pointer) {
     const g = this.gestures.get(p.id);
     if (!g || !p.isDown) return;
-    if (Math.hypot(p.x - g.x0, p.y - g.y0) > 8) g.moved = true;
+    const a = artPoint(p);
+    if (Math.hypot(a.x - g.x0, a.y - g.y0) > 8) g.moved = true;
     if (g.btn) return;
     if (this.fireHeld) { this.g.fireAt(p.x, p.y); return; }
     if (g.moved && this.time.now - g.lastDrag > 120 && !this.pendingOrder && !this.grenadeArmed) {
@@ -333,23 +337,26 @@ export class HudScene extends Phaser.Scene {
     if (this.toast.length > 3) this.toast.shift();
   }
 
-  /** Pixel text (the game's own font), created once per key and reused every frame. */
-  private text(key: string, x: number, y: number, str: string, o: { size?: number; color?: RGB; align?: number; font?: string } = {}) {
+  /** A line of the HUD's type, created once per key and reused every frame (redrawn only when it changes). */
+  private text(key: string, x: number, y: number, str: string, o: { size?: number; color?: RGB; align?: number; font?: string; shadow?: RGB } = {}) {
     let t = this.texts.get(key);
     const font = o.font ?? (o.size && o.size <= 6 ? PXS : PX);
     if (!t) {
-      t = this.add.bitmapText(0, 0, font, "").setDepth(20);
+      t = txt(this, 0, 0, "", { font, face: "sans" }).setDepth(20);
       this.texts.set(key, t);
     }
-    const body = font === PXS || font === PXB ? str.toLocaleUpperCase("pl") : str;
+    const body = capsOf(font) ? str.toLocaleUpperCase("pl") : str;
     if (t.text !== body) t.setText(body);
-    t.setPosition(Math.round(x), Math.round(y)).setOrigin(o.align ?? 0, 0).setVisible(true).setAlpha(1);
-    t.setTint(hex(o.color ?? PAL.shared.chalk));
+    t.setPosition(Math.round(x), Math.round(y) + capShift(t, "sans", font)).setOrigin(o.align ?? 0, 0).setVisible(true).setAlpha(1);
+    const col = css(o.color ?? PAL.shared.chalk);
+    if (t.style.color !== col) t.setColor(col);
+    const shade = o.shadow ? css(o.shadow) : "";
+    if (shade && t.style.shadowColor !== shade) t.setShadow(1, 1, shade, 0, false, true);
     return t;
   }
 
   /** A dark panel behind a text, so it reads over any street. */
-  private panelBehind(t: Phaser.GameObjects.BitmapText, pad = 3, alpha = 0.62) {
+  private panelBehind(t: Phaser.GameObjects.Text, pad = 3, alpha = 0.62) {
     const b = t.getBounds();
     this.gfx.fillStyle(hex(PAL.shared.outline), alpha).fillRect(Math.floor(b.x - pad), Math.floor(b.y - pad + 1), Math.ceil(b.width + pad * 2), Math.ceil(b.height + pad * 2 - 2));
   }
@@ -374,12 +381,12 @@ export class HudScene extends Phaser.Scene {
     const g = this.gfx;
     g.clear();
     const keep = new Set<string>();
-    const W = this.scale.width;
+    const W = screen.w;
     const sim = this.g.run.sim;
     const s = sim.state;
     for (const b of this.btns) {
       if (!b.visible()) { this.images.get(b.key)?.setVisible(false); continue; }
-      this.drawButton(b);
+      this.drawButton(b, keep);
     }
     // objectives: top right, under pause and map, on a dark panel
     const objs = s.objectives.filter((o) => o.primary || o.status !== "open");
@@ -401,7 +408,7 @@ export class HudScene extends Phaser.Scene {
     this.toast.forEach((t, k) => {
       const col = t.tone === "good" ? PAL.hud.hp_ok : t.tone === "bad" ? PAL.hud.hp_low : PAL.shared.chalk;
       keep.add(`toast${k}`);
-      const tx = this.text(`toast${k}`, W / 2, this.scale.height - this.safe.bottom - 16 - (this.toast.length - 1 - k) * 11, t.text, { align: 0.5, color: col });
+      const tx = this.text(`toast${k}`, W / 2, screen.h - this.safe.bottom - 16 - (this.toast.length - 1 - k) * 11, t.text, { align: 0.5, color: col });
       const a = Math.min(1, (3200 - (now - t.t)) / 500);
       this.panelBehind(tx, 2, 0.6 * a);
       tx.setAlpha(a);
@@ -435,16 +442,16 @@ export class HudScene extends Phaser.Scene {
         this.hintBox = box;
       }
     }
-    if (this.pendingOrder) { keep.add("pending"); const t = this.text("pending", W / 2, this.scale.height - 22, this.pendingOrder.kind === "cover" ? "Tap where they should cover" : "Tap where they go on the signal", { align: 0.5, color: PAL.shared.chalk }); this.panelBehind(t); }
-    if (this.grenadeArmed) { keep.add("armed"); const t = this.text("armed", W / 2, this.scale.height - 22, "Tap where to throw", { align: 0.5, color: PAL.shared.chalk }); this.panelBehind(t); }
+    if (this.pendingOrder) { keep.add("pending"); const t = this.text("pending", W / 2, screen.h - 22, this.pendingOrder.kind === "cover" ? "Tap where they should cover" : "Tap where they go on the signal", { align: 0.5, color: PAL.shared.chalk }); this.panelBehind(t); }
+    if (this.grenadeArmed) { keep.add("armed"); const t = this.text("armed", W / 2, screen.h - 22, "Tap where to throw", { align: 0.5, color: PAL.shared.chalk }); this.panelBehind(t); }
     this.hideTextsExcept(keep);
   }
 
-  private drawButton(b: Btn) {
+  private drawButton(b: Btn, keep: Set<string>) {
     const sim = this.g.run.sim;
     const s = sim.state;
     const pressed = [...this.gestures.values()].some((q) => q.btn === b) || (b.kind === "grenade" && this.grenadeArmed) || (b.kind === "fire" && this.fireHeld);
-    let art: string | null = null;
+    let art: HudImage | null = null;
     switch (b.kind) {
       case "squad": { const sq = s.squads[b.index]; if (sq) art = this.art.squadTag(sim, sq, s.controlled === b.index); break; }
       case "chip": { const u = this.members()[b.index]; if (u) art = this.art.chip(u, s.picked === u.id); break; }
@@ -461,7 +468,14 @@ export class HudScene extends Phaser.Scene {
     }
     let img = this.images.get(b.key);
     if (!art) { img?.setVisible(false); return; }
-    if (!img) { img = this.add.image(0, 0, art).setOrigin(0).setDepth(12); this.images.set(b.key, img); }
-    img.setTexture(art).setPosition(b.x, b.y).setVisible(true);
+    if (!img) { img = this.add.image(0, 0, art.key).setOrigin(0).setDepth(12); this.images.set(b.key, img); }
+    img.setTexture(art.key).setPosition(b.x, b.y).setVisible(true);
+    art.labels.forEach((l, i) => {
+      const key = `${b.key}:${i}`;
+      keep.add(key);
+      const font = l.size === "pxs" ? PXS : l.size === "pxb" ? PXB : PX;
+      const line = l.max === undefined ? l.text : fitLine(l.text, l.max, font);
+      this.text(key, b.x + l.x, b.y + l.y, line, { font, color: l.colour, align: l.align === "center" ? 0.5 : 0, shadow: l.shadow });
+    });
   }
 }

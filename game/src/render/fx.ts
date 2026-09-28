@@ -9,20 +9,20 @@ import Phaser from "phaser";
 import type { Sim } from "../sim/sim";
 import type { Glyph, SimEvent, Unit } from "../sim/types";
 import { UF_SILENT_DEATH } from "../sim/types";
-import { PAL, hex, type RGB } from "../art/palette";
-import { crop, img, outline, toCanvas, type PixelImage, type Sheet } from "../art/pixel";
+import { PAL, hex, css, type RGB } from "../art/palette";
+import { crop, img, outline, toCanvas, type Sheet } from "../art/pixel";
 import { buildFxSheet } from "../art/fx";
 import { MUZZLE } from "../art/troopers";
 import { buildGlyph, type GlyphName } from "../art/hud";
-import { FONT, drawText, measure } from "../art/font";
 import { buildPalettePool } from "../art/light";
+import { txt, PX } from "../ui/text";
 import { addImage, addSheet } from "./artbank";
 import { sx, sy, facingOf } from "./iso";
 import type { WorldView } from "./world";
 
 interface Tracer { x0: number; y0: number; x1: number; y1: number; t: number; side: string }
 interface Anim { spr: Phaser.GameObjects.Sprite; frames: string[]; fps: number; t: number; loop: boolean; vy?: number }
-interface Bubble { unit: number; img: Phaser.GameObjects.Image; t: number }
+interface Bubble { unit: number; img: Phaser.GameObjects.Text; t: number }
 interface FireView { x: number; y: number; sprs: Phaser.GameObjects.Sprite[]; light: Phaser.GameObjects.Image; flickerT: number }
 
 /** Who shouts: our side and the prisoners in chalk, the Germans in their field grey. */
@@ -220,18 +220,6 @@ export class Fx {
 
   // ------------------------------------------------------------------ shouts
 
-  /** A shout in the game's text face, one colour per side, with a 1 px outline to read on the street. */
-  private shoutKey(text: string, side: "de" | "pl"): string {
-    const key = `shout:${side}:${text}`;
-    if (this.scene.textures.exists(key)) return key;
-    const w = measure(FONT, text) + 2, h = FONT.lineHeight + 4;
-    const im = img(w, h);
-    drawText(im, FONT, 1, 1, text, VOICE[side]);
-    outline(im, PAL.shared.outline);
-    addImage(this.scene, key, trimRows(im));
-    return key;
-  }
-
   /** Where a shout sits (its bottom centre): over the man, or over the vehicle he is in. */
   private voiceAt(sim: Sim, id: number): { x: number; y: number } | null {
     const u = sim.unit(id);
@@ -247,7 +235,9 @@ export class Fx {
   private say(u: Unit | undefined, text: string) {
     if (!u) return;
     for (const b of this.bubbles) if (b.unit === u.id) { b.img.destroy(); b.t = 99; }
-    const im = this.scene.add.image(0, 0, this.shoutKey(text, u.side === "de" ? "de" : "pl")).setOrigin(0).setDepth(2.2e6).setVisible(false);
+    // in the game's type, the speaker's colour, with a pixel of outline to read on the street
+    const im = txt(this.scene, 0, 0, text, { font: PX, face: "sans", color: VOICE[u.side === "de" ? "de" : "pl"] })
+      .setStroke(css(PAL.shared.outline), 2).setDepth(2.2e6).setVisible(false);
     this.bubbles.push({ unit: u.id, img: im, t: 0 });
   }
 
@@ -311,13 +301,4 @@ export class Fx {
     }
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt);
   }
-}
-
-/** Drop the empty rows above and below the ink (a shout's image is as tall as its letters). */
-function trimRows(im: PixelImage): PixelImage {
-  const rowInk = (y: number) => { for (let x = 0; x < im.w; x++) if (im.data[(y * im.w + x) * 4 + 3]) return true; return false; };
-  let y0 = 0, y1 = im.h - 1;
-  while (y0 < y1 && !rowInk(y0)) y0++;
-  while (y1 > y0 && !rowInk(y1)) y1--;
-  return crop(im, 0, y0, im.w, y1 - y0 + 1);
 }

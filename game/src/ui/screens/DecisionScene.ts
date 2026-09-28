@@ -6,9 +6,10 @@ import type { Flow } from "../../game/flow";
 import type { Decision } from "../../missions/campaign";
 import { SQUADS, PEOPLE } from "../../content/arsenal/roster";
 import { PAL, SQUAD_COLOURS, hex } from "../../art/palette";
-import { registerFonts, txt, PX, PXS, PXB } from "../text";
+import { txt, setFace, PX, PXS, PXB } from "../text";
 import { buildPortraitTexture } from "../../render/artbank";
 import { readSafeInsets } from "../../render/view";
+import { screen, fitCamera } from "../../render/screen";
 import { sound } from "../../render/sound";
 
 export class DecisionScene extends Phaser.Scene {
@@ -26,7 +27,8 @@ export class DecisionScene extends Phaser.Scene {
   }
 
   create() {
-    registerFonts(this);
+    fitCamera(this);
+    setFace(this, "type");
     this.cameras.main.setBackgroundColor(hex(PAL.hud.paper[0]));
     this.flow.campaign.stage = "decision";
     for (const k of DecisionScene.cases(this.flow)) if (!this.flow.campaign.decisions[k]) this.flow.campaign.decisions[k] = this.flow.campaign.soldiers[k].state === "wounded" ? "fight" : "leave";
@@ -48,8 +50,8 @@ export class DecisionScene extends Phaser.Scene {
   private draw() {
     this.children.removeAll(true);
     const c = this.flow.campaign;
-    const W = this.scale.width, H = this.scale.height;
-    const S = readSafeInsets(1.5);
+    const W = screen.w, H = screen.h;
+    const S = readSafeInsets(screen.zoom);
     const L = S.left + 12, R = W - S.right - 12, T = S.top + 8, B = H - S.bottom - 8;
     txt(this, L, T, "BEFORE THE ARSENAL", { font: PXB, color: PAL.hud.paper_ink });
     txt(this, L, T + 16, "17:25. The van will be here soon. Who goes, and who does not?", { color: PAL.hud.paper_ink });
@@ -75,7 +77,7 @@ export class DecisionScene extends Phaser.Scene {
         // benching the last squad is not allowed: somebody has to go
         const wouldBench = (d === "evacuate" || d === "rescue") && !bench.includes(sqi) && bench.length + 1 >= SQUADS.filter((_, i) => this.fitCount(i) > 0).length;
         const b = this.add.rectangle(bx, by, bw, 14, hex(on ? PAL.hud.button_olive[1] : PAL.hud.paper[0])).setOrigin(0).setStrokeStyle(1, hex(wouldBench ? PAL.hud.hp_low : PAL.hud.paper_ink));
-        txt(this, bx + 4, by + 3, label, { font: PXS, color: on ? PAL.hud.button_ink : PAL.hud.paper_ink });
+        txt(this, bx + 4, by + 3, label, { font: PXS, face: "sans", color: on ? PAL.hud.button_ink : PAL.hud.paper_ink });
         if (!wouldBench) b.setInteractive({ useHandCursor: true }).on("pointerup", () => { c.decisions[key] = d; sound.ui("ui_tap"); this.draw(); });
       });
     });
@@ -85,7 +87,7 @@ export class DecisionScene extends Phaser.Scene {
     txt(this, L, B - 30, `To the Arsenal: ${going.join(", ") || "nobody"}`, { color: PAL.hud.paper_ink });
     const bw = 150;
     const go = this.add.rectangle(R - bw, B - 30, bw, 26, hex(PAL.hud.button_olive[1])).setOrigin(0).setStrokeStyle(1, hex(PAL.hud.button_rim));
-    txt(this, R - bw / 2, B - 22, "TO THE ARSENAL", { align: 0.5, color: PAL.hud.button_ink, font: PX });
+    txt(this, R - bw / 2, B - 22, "TO THE ARSENAL", { align: 0.5, color: PAL.hud.button_ink, font: PX, face: "sans" });
     go.setInteractive({ useHandCursor: true }).on("pointerup", () => {
       sound.ui("ui_go");
       c.benched = this.benched();

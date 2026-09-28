@@ -97,11 +97,11 @@ export class NoteScene extends Phaser.Scene {
     const creditList = credits.map((c) => `<li>${esc(c.file)}: ${esc(subject(c, c.file))}. ${esc(c.author)}, ${esc(c.year)}. ${esc(c.licence)}. <a href="${esc(c.sourcePage)}" target="_blank" rel="noopener">${pl ? "Źródło" : "Source"}</a></li>`).join("");
     el.innerHTML = `
 <style>
-  #note .page{max-width:680px;margin:0 auto;padding:max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 40px max(18px, env(safe-area-inset-left));font:16px/1.55 Georgia,"Times New Roman",serif;background:${paper};min-height:100%;box-shadow:0 0 0 1px ${faint}}
-  #note h1{font:700 22px/1.2 Georgia,serif;margin:6px 0 2px;letter-spacing:.02em}
-  #note h2{font:600 13px/1.2 ui-monospace,Menlo,monospace;letter-spacing:.12em;text-transform:uppercase;color:${faint};margin:26px 0 8px}
-  #note h3{font:600 14px/1.2 Georgia,serif;margin:10px 0 4px}
-  #note .date{font:13px ui-monospace,Menlo,monospace;color:${faint}}
+  #note .page{max-width:680px;margin:0 auto;padding:max(18px, env(safe-area-inset-top)) max(18px, env(safe-area-inset-right)) 40px max(18px, env(safe-area-inset-left));font:16px/1.6 "Courier Prime","Courier New",monospace;background:${paper};min-height:100%;box-shadow:0 0 0 1px ${faint}}
+  #note h1{font:700 22px/1.2 "Courier Prime","Courier New",monospace;margin:6px 0 2px;letter-spacing:.02em}
+  #note h2{font:700 13px/1.2 "Courier Prime","Courier New",monospace;letter-spacing:.12em;text-transform:uppercase;color:${faint};margin:26px 0 8px}
+  #note h3{font:700 14px/1.2 "Courier Prime","Courier New",monospace;margin:10px 0 4px}
+  #note .date{font:13px "Courier Prime","Courier New",monospace;color:${faint}}
   #note p{margin:0 0 12px}
   #note .figs{display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:12px}
   #note figure{margin:0}

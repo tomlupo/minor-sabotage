@@ -3,8 +3,9 @@
 import Phaser from "phaser";
 import type { Flow } from "../../game/flow";
 import { PAL, hex } from "../../art/palette";
-import { registerFonts, txt, PX, PXS, PXB } from "../text";
+import { txt, setFace, PX, PXS, PXB } from "../text";
 import { readSafeInsets } from "../../render/view";
+import { screen, fitCamera } from "../../render/screen";
 import { sound } from "../../render/sound";
 
 const LINES: [string, string][] = [
@@ -18,7 +19,7 @@ export class IntroScene extends Phaser.Scene {
   private shown = 0;
   private chars = 0;
   private t = 0;
-  private objs: Phaser.GameObjects.BitmapText[] = [];
+  private objs: Phaser.GameObjects.Text[] = [];
   private done = false;
 
   constructor() {
@@ -33,10 +34,11 @@ export class IntroScene extends Phaser.Scene {
   }
 
   create() {
-    registerFonts(this);
+    fitCamera(this);
+    setFace(this, "type");
     this.cameras.main.setBackgroundColor(hex(PAL.hud.paper[0]));
-    const W = this.scale.width, H = this.scale.height;
-    const S = readSafeInsets(1.5);
+    const W = screen.w, H = screen.h;
+    const S = readSafeInsets(screen.zoom);
     const L = S.left + 22, wrap = Math.min(W - L - S.right - 22, 440);
     let y = S.top + 18;
     this.objs = [];
