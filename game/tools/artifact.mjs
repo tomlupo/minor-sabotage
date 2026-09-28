@@ -18,6 +18,7 @@ const jsFile = readdirSync(resolve(dist, "assets")).find((f) => f.endsWith(".js"
 const js = readFileSync(resolve(dist, "assets", jsFile), "utf8").replace(/<\/script/gi, "<\\/script");
 
 const page = `<title>Minor Sabotage</title>
+<link rel="icon" href="data:,">
 <style>${style}
   body { background: #24201a; color: #e8e4d8; }
 </style>
