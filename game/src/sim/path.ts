@@ -77,10 +77,7 @@ export class PathFinder {
    * none within `maxNodes`. When the goal cell is blocked, the nearest walkable cell is used.
    * `extraCost(cx, cy)` lets callers make cells expensive (e.g. inside a guard's cone).
    */
-  find(
-    from: Pt, to: Pt, maxNodes = 12000, extraCost?: (cx: number, cy: number) => number,
-    clear?: (x0: number, y0: number, x1: number, y1: number) => boolean,
-  ): Pt[] | null {
+  find(from: Pt, to: Pt, maxNodes = 12000, extraCost?: (cx: number, cy: number) => number): Pt[] | null {
     const G = this.grid;
     const goal = G.walkable(to.x, to.y) ? to : G.nearestWalkable(to.x, to.y, 6);
     const start = G.walkable(from.x, from.y) ? from : G.nearestWalkable(from.x, from.y, 3);
@@ -137,13 +134,12 @@ export class PathFinder {
     }
     cells.reverse();
     if (found) cells[cells.length - 1] = { x: goal.x, y: goal.y };
-    return smooth(G, start, cells, clear);
+    return smooth(G, start, cells);
   }
 }
 
-/** String pulling: drop waypoints that can be skipped by a straight walkable line (and, with
- *  `clear`, one it accepts: the rules pass the fires' check, so a detour is not pulled back). */
-export function smooth(G: Grid, start: Pt, pts: Pt[], clear?: (x0: number, y0: number, x1: number, y1: number) => boolean): Pt[] {
+/** String pulling: drop waypoints that can be skipped by a straight walkable line. */
+export function smooth(G: Grid, start: Pt, pts: Pt[]): Pt[] {
   if (pts.length <= 1) return pts;
   const out: Pt[] = [];
   let anchor = start;
@@ -151,7 +147,7 @@ export function smooth(G: Grid, start: Pt, pts: Pt[], clear?: (x0: number, y0: n
   // Greedy forward: keep extending the straight run from the anchor until it would clip a
   // wall, then bend at the last point that was still visible. Linear in the route length.
   for (let k = 1; k < pts.length; k++) {
-    if (!G.walkLine(anchor.x, anchor.y, pts[k].x, pts[k].y, 0.35) || (clear && !clear(anchor.x, anchor.y, pts[k].x, pts[k].y))) {
+    if (!G.walkLine(anchor.x, anchor.y, pts[k].x, pts[k].y, 0.35)) {
       out.push(last);
       anchor = last;
     }

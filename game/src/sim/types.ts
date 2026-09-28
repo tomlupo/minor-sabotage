@@ -93,6 +93,9 @@ export interface Unit {
   /** Until this time he is stepping out of a vehicle's way: his column or the man he
    *  follows does not call him back. */
   yieldUntil: number;
+  /** Stopped where closed ground (a fire, a vehicle) cut off the only way to (goalX, goalY):
+   *  when to try again, or 0. */
+  waitT: number;
   /** Removed from the street: inside a vehicle, escaped, evacuated. */
   hidden: boolean;
   kills: number;

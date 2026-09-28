@@ -6,6 +6,7 @@ import type { Squad, Unit } from "./types";
 import type { Pt } from "./path";
 import { SPEED, SQUAD, UNIT_RADIUS } from "./tuning";
 import { outOfColumn } from "./tasks";
+import { F_FIRE, F_VEH } from "./grid";
 
 const TRAIL_MAX = 80;
 
@@ -19,12 +20,11 @@ export function setAnim(u: Unit, a: Unit["anim"], lock = 0): void {
 
 /** Send a unit along a route to (x, y). Returns false if no route. */
 export function goTo(sim: Sim, u: Unit, x: number, y: number, maxNodes = 12000): boolean {
-  // nobody walks into burning petrol: sent into it, he stops at its edge
-  ({ x, y } = sim.outOfFire(x, y, u.x, u.y));
   u.goalX = x;
   u.goalY = y;
+  u.waitT = 0;
   if (Math.hypot(x - u.x, y - u.y) < 0.2) { u.path = []; return true; }
-  if (sim.grid.walkLine(u.x, u.y, x, y, 0.3) && sim.inBounds(x, y) && sim.clearOfFire(u.x, u.y, x, y)) {
+  if (sim.grid.walkLine(u.x, u.y, x, y, 0.3) && sim.inBounds(x, y)) {
     u.path = [{ x, y }];
     return true;
   }
@@ -34,16 +34,35 @@ export function goTo(sim: Sim, u: Unit, x: number, y: number, maxNodes = 12000):
   return true;
 }
 
+/** A route to (x, y) that gets there (within 3 m), or none: the route finder's nearest-point
+ *  fallback would walk a man away from a way that is only shut for now. Waiting, he tries again
+ *  in a second. */
+function reroute(sim: Sim, u: Unit, x: number, y: number): Pt[] {
+  const r = sim.route({ x: u.x, y: u.y }, { x, y });
+  const end = r?.[r.length - 1];
+  if (r && end && Math.hypot(end.x - x, end.y - y) < 3) { u.waitT = 0; return r; }
+  u.goalX = x;
+  u.goalY = y;
+  u.waitT = sim.state.time + 1;
+  return [];
+}
+
 export function stepMovement(sim: Sim, dt: number): void {
   const G = sim.grid;
   const units = sim.state.units;
   for (const u of units) {
     if (u.state !== "ok" || u.hidden) continue;
     const kneeling = u.task && (u.task.kind === "work" || u.task.kind === "help") && u.task.phase === "work";
-    // a fire lit across his way since the route was made: he goes round it, or stops at its edge
-    if (u.path.length && !kneeling && sim.state.fires.length && (sim.state.tick + u.id) % 5 === 0 && !sim.clearOfFire(u.x, u.y, u.path[0].x, u.path[0].y)) {
-      const last = u.path[u.path.length - 1];
-      goTo(sim, u, last.x, last.y, 4000);
+    // stopped where the only way was shut: is it open again?
+    if (u.waitT && !u.path.length && sim.state.time >= u.waitT) u.path = reroute(sim, u, u.goalX, u.goalY);
+    // ground closed under him (a fire caught him, a vehicle pulled in): he gets off it first,
+    // then goes on where he was going
+    if (!kneeling && (sim.state.tick + u.id) % 5 === 0 && (G.flagAt(u.x, u.y) & (F_FIRE | F_VEH))) {
+      const out = G.nearestWalkable(u.x, u.y, 4);
+      if (out && !(u.path.length && Math.hypot(u.path[0].x - out.x, u.path[0].y - out.y) < 0.1)) {
+        const last = u.path[u.path.length - 1];
+        u.path = [out, ...(last ? sim.route(out, last) ?? [] : [])];
+      }
     }
     if (u.path.length && !kneeling) {
       const p = u.path[0];
@@ -57,14 +76,16 @@ export function stepMovement(sim: Sim, dt: number): void {
         u.path.shift();
       } else {
         const nx = u.x + (dx / d) * stepLen, ny = u.y + (dy / d) * stepLen;
-        if (G.walkable(nx, ny)) { u.x = nx; u.y = ny; }
-        else if (G.walkable(nx, u.y)) u.x = nx;
-        else if (G.walkable(u.x, ny)) u.y = ny;
+        // (a man standing on closed ground may step off it; a slide along one axis counts only
+        // when it moves him, or walking square into a closed cell would stall him for ever)
+        if (G.walkable(nx, ny) || !G.walkable(u.x, u.y)) { u.x = nx; u.y = ny; }
+        else if (Math.abs(nx - u.x) > 1e-4 && G.walkable(nx, u.y)) u.x = nx;
+        else if (Math.abs(ny - u.y) > 1e-4 && G.walkable(u.x, ny)) u.y = ny;
         else {
-          // blocked (a vehicle pulled in): try again around it
+          // blocked (a vehicle pulled in, a fire lit across the way): around it if there is a way;
+          // if the only way is shut he waits here, at its edge, and tries again (a fire burns out)
           const last = u.path[u.path.length - 1];
-          const r = sim.route({ x: u.x, y: u.y }, last, 4000);
-          u.path = r ?? [];
+          u.path = reroute(sim, u, last.x, last.y);
         }
       }
       if (d > 0.01 && u.animLock <= 0) u.dir = Math.atan2(dy, dx);
@@ -195,7 +216,7 @@ export function stepSquads(sim: Sim, dt: number): void {
       if (d < (moving ? 0.35 : 0.25)) { if (!moving) u.path = []; return; }
       // catch up if the column stretched (stepMovement applies the wound slowdown)
       u.speed = SPEED.partisan * (d > 3 ? 1.25 : 1);
-      if (sim.grid.walkLine(u.x, u.y, target.x, target.y, 0.25) && sim.clearOfFire(u.x, u.y, target.x, target.y)) {
+      if (sim.grid.walkLine(u.x, u.y, target.x, target.y, 0.25)) {
         u.path = [target];
       } else {
         // off the trail (pushed round a corner): route, but not every tick
@@ -237,7 +258,7 @@ function stepFollowers(sim: Sim, _dt: number): void {
     const d = Math.hypot(bx - u.x, by - u.y);
     if (d < 0.6) { u.path = []; continue; }
     if ((s.tick + u.id) % 5 !== 0 && u.path.length) continue;
-    if (sim.grid.walkLine(u.x, u.y, bx, by, 0.25) && sim.clearOfFire(u.x, u.y, bx, by)) u.path = [{ x: bx, y: by }];
+    if (sim.grid.walkLine(u.x, u.y, bx, by, 0.25)) u.path = [{ x: bx, y: by }];
     else goTo(sim, u, bx, by, 2500);
   }
 }

@@ -4,6 +4,9 @@ import { Sim } from "../src/sim/sim";
 import { makeSquad, fieldSquad } from "../src/sim/setup";
 import { cmdMove, cmdTapEnemy, cmdThrow, cmdHelp, cmdSelectSquad, cmdOrder, cmdPick, cmdWork } from "../src/sim/commands";
 import { goTo } from "../src/sim/move";
+import { syncFireCells } from "../src/sim/combat";
+import { buildArsenalMap } from "../src/content/arsenal/map";
+import { gridFromMap } from "../src/content/mapdata";
 
 /** An open 60 x 40 m yard with a wall across the middle, gap at the north end. */
 function yard(): Grid {
@@ -198,6 +201,7 @@ describe("fire on the street", () => {
     const sim = new Sim(yard());
     const u = sim.spawnUnit({ side: "pl", look: "pl", x: 10, y: 20, weapon: "sten" });
     sim.state.fires.push({ id: 999, x: 15, y: 20, r: 2, t: 60 });
+    syncFireCells(sim); // as a bottle's fire is, in the same tick
     goTo(sim, u, 20, 20);
     let closest = Infinity;
     for (let i = 0; i < 30 * 8; i++) {
@@ -215,6 +219,7 @@ describe("fire on the street", () => {
     run(sim, 1);
     // a bottle bursts on the column's way, a few metres ahead of the leader
     sim.state.fires.push({ id: 998, x: us[0].x + 5, y: 20, r: 2, t: 60 });
+    syncFireCells(sim); // as a bottle's fire is, in the same tick
     const fx = us[0].x + 5;
     let closest = Infinity;
     for (let i = 0; i < 30 * 10; i++) {
@@ -230,10 +235,50 @@ describe("fire on the street", () => {
     const sim = new Sim(yard());
     const u = sim.spawnUnit({ side: "pl", look: "pl", x: 13.1, y: 20, weapon: "sten" });
     sim.state.fires.push({ id: 997, x: 15, y: 20, r: 2.1, t: 60 }); // he stands 1.9 m from it
+    syncFireCells(sim); // as a bottle's fire is, in the same tick
     goTo(sim, u, 20, 20);
     let closest = Infinity;
     for (let i = 0; i < 30 * 8; i++) { sim.step(); closest = Math.min(closest, Math.hypot(u.x - 15, u.y - 20)); }
     expect(closest).toBeGreaterThan(2.1 * 0.8);
+  });
+
+  it("on the real map, lit ahead of a squad on a long walk, does not strand its leader", () => {
+    // review round 4's case: a re-plan cut short left the leader 28 m from where he was sent
+    const md = buildArsenalMap();
+    const sim = new Sim(gridFromMap(md), 365);
+    const sq = makeSquad(sim, 0, "Zośka", 0);
+    const us = fieldSquad(sim, sq, [
+      { ...TROOPER, name: "Zośka", rank: 5 }, { ...TROOPER, name: "Alek", rank: 4 },
+      { ...TROOPER, name: "Rudy", rank: 3 }, { ...TROOPER, name: "Anoda", rank: 3 },
+    ], 41.5, 64.5, 0);
+    sq.order = "follow";
+    sim.state.controlled = 0;
+    cmdMove(sim, 56.5, 30.5);
+    run(sim, 1);
+    sim.state.fires.push({ id: 995, x: 50.8, y: 62.7, r: 2.1, t: 8 });
+    syncFireCells(sim);
+    run(sim, 40);
+    expect(Math.hypot(us[0].x - 56.5, us[0].y - 30.5)).toBeLessThan(2);
+    expect(us.every((u) => u.state === "ok" && !u.wounded)).toBe(true);
+  });
+
+  it("closing a passage, stops a man at its edge until it is out, and he goes on", () => {
+    const sim = new Sim(yard());
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: 20, y: 20, weapon: "sten" });
+    // the yard's wall has one gap, at its north end: the fire fills it
+    sim.state.fires.push({ id: 996, x: 30.5, y: 3, r: 2.2, t: 20 });
+    syncFireCells(sim);
+    goTo(sim, u, 40, 20);
+    let closest = Infinity;
+    for (let i = 0; i < 30 * 15; i++) { sim.step(); closest = Math.min(closest, Math.hypot(u.x - 30.5, u.y - 3)); }
+    expect(closest).toBeGreaterThan(2.2 * 0.8);
+    expect(u.state).toBe("ok");
+    expect(u.x).toBeLessThan(30);
+    // burnt out, the way is open: sent again, he goes through
+    for (let i = 0; i < 30 * 8; i++) sim.step();
+    goTo(sim, u, 40, 20);
+    for (let i = 0; i < 30 * 20; i++) sim.step();
+    expect(Math.hypot(u.x - 40, u.y - 20)).toBeLessThan(1);
   });
 });
 

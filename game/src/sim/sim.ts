@@ -9,7 +9,7 @@ import type {
 } from "./types";
 import { UF_SILENT_DEATH } from "./types";
 import { stepMovement, stepSquads, recordTrails } from "./move";
-import { stepCombat, stepProjectiles, stepFires } from "./combat";
+import { stepCombat, stepProjectiles, stepFires, syncFireCells } from "./combat";
 import { stepAI, stepSpawners, processNoises } from "./ai";
 import { stepVehicles, rebuildVehicleCells } from "./vehicles";
 import { stepTasks } from "./tasks";
@@ -49,6 +49,8 @@ export class Sim {
   readonly pf: PathFinder;
   state: SimState;
   mission: Mission | null = null;
+  /** Which fires the grid's burning cells were last drawn for (syncFireCells). */
+  fireSig = "";
   /** Noises heard this tick (processed by the AI, not serialised). */
   noises: { x: number; y: number; r: number; gun: boolean }[] = [];
   /** Street names by id, for messages ("Alek is down on Długa"). */
@@ -257,6 +259,7 @@ export class Sim {
       glyph: "none",
       follow: -1,
       yieldUntil: 0,
+      waitT: 0,
       hidden: o.hidden ?? false,
       kills: 0,
       sinceShot: 99,
@@ -404,50 +407,13 @@ export class Sim {
     const clamp = (p: Pt) => ({ x: Math.min(b.x + b.w - 0.5, Math.max(b.x + 0.5, p.x)), y: Math.min(b.y + b.h - 0.5, Math.max(b.y + 0.5, p.y)) });
     const G = this.grid;
     const full = b.x === 0 && b.y === 0 && b.w === G.w && b.h === G.h;
-    const fires = this.state.fires;
-    // outside the phase's bounds is out of the question; burning petrol is walked round
-    const cost = (cx: number, cy: number) => {
-      let c = full || this.inBounds(cx + 0.5, cy + 0.5) ? 0 : 1e6;
-      for (const f of fires) if (Math.hypot(cx + 0.5 - f.x, cy + 0.5 - f.y) < f.r * 0.8 + 0.5) c += 40;
-      return c;
-    };
-    const clear = fires.length ? (x0: number, y0: number, x1: number, y1: number) => this.clearOfFire(x0, y0, x1, y1) : undefined;
-    return this.pf.find(from, clamp(to), maxNodes, full && !fires.length ? undefined : cost, clear);
+    // burning ground is closed in the grid itself (syncFireCells), like a vehicle's footprint
+    return this.pf.find(from, clamp(to), maxNodes, full ? undefined : (cx, cy) => (this.inBounds(cx + 0.5, cy + 0.5) ? 0 : 1e6));
   }
 
   /** The fire burning where it would hurt someone at (x, y), grown by `margin`, or null. */
   fireAt(x: number, y: number, margin = 0) {
     return this.state.fires.find((f) => Math.hypot(x - f.x, y - f.y) < f.r * 0.8 + margin) ?? null;
-  }
-
-  /** Whether a straight walk from (x0, y0) to (x1, y1) keeps out of every fire. Nobody walks
-   *  into one, so a walk that ends in a fire is not clear; a man standing in one may walk out,
-   *  so a walk that starts in a fire is clear when it heads away from its centre. */
-  clearOfFire(x0: number, y0: number, x1: number, y1: number): boolean {
-    for (const f of this.state.fires) {
-      const r = f.r * 0.8 + 0.4;
-      if (Math.hypot(x1 - f.x, y1 - f.y) < r) return false;
-      const dx = x1 - x0, dy = y1 - y0, l2 = dx * dx + dy * dy;
-      if (Math.hypot(x0 - f.x, y0 - f.y) < r) {
-        if ((x0 - f.x) * dx + (y0 - f.y) * dy < 0) return false;
-        continue;
-      }
-      const t = l2 ? Math.max(0, Math.min(1, ((f.x - x0) * dx + (f.y - y0) * dy) / l2)) : 0;
-      if (Math.hypot(x0 + dx * t - f.x, y0 + dy * t - f.y) < r) return false;
-    }
-    return true;
-  }
-
-  /** (x, y), or when it lies in a fire, the spot at the fire's edge on the side of (fromX,
-   *  fromY): where a man sent into burning petrol stops. */
-  outOfFire(x: number, y: number, fromX: number, fromY: number): Pt {
-    for (const f of this.state.fires) {
-      const r = f.r * 0.8 + 0.6;
-      if (Math.hypot(x - f.x, y - f.y) >= r - 0.2) continue;
-      const a = fromX === f.x && fromY === f.y ? 0 : Math.atan2(fromY - f.y, fromX - f.x);
-      return this.grid.nearestWalkable(f.x + Math.cos(a) * r, f.y + Math.sin(a) * r, 2) ?? { x, y };
-    }
-    return { x, y };
   }
 
   // ------------------------------------------------------------------ harm
@@ -553,5 +519,7 @@ export class Sim {
     this.state = JSON.parse(json) as SimState;
     for (let i = 0; i < this.grid.flags.length; i++) this.grid.flags[i] &= ~F_VEH;
     rebuildVehicleCells(this);
+    this.fireSig = "";
+    syncFireCells(this);
   }
 }

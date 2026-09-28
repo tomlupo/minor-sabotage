@@ -4,7 +4,7 @@
 // decided 2026-09-28). Guards shoot once alerted.
 import type { Sim } from "./sim";
 import type { Squad, Unit, Vehicle } from "./types";
-import { F_COVER } from "./grid";
+import { F_COVER, F_FIRE } from "./grid";
 import { gauss } from "./rng";
 import { goTo, setAnim } from "./move";
 import { outOfColumn } from "./tasks";
@@ -337,8 +337,31 @@ export function damageProp(sim: Sim, id: number, dmg: number): void {
 
 // ------------------------------------------------------------------ fires
 
+/**
+ * Burning ground is closed to walking while it burns, like a vehicle's footprint: every route,
+ * straight line and step keeps out of it with no rule of its own. A cell is closed when any
+ * point of it could lie inside a fire's harm (0.8 of its radius). Rebuilt when the fires change.
+ */
+export function syncFireCells(sim: Sim): void {
+  const s = sim.state;
+  const sig = s.fires.map((f) => f.id).join(",");
+  if (sig === sim.fireSig) return;
+  sim.fireSig = sig;
+  const G = sim.grid;
+  for (let i = 0; i < G.flags.length; i++) G.flags[i] &= ~F_FIRE;
+  for (const f of s.fires) {
+    const R = f.r * 0.8 + 0.9;
+    for (let cy = Math.floor(f.y - R); cy <= Math.floor(f.y + R); cy++) {
+      for (let cx = Math.floor(f.x - R); cx <= Math.floor(f.x + R); cx++) {
+        if (G.inBounds(cx, cy) && Math.hypot(cx + 0.5 - f.x, cy + 0.5 - f.y) < R) G.flags[cy * G.w + cx] |= F_FIRE;
+      }
+    }
+  }
+}
+
 export function stepFires(sim: Sim, dt: number): void {
   const s = sim.state;
+  syncFireCells(sim);
   if (!s.fires.length) return;
   const tickHurt = s.tick % 15 === 0;
   for (const f of s.fires) {
@@ -356,5 +379,6 @@ export function stepFires(sim: Sim, dt: number): void {
   if (out.length) {
     for (const f of out) sim.emit({ t: "fire", id: f.id, x: f.x, y: f.y, on: false });
     s.fires = s.fires.filter((f) => f.t > 0);
+    syncFireCells(sim);
   }
 }

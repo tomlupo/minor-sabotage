@@ -7,6 +7,7 @@ export const F_SIGHT = 2; // blocks sight (walls, buildings)
 export const F_COVER = 4; // low cover: bullets may stop here (sandbags, a car body)
 export const F_ROOF = 8; // under a roof (a gateway passage): units show as silhouettes
 export const F_VEH = 16; // dynamic: a vehicle stands here (not walkable, blocks sight)
+export const F_FIRE = 32; // dynamic: burning petrol here (not walkable; sight passes)
 
 export class Grid {
   readonly w: number;
@@ -45,7 +46,7 @@ export class Grid {
   walkableCell(cx: number, cy: number): boolean {
     if (!this.inBounds(cx, cy)) return false;
     const f = this.flags[cy * this.w + cx];
-    return (f & F_WALK) !== 0 && (f & F_VEH) === 0;
+    return (f & F_WALK) !== 0 && (f & (F_VEH | F_FIRE)) === 0;
   }
 
   walkable(x: number, y: number): boolean {
