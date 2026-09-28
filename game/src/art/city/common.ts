@@ -25,9 +25,6 @@ export function wordsI(im: PixelImage): Int32Array {
   return new Int32Array(im.data.buffer, im.data.byteOffset, im.w * im.h);
 }
 
-/** 4x4 Bayer thresholds 0..15 (style guide §4: dither only ground and foliage). */
-export const BAYER16 = new Uint8Array([0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]);
-
 // ------------------------------------------------------------------ value noise texture
 
 export const NOISE_BITS = 8;

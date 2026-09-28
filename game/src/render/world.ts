@@ -1,15 +1,19 @@
 // Draws the rules' state as the Diorama (style guide): the painted ground in chunks, the
 // buildings full or cut with their ghosts, props, vehicles and troopers sorted by the y of
-// their feet, and dotted silhouettes for anyone behind a roof.
+// their feet, and dotted silhouettes for anyone, and any vehicle, behind a roof.
 import Phaser from "phaser";
 import type { Sim } from "../sim/sim";
 import type { Unit, Vehicle, Prop } from "../sim/types";
 import type { MapData, MapBuilding } from "../content/mapdata";
-import type { TrooperLook, GroundGrid, PropKind } from "../art/types";
+import type { TrooperLook, GroundGrid, PropKind, VehicleState } from "../art/types";
 import { F_ROOF } from "../sim/grid";
 import { PAL, hex } from "../art/palette";
 import { toCanvas, img, poly } from "../art/pixel";
-import { buildTrooper, paintGroundImage, buildingArt, propArt, vehicleSheet, addSheet, addImage, art, DEFAULT_ANIMS, type TrooperTex } from "./artbank";
+import { paintGround } from "../art/city/ground";
+import { buildProp, POLE_WIRE_POINT } from "../art/props";
+import { buildVehicleSheet } from "../art/vehicles";
+import { TROOPER_ANIMS } from "../art/troopers";
+import { buildTrooper, buildingArt, addSheet, addImage, silhouetteSheet, type TrooperTex } from "./artbank";
 import { sx, sy, facingOf, headingFrame } from "./iso";
 import { ANIM_FRAMES } from "../art/types";
 
@@ -33,17 +37,27 @@ interface UnitView {
   lastFrame: string;
 }
 
+interface VehicleView {
+  spr: Phaser.GameObjects.Sprite;
+  /** The dotted outline shown over the roofs while the vehicle is behind them. */
+  sil: Phaser.GameObjects.Sprite;
+  key: string;
+}
+
+/** Where the silhouette test looks on a vehicle: along its length, a metre up. */
+const VEHICLE_PROBES = [-0.35, 0, 0.35];
+const VEHICLE_PROBE_Z = 1;
+
 export class WorldView {
   readonly scene: Phaser.Scene;
   readonly md: MapData;
   private chunks: { x: number; y: number; canvas: HTMLCanvasElement; tex: Phaser.Textures.CanvasTexture; dirty: boolean }[] = [];
   private buildings: BuildingView[] = [];
   private units = new Map<number, UnitView>();
-  private vehicles = new Map<number, { spr: Phaser.GameObjects.Sprite; key: string }>();
-  private props = new Map<number, { img: Phaser.GameObjects.Image; state: string; kind: PropKind }>();
+  private vehicles = new Map<number, VehicleView>();
+  private props = new Map<number, { img: Phaser.GameObjects.Image; state: string; variant: string; kind: PropKind }>();
   private troopers = new Map<string, TrooperTex>();
   private looks: Record<string, TrooperLook>;
-  private anims = art.trooperAnims() ?? DEFAULT_ANIMS;
   private wires: Phaser.GameObjects.Graphics;
   activeStreet = -1;
   private pendingStreet = -1;
@@ -63,7 +77,7 @@ export class WorldView {
   private buildGround() {
     const md = this.md;
     const grid: GroundGrid = { w: md.w, h: md.h, cells: md.ground, legend: md.legend };
-    const ground = paintGroundImage(grid, 1943);
+    const ground = paintGround(grid, 1943);
     // late afternoon: buildings throw long shadows to the east (style guide §4)
     const shade = img(ground.w, ground.h);
     for (const b of md.buildings) {
@@ -151,17 +165,15 @@ export class WorldView {
     return here;
   }
 
-  /** A second street to keep open (where the van is), set by the scene each frame. */
-  focusStreet = -1;
-
+  /** The cut follows your squad's street and nothing else (decision 2026-09-27, the street cut):
+   *  whatever else is behind a roof, the van included, shows as a dotted silhouette. */
   private updateCut(sim: Sim, dt: number) {
     const s = this.streetFor(sim);
     if (s !== this.pendingStreet) { this.pendingStreet = s; this.pendingT = 0; }
     this.pendingT += dt;
     if (this.pendingT > 0.15 && s >= 0) this.activeStreet = s;
     for (const v of this.buildings) {
-      const open = v.b.street === this.activeStreet || (this.focusStreet >= 0 && v.b.street === this.focusStreet);
-      const want = v.cut && v.b.cuttable && open ? 1 : 0;
+      const want = v.cut && v.b.cuttable && v.b.street === this.activeStreet ? 1 : 0;
       if (v.cutT === want) continue;
       v.cutT = want > v.cutT ? Math.min(1, v.cutT + dt / 0.3) : Math.max(0, v.cutT - dt / 0.3);
       if (!v.cut) continue;
@@ -227,7 +239,7 @@ export class WorldView {
     const { f, flip } = facingOf(u.dir);
     const anim = u.anim;
     const n = ANIM_FRAMES[anim] ?? 1;
-    const spec = this.anims[anim] ?? DEFAULT_ANIMS[anim];
+    const spec = TROOPER_ANIMS[anim];
     let i = Math.floor(u.animT * spec.fps);
     i = spec.loop ? i % n : Math.min(n - 1, i);
     if (anim === "walk" && !u.moving) i = 0;
@@ -236,49 +248,103 @@ export class WorldView {
 
   // ------------------------------------------------------------------ vehicles and props
 
+  /** The texture of a vehicle's look, and beside it (key + ":sil") its dotted silhouette. */
   private vehicleKey(v: Vehicle): string {
-    const st = v.doorsOpen && (v.state === "intact" || v.state === "doors_open") ? "doors_open" : v.state === "doors_open" ? "intact" : v.state;
+    const st: VehicleState = v.doorsOpen && (v.state === "intact" || v.state === "doors_open") ? "doors_open" : v.state === "doors_open" ? "intact" : v.state;
     const key = `vh:${v.kind}:${st}`;
     if (!this.scene.textures.exists(key)) {
-      const sh = vehicleSheet(v.kind, st);
+      const sh = buildVehicleSheet(v.kind, st);
       addSheet(this.scene, key, sh);
+      addSheet(this.scene, `${key}:sil`, silhouetteSheet(sh));
       this.noteSheetAnchors(key, sh.frames);
     }
     return key;
   }
 
+  /** Is the vehicle mostly behind a building drawn in front of it? */
+  private vehicleHidden(sim: Sim, veh: Vehicle, x: number, y: number, depth: number): boolean {
+    if ((sim.grid.flagAt(x, y) & F_ROOF) !== 0) return true;
+    const c = Math.cos(veh.heading), s = Math.sin(veh.heading);
+    let n = 0;
+    for (const k of VEHICLE_PROBES) {
+      const wx = x + c * veh.len * k, wy = y + s * veh.len * k;
+      if (this.occluded(Math.round(sx(wx)), Math.round(sy(wy, VEHICLE_PROBE_Z)), depth)) n++;
+    }
+    return n * 2 > VEHICLE_PROBES.length;
+  }
+
+  private syncVehicles(sim: Sim, a: number) {
+    const seen = new Set<number>();
+    for (const veh of sim.state.vehicles) {
+      seen.add(veh.id);
+      const key = this.vehicleKey(veh);
+      let v = this.vehicles.get(veh.id);
+      if (!v) {
+        const ours = veh.crew.some((id) => sim.unit(id)?.side === "pl");
+        const sil = this.scene.add.sprite(0, 0, `${key}:sil`, "h0").setDepth(2e6).setVisible(false)
+          .setTint(hex(ours ? PAL.shared.select_gold : PAL.shared.poppy_red));
+        v = { spr: this.scene.add.sprite(0, 0, key, "h0"), sil, key };
+        this.vehicles.set(veh.id, v);
+      }
+      if (v.key !== key) { v.spr.setTexture(key); v.sil.setTexture(`${key}:sil`); v.key = key; }
+      const frame = headingFrame(veh.heading);
+      v.spr.setFrame(frame);
+      v.sil.setFrame(frame);
+      const fr = v.spr.frame;
+      const sheetFrames = this.scene.textures.get(key).customData as Record<string, { ax: number; ay: number }> | undefined;
+      const anchor = sheetFrames?.[frame];
+      const ox = anchor ? anchor.ax / fr.width : 0.5, oy = anchor ? anchor.ay / fr.height : 0.75;
+      const x = veh.px + (veh.x - veh.px) * a, y = veh.py + (veh.y - veh.py) * a;
+      const ext = Math.abs(Math.sin(veh.heading)) * veh.len / 2 + Math.abs(Math.cos(veh.heading)) * veh.wid / 2;
+      const px = Math.round(sx(x)), py = Math.round(sy(y)), depth = sy(y + ext);
+      v.spr.setOrigin(ox, oy).setPosition(px, py).setDepth(depth);
+      v.sil.setOrigin(ox, oy).setPosition(px, py).setVisible(this.vehicleHidden(sim, veh, x, y, depth));
+    }
+    // a vehicle the rules removed (the DKW off the map) leaves the picture with it
+    for (const [id, v] of this.vehicles) if (!seen.has(id)) { v.spr.destroy(); v.sil.destroy(); this.vehicles.delete(id); }
+  }
+
   private propKey(p: Prop): string {
     const key = `pr:${p.kind}:${p.state}:${p.variant}`;
     if (!this.scene.textures.exists(key)) {
-      const a = propArt(p.kind as PropKind, p.state, p.variant || undefined);
+      const a = buildProp(p.kind as PropKind, p.state, p.variant || undefined);
       addImage(this.scene, key, a.image);
       this.scene.textures.get(key).customData = { ax: a.ax, ay: a.ay, w: a.image.w, h: a.image.h };
     }
     return key;
   }
 
+  /** Props stand on their ground point and sort by it, rounded like the troopers' feet, so a
+   *  man on the same row stands in front of a prop (a fallen man's kit under his boots) and a
+   *  body lies under it. A prop redraws when its state or variant changes (the Sten taken out
+   *  of a kit), and goes from the picture when the rules take it away (an emptied kit). */
   private syncProps(sim: Sim) {
+    const seen = new Set<number>();
     for (const p of sim.state.props) {
+      seen.add(p.id);
       let v = this.props.get(p.id);
-      if (!v || v.state !== p.state) {
+      if (!v || v.state !== p.state || v.variant !== p.variant) {
         const key = this.propKey(p);
         const cd = this.scene.textures.get(key).customData as { ax: number; ay: number; w: number; h: number };
         if (!v) {
-          const im = this.scene.add.image(sx(p.x), sy(p.y), key).setOrigin(cd.ax / cd.w, cd.ay / cd.h).setDepth(sy(p.y));
-          v = { img: im, state: p.state, kind: p.kind as PropKind };
+          const x = Math.round(sx(p.x)), y = Math.round(sy(p.y));
+          const im = this.scene.add.image(x, y, key).setOrigin(cd.ax / cd.w, cd.ay / cd.h).setDepth(y);
+          v = { img: im, state: p.state, variant: p.variant, kind: p.kind as PropKind };
           this.props.set(p.id, v);
         } else {
           v.img.setTexture(key).setOrigin(cd.ax / cd.w, cd.ay / cd.h);
           v.state = p.state;
+          v.variant = p.variant;
         }
       }
     }
+    for (const [id, v] of this.props) if (!seen.has(id)) { v.img.destroy(); this.props.delete(id); }
   }
 
   private drawWires(sim: Sim) {
     const g = this.wires;
     g.clear();
-    const pt = art.poleWire();
+    const pt = POLE_WIRE_POINT;
     // the line runs in map order: up Przejazd from the post, then along Długa to the box
     const poles = sim.state.props.filter((p) => p.tag.startsWith("pole_") || p.tag === "line_box");
     if (poles.length < 2) return;
@@ -292,9 +358,9 @@ export class WorldView {
       const va = this.props.get(a.id), vb = this.props.get(b.id);
       if (!va || !vb) continue;
       // hang the wire from the insulator (POLE_WIRE_POINT) on a pole, from the roof of the box
-      const at = (p: Prop, v: { img: Phaser.GameObjects.Image }) => p.kind === "phone_pole" && pt
-        ? { x: sx(p.x) + (pt[0] - v.img.displayOriginX), y: sy(p.y) - (v.img.displayOriginY - pt[1]) }
-        : { x: sx(p.x), y: sy(p.y) - v.img.displayOriginY + 2 };
+      const at = (p: Prop, v: { img: Phaser.GameObjects.Image }) => p.kind === "phone_pole"
+        ? { x: v.img.x + (pt[0] - v.img.displayOriginX), y: v.img.y - (v.img.displayOriginY - pt[1]) }
+        : { x: v.img.x, y: v.img.y - v.img.displayOriginY + 2 };
       const A = at(a, va), Bp = at(b, vb);
       const x0 = A.x, y0 = A.y, x1 = Bp.x, y1 = Bp.y;
       // a sagging wire
@@ -333,26 +399,7 @@ export class WorldView {
       v.sil.setPosition(px, py).setFlipX(flip).setVisible(hid);
     }
     for (const [id, v] of this.units) if (!seen.has(id)) { v.spr.destroy(); v.sil.destroy(); v.shadow.destroy(); this.units.delete(id); }
-
-    for (const veh of sim.state.vehicles) {
-      const key = this.vehicleKey(veh);
-      let v = this.vehicles.get(veh.id);
-      if (!v) {
-        v = { spr: this.scene.add.sprite(0, 0, key, "h0"), key };
-        this.vehicles.set(veh.id, v);
-      }
-      if (v.key !== key) { v.spr.setTexture(key); v.key = key; }
-      const frame = headingFrame(veh.heading);
-      v.spr.setFrame(frame);
-      const fr = v.spr.frame;
-      const sheetFrames = this.scene.textures.get(key).customData as Record<string, { ax: number; ay: number }> | undefined;
-      const anchor = sheetFrames?.[frame];
-      if (anchor) v.spr.setOrigin(anchor.ax / fr.width, anchor.ay / fr.height);
-      else v.spr.setOrigin(0.5, 0.75);
-      const x = veh.px + (veh.x - veh.px) * a, y = veh.py + (veh.y - veh.py) * a;
-      const ext = Math.abs(Math.sin(veh.heading)) * veh.len / 2 + Math.abs(Math.cos(veh.heading)) * veh.wid / 2;
-      v.spr.setPosition(Math.round(sx(x)), Math.round(sy(y))).setDepth(sy(y + ext));
-    }
+    this.syncVehicles(sim, a);
     this.syncProps(sim);
     this.drawWires(sim);
     this.flushDecals();

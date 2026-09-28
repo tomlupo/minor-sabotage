@@ -12,9 +12,9 @@
 // manholes, drains, puddles) are drawn in a second pass.
 import { PAL } from "../palette";
 import type { PixelImage } from "../pixel";
-import { hash2 as hash2Import, img } from "../pixel";
+import { BAYER4 as BAYER_IMPORT, hash2 as hash2Import, img } from "../pixel";
 import type { GroundGrid, GroundMat, GroundPainter } from "../types";
-import { BAYER16 as BAYER_IMPORT, ihash as ihashImport, lumpTex, noiseTex, packI, wordsI, X as XTRA } from "./common";
+import { ihash as ihashImport, lumpTex, noiseTex, packI, wordsI, X as XTRA } from "./common";
 
 // Hot loops read module-local bindings: under a bundler's SSR transform (vitest, vite-node)
 // an imported binding can be a live getter, which would cost a call per pixel.

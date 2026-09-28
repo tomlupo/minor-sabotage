@@ -6,17 +6,14 @@ import { mapData, simForMap } from "../../game/flow";
 import type { Sim } from "../../sim/sim";
 import { WorldView } from "../../render/world";
 import { allLooks } from "../../content/arsenal/roster";
-import { PAL, hex, css } from "../../art/palette";
-import type { PixelImage } from "../../art/pixel";
+import { PAL, hex, lightHex } from "../../art/palette";
 import { toCanvas } from "../../art/pixel";
-import { registerFonts, txt, PX, PXS, PXB } from "../text";
+import { buildLogo, buildTurtle } from "../../art/hud";
+import { registerFonts, txt, PX, PXS } from "../text";
 import { sx, sy } from "../../render/iso";
 import { readSafeInsets } from "../../render/view";
 import { sound } from "../../render/sound";
 import { store, type Bookmark } from "../../game/store";
-
-type Mod = Record<string, unknown>;
-const HUD = (Object.values(import.meta.glob<Mod>("../../art/hud.ts", { eager: true }))[0] ?? {}) as Mod;
 
 export class TitleScene extends Phaser.Scene {
   flow!: Flow;
@@ -40,8 +37,8 @@ export class TitleScene extends Phaser.Scene {
     this.world = new WorldView(this, md, allLooks());
     const cam = this.cameras.main;
     cam.setBounds(0, 0, sx(md.w), sy(md.h));
-    const amb = PAL.light.ambient.dusk;
-    this.add.rectangle(0, 0, this.scale.width, this.scale.height, (Math.round(amb[0] * 255) << 16) | (Math.round(amb[1] * 190) << 8) | Math.round(amb[2] * 180))
+    // the street at dusk (style guide §5: the ambient multiplies the finished frame), then soot
+    this.add.rectangle(0, 0, this.scale.width, this.scale.height, lightHex(PAL.light.ambient.dusk))
       .setOrigin(0).setScrollFactor(0).setDepth(3e6).setBlendMode(Phaser.BlendModes.MULTIPLY);
     this.add.rectangle(0, 0, this.scale.width, this.scale.height, hex(PAL.city_1943.soot[0]), 0.45).setOrigin(0).setScrollFactor(0).setDepth(3e6 + 1);
     this.bookmark = await store.takeBookmark();
@@ -56,32 +53,21 @@ export class TitleScene extends Phaser.Scene {
     const S = readSafeInsets(1.5);
     const cx = W / 2;
     const d = 3e6 + 10;
-    const logo = HUD.buildLogo as (() => PixelImage) | undefined;
-    const turtle = HUD.buildTurtle as ((size: number) => PixelImage) | undefined;
     let y = S.top + 18;
-    if (logo) {
-      const im = logo();
-      if (!this.textures.exists("logo")) this.textures.addCanvas("logo", toCanvas(im));
-      this.add.image(cx, y, "logo").setOrigin(0.5, 0).setScrollFactor(0).setDepth(d);
-      y += im.h + 6;
-    } else {
-      txt(this, cx, y, "MINOR SABOTAGE", { font: PXB, color: PAL.shared.chalk, align: 0.5 }).setScrollFactor(0).setDepth(d);
-      y += 16;
-      txt(this, cx, y, "MAŁY SABOTAŻ", { font: PX, color: PAL.shared.poppy_red, align: 0.5 }).setScrollFactor(0).setDepth(d);
-      y += 14;
-    }
-    if (turtle) {
-      const im = turtle(28);
-      if (!this.textures.exists("turtle")) this.textures.addCanvas("turtle", toCanvas(im));
-      this.add.image(W - S.right - 20, H - S.bottom - 16, "turtle").setOrigin(1, 1).setScrollFactor(0).setDepth(d).setAlpha(0.9);
-    }
+    if (!this.textures.exists("logo")) this.textures.addCanvas("logo", toCanvas(buildLogo()));
+    const logo = this.textures.getFrame("logo");
+    this.add.image(Math.round(cx - logo.width / 2), y, "logo").setOrigin(0).setScrollFactor(0).setDepth(d);
+    y += logo.height + 6;
+    if (!this.textures.exists("turtle")) this.textures.addCanvas("turtle", toCanvas(buildTurtle(28)));
+    this.add.image(W - S.right - 20, H - S.bottom - 16, "turtle").setOrigin(1, 1).setScrollFactor(0).setDepth(d).setAlpha(0.9);
     txt(this, W - S.right - 20, H - S.bottom - 12, "PRACUJ POWOLI", { font: PXS, color: PAL.shared.chalk, align: 1 }).setScrollFactor(0).setDepth(d);
     txt(this, cx, y + 4, "Warsaw, 26 March 1943", { font: PX, color: PAL.shared.chalk, align: 0.5 }).setScrollFactor(0).setDepth(d);
     txt(this, cx, y + 16, "The demo: Akcja pod Arsenałem", { font: PXS, color: PAL.hud.paper[1], align: 0.5 }).setScrollFactor(0).setDepth(d);
 
     const buttons: [string, () => void][] = [];
     if (this.bookmark) buttons.push([`RESUME ${this.bookmark.phase.toUpperCase()} (ONCE)`, () => this.flow.resume(this.bookmark!)]);
-    if (this.hasSave) buttons.push(["CONTINUE THE OPERATION", () => void this.flow.continueSaved()]);
+    // with a bookmark the phase goes on from it, once; without, the phase it left is settled
+    if (this.hasSave && !this.bookmark) buttons.push(["CONTINUE THE OPERATION", () => void this.flow.continueSaved()]);
     buttons.push([this.hasSave ? "NEW OPERATION" : "BEGIN", () => this.flow.newOperation()]);
     let by = H * 0.56;
     for (const [label, act] of buttons) {
@@ -94,7 +80,6 @@ export class TitleScene extends Phaser.Scene {
     txt(this, S.left + 10, H - S.bottom - 22, "A game about the Polish underground. The people are real;", { font: PXS, color: PAL.hud.paper[1] }).setScrollFactor(0).setDepth(d);
     txt(this, S.left + 10, H - S.bottom - 14, "the note at the end tells what really happened.", { font: PXS, color: PAL.hud.paper[1] }).setScrollFactor(0).setDepth(d);
     txt(this, S.left + 10, S.top + 6, "Inspired by Cannon Fodder and Commandos", { font: PXS, color: PAL.hud.paper[0] }).setScrollFactor(0).setDepth(d);
-    void css;
   }
 
   override update(_t: number, delta: number) {

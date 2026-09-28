@@ -179,8 +179,10 @@ export function outline(im: PixelImage, c: RGB, sides: "all" | "br" = "all"): vo
   for (let i = 0; i < mark.length; i += 2) px(im, mark[i], mark[i + 1], c);
 }
 
-const BAYER4 = [0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5];
-/** 4x4 Bayer threshold in [0, 1). Style guide §4: dither only ground and foliage. */
+/** The one 4x4 Bayer table: thresholds 0..15, row-major, index ((y & 3) << 2) | (x & 3).
+ *  Style guide §4: dither only ground and foliage (and §5: the edges of light pools). */
+export const BAYER4 = new Uint8Array([0, 8, 2, 10, 12, 4, 14, 6, 3, 11, 1, 9, 15, 7, 13, 5]);
+/** 4x4 Bayer threshold in [0, 1). */
 export function bayer(x: number, y: number): number {
   return BAYER4[((y & 3) << 2) | (x & 3)] / 16;
 }

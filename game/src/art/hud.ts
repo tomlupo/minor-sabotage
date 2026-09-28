@@ -379,8 +379,9 @@ export const MARKER_ANCHORS = {
   waitMark: { x: 4, y: 11 },
 } as const;
 
-/** Where you tapped (select_gold): four frames growing and breaking up; 16 x 13, centre (8, 6). */
-export function buildTapRing(frame: number): PixelImage {
+/** Where you tapped (select_gold; poppy_red on an enemy, `c`): four frames growing and breaking
+ *  up; 16 x 13, centre (8, 6). */
+export function buildTapRing(frame: number, c: RGB = HUD.gold): PixelImage {
   const f = Math.max(0, Math.min(3, frame | 0));
   const sizes: [number, number][] = [[6, 4], [10, 8], [14, 10], [16, 12]];
   const [rw, rh] = sizes[f];
@@ -388,8 +389,8 @@ export function buildTapRing(frame: number): PixelImage {
   const ring = ellipseRing(rw, rh);
   const ox = (16 - rw) / 2, oy = Math.floor((12 - rh) / 2);
   const keep = (x: number, y: number) => f < 3 || (x + y) % 2 === 0;
-  for (const [c, dy] of [[HUD.outline, 1], [HUD.gold, 0]] as const) {
-    for (let y = 0; y < ring.h; y++) for (let x = 0; x < ring.w; x++) if (on(ring, x, y) && keep(x, y)) px(im, ox + x, oy + y + dy, c);
+  for (const [ink, dy] of [[HUD.outline, 1], [c, 0]] as const) {
+    for (let y = 0; y < ring.h; y++) for (let x = 0; x < ring.w; x++) if (on(ring, x, y) && keep(x, y)) px(im, ox + x, oy + y + dy, ink);
   }
   return im;
 }

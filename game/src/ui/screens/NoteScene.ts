@@ -113,7 +113,7 @@ export class NoteScene extends Phaser.Scene {
   #note .credits{font-size:11px;line-height:1.4;color:${faint};padding-left:18px}
   #note .credits a{color:${faint}}
   #note .bar{display:flex;gap:8px;flex-wrap:wrap;margin-top:22px}
-  #note button{font:600 14px ui-monospace,Menlo,monospace;background:${css(PAL.hud.button_olive[1])};color:${css(PAL.hud.button_ink)};border:1px solid ${css(PAL.hud.button_rim)};padding:10px 14px;min-height:44px;border-radius:2px}
+  #note button{font:600 14px ui-monospace,Menlo,monospace;background:${ink};color:${paper};border:1px solid ${ink};padding:10px 14px;min-height:44px;border-radius:2px}
   #note button.alt{background:transparent;color:${ink};border-color:${faint}}
 </style>
 <div class="page">

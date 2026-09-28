@@ -1,8 +1,9 @@
 // The effects sheet (types.ts FxBuilder): muzzle flashes per facing, the explosion, a looping fire
 // for burning props, vehicles and petrol, smoke, dust, slush, a petrol bottle smashing, ricochet
 // sparks, and ground and wall decals. Stepped palette colours only (style guide §3): the fire ramp
-// with the ember steps under it, soot for smoke (the one place dither is allowed besides ground and
-// foliage), cut_cap and dark brick for blood, never poppy red.
+// with the ember steps under it, soot for smoke, cut_cap and dark brick for blood, never poppy red.
+// Dither only on the ground (§4: the scorch marks' ragged edge): smoke and dust thin out as the
+// edges of their lumps eat in, never through a dither pattern.
 //
 // Anchors: muzzle flashes at the muzzle (the flash points away from it); explosion, fire, smoke,
 // dust, slush, glass and sparks at the effect's centre on the ground; decals at their centre.
@@ -183,10 +184,9 @@ function explosion(): Cell[] {
         const heat = (dens * 1.1 + (n - 0.5) * 0.35) * heatFall * (1.15 - up * 0.45);
         const c = heatColour(heat);
         if (c) { px(im, x, y, c); continue; }
-        // smoke, thinning with time through a dither
+        // smoke, thinning with time: its thin edge is cut away, raggedly (no dither)
         const keep = dens * 1.5 - Math.max(0, t - 0.4) * 1.1 + (n - 0.5) * 0.3;
-        if (keep <= 0) continue;
-        if (f >= 5 && bayer(x, y) > keep * 2.2) continue;
+        if (keep <= (f >= 5 ? 0.1 + (f - 5) * 0.07 : 0)) continue;
         const lit = core * (1 + n * 0.4);
         const sc = lit > 0.95 ? SMOKE[4] : lit > 0.65 ? SMOKE[3] : lit > 0.38 ? SMOKE[2] : SMOKE[1];
         px(im, x, y, sc);
@@ -257,7 +257,8 @@ function fire(): Cell[] {
 
 // ---------------------------------------------------------------- smoke, dust, slush
 
-/** A billow of round lumps, lit from the top left, thinned by a dither as it ages. */
+/** A billow of round lumps, lit from the top left. As it ages the edge of every lump eats in,
+ *  raggedly, so the billow breaks into smaller puffs (no dither: style guide §4). */
 function billow(W: number, H: number, ax: number, ay: number, lumps: { x: number; y: number; r: number }[], age: number, tones: RGB[], seed: number): PixelImage {
   const im = img(W, H);
   for (let y = 0; y < H; y++) {
@@ -273,7 +274,7 @@ function billow(W: number, H: number, ax: number, ay: number, lumps: { x: number
       }
       if (dens <= 0) continue;
       const n = vnoise(x * 0.5, y * 0.5, seed, seed);
-      if (bayer(x, y) < age * 0.95 - dens * 0.8 + (n - 0.5) * 0.4) continue;
+      if (dens < age * 0.55 + (n - 0.5) * 0.35) continue;
       const k = lit + (n - 0.5) * 0.3;
       px(im, x, y, k > 1.0 ? tones[3] : k > 0.7 ? tones[2] : k > 0.35 ? tones[1] : tones[0]);
     }

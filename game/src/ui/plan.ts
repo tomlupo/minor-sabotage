@@ -4,9 +4,10 @@
 import type { MapData } from "../content/mapdata";
 import { F_SIGHT } from "../content/mapdata";
 import type { PixelImage } from "../art/pixel";
-import { img, px, rect, line, hash2, blit } from "../art/pixel";
+import { img, px, line, hash2, blit } from "../art/pixel";
 import { PAL, mix } from "../art/palette";
 import { FONT_SMALL, drawText, measure } from "../art/font";
+import { buildPaper } from "../art/hud";
 
 export interface PlanView {
   image: PixelImage;
@@ -15,20 +16,12 @@ export interface PlanView {
   sy: (y: number) => number;
 }
 
-type Mod = Record<string, unknown>;
-const HUD = (Object.values(import.meta.glob<Mod>("../art/hud.ts", { eager: true }))[0] ?? {}) as Mod;
-
 export function drawPlan(md: MapData, w: number, h: number): PlanView {
   const im = img(w, h);
-  const [paperD, paperL] = PAL.hud.paper;
+  const paperD = PAL.hud.paper[0];
   const ink = PAL.hud.paper_ink;
   const pencil = mix(paperD, ink, 0.45);
-  const buildPaper = HUD.buildPaper as ((w: number, h: number, seed: number) => PixelImage) | undefined;
-  if (buildPaper) blit(im, buildPaper(w, h, 7), 0, 0);
-  else {
-    rect(im, 0, 0, w, h, paperL);
-    for (let y = 0; y < h; y++) for (let x = 0; x < w; x++) if (hash2(x, y, 3) < 0.05) px(im, x, y, paperD);
-  }
+  blit(im, buildPaper(w, h, 7), 0, 0);
   const pad = 6;
   const k = Math.min((w - pad * 2) / md.w, (h - pad * 2) / md.h);
   const ox = Math.round((w - md.w * k) / 2), oy = Math.round((h - md.h * k) / 2);

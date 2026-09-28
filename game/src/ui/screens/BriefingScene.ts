@@ -12,11 +12,15 @@ import { registerFonts, txt, PX, PXS, PXB } from "../text";
 import { readSafeInsets } from "../../render/view";
 import { sound } from "../../render/sound";
 
-const INFO: Record<TaskId, { letter: string; title: string; place: string; job: string; helps: string; at: [number, number] }> = {
+const INFO: Record<TaskId, { letter: string; title: string; place: string; job: string; helps?: string; at: [number, number] }> = {
   signal: { letter: "A", title: "Sygnalizacja", place: "Bielańska", job: "Set three posts to signal the van: the telephone, Tłomackie, the Bank Polski.", helps: "Scouts know the street.", at: [131, 138] },
-  ghetto: { letter: "B", title: "Getto", place: "Długa at Przejazd", job: "Cut the telephone of the police post at the ghetto wall; cover Długa west.", helps: "Sappers cut wire faster.", at: [28, 58] },
-  oldtown: { letter: "C", title: "Stare Miasto", place: "Długa, to the Old Town", job: "Silence the Arbeitsamt's gate; disable the Wehrmacht truck before it leaves.", helps: "Sappers work faster on the truck.", at: [196, 80] },
+  ghetto: { letter: "B", title: "Getto", place: "Długa at Przejazd", job: "Cut the telephone of the police post at the ghetto wall; cover Długa west.", at: [28, 58] },
+  oldtown: { letter: "C", title: "Stare Miasto", place: "Długa, to the Old Town", job: "Silence the Arbeitsamt's gate; disable the Wehrmacht truck before it leaves.", at: [196, 80] },
 };
+
+/** A task that went partly: ochre ink, between the green of done and the red of failed
+ *  (select_gold is only for your selection, style guide §3). */
+const PARTIAL = PAL.city_1943.plaster_ochre[0];
 
 export class BriefingScene extends Phaser.Scene {
   flow!: Flow;
@@ -66,7 +70,7 @@ export class BriefingScene extends Phaser.Scene {
       const info = INFO[t];
       const res = c.results[t];
       const x = plan.sx(info.at[0]) + L, y = plan.sy(info.at[1]) + T;
-      const col = res ? (res.outcome === "success" ? PAL.hud.hp_ok : res.outcome === "partial" ? PAL.shared.select_gold : PAL.hud.hp_low) : PAL.hud.paper_ink;
+      const col = res ? (res.outcome === "success" ? PAL.hud.hp_ok : res.outcome === "partial" ? PARTIAL : PAL.hud.hp_low) : PAL.hud.paper_ink;
       const ring = this.add.circle(x, y, 8, hex(PAL.hud.paper[1])).setStrokeStyle(t === this.sel ? 2 : 1, hex(t === this.sel ? PAL.shared.select_gold : col));
       ring.setInteractive({ useHandCursor: true }).on("pointerup", () => { this.sel = t; sound.ui("ui_tap"); this.draw(); });
       txt(this, x, y - 4, info.letter, { color: col, align: 0.5 });
@@ -90,12 +94,12 @@ export class BriefingScene extends Phaser.Scene {
       txt(this, cx + cw - 4, y + 3, SQUADS[sqi].name, { color: PAL.hud.paper_ink, align: 1, font: PXS });
       if (res) {
         const word = res.outcome === "success" ? "DONE" : res.outcome === "partial" ? "PART DONE" : "FAILED";
-        const col = res.outcome === "success" ? PAL.hud.hp_ok : res.outcome === "partial" ? mix(PAL.shared.select_gold, PAL.hud.paper_ink, 0.3) : PAL.hud.hp_low;
+        const col = res.outcome === "success" ? PAL.hud.hp_ok : res.outcome === "partial" ? PARTIAL : PAL.hud.hp_low;
         txt(this, cx + 10, y + 14, `${word}${res.silent ? ", quietly" : ", the alarm went up"}`, { font: PXS, color: col });
         txt(this, cx + 10, y + 24, this.effect(t), { font: PX, color: PAL.hud.paper_ink, wrap: cw - 16 });
       } else {
         txt(this, cx + 10, y + 14, info.job, { font: PX, color: PAL.hud.paper_ink, wrap: cw - 16 });
-        txt(this, cx + 10, y + cardH - 9, info.helps, { font: PXS, color: mix(PAL.hud.paper_ink, PAL.hud.paper[0], 0.4) });
+        if (info.helps) txt(this, cx + 10, y + cardH - 9, info.helps, { font: PXS, color: mix(PAL.hud.paper_ink, PAL.hud.paper[0], 0.4) });
       }
     });
 

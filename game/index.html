@@ -45,11 +45,13 @@
       @media (orientation: portrait) and (max-width: 700px) {
         #rotate { display: flex; }
       }
-      /* while the art is drawn at start (a few seconds on a phone); the first screen removes it */
+      /* while the art is drawn at start (a few seconds on a phone); the first screen removes it.
+         The page shows before any script runs, so its colours are written here: each is a colour
+         of docs/art/palette.json (outline, chalk, hud.paper[0]), held so by tests/colour-literals. */
       #boot {
         position: fixed; inset: 0; z-index: 5; display: flex; flex-direction: column;
         align-items: center; justify-content: center; gap: 10px; pointer-events: none;
-        background: #24201a; color: #d8ceb4; font: 600 13px/1.4 ui-monospace, Menlo, monospace;
+        background: #24201a; color: #d6ccb4; font: 600 13px/1.4 ui-monospace, Menlo, monospace;
         letter-spacing: 0.24em;
       }
       #boot small { font-weight: 400; font-size: 11px; letter-spacing: 0.08em; opacity: 0.6; }

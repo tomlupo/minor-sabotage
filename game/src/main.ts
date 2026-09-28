@@ -10,6 +10,7 @@ import { IntroScene } from "./ui/screens/IntroScene";
 import { CardScene } from "./ui/screens/CardScene";
 import { Flow, fakeResults, bootDone } from "./game/flow";
 import { registerFonts } from "./ui/text";
+import { PAL, hex } from "./art/palette";
 
 const parent = document.getElementById("game")!;
 const v0 = computeView(window.innerWidth, window.innerHeight);
@@ -43,7 +44,7 @@ class Boot extends Phaser.Scene {
 const game = new Phaser.Game({
   type: Phaser.WEBGL,
   parent,
-  backgroundColor: "#24201a",
+  backgroundColor: hex(PAL.shared.outline),
   pixelArt: true,
   antialias: false,
   roundPixels: true,

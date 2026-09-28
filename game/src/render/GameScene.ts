@@ -6,7 +6,7 @@ import type { Unit } from "../sim/types";
 import type { MapData } from "../content/mapdata";
 import type { Phase, Interactable } from "../missions/types";
 import { cmdMove, cmdTapEnemy, cmdHelp, cmdThrow, cmdFireAt } from "../sim/commands";
-import { PAL } from "../art/palette";
+import { PAL, lightHex } from "../art/palette";
 import { allLooks } from "../content/arsenal/roster";
 import { WorldView } from "./world";
 import { Overlay } from "./overlay";
@@ -68,6 +68,8 @@ export class GameScene extends Phaser.Scene {
     this.world.preload([...looks]);
     this.overlay = new Overlay(this);
     this.fx = new Fx(this, this.world);
+    // a phase resumed from a snapshot starts with what it was left with (fires, glyphs, the dead)
+    this.fx.fromState(sim);
     const Z = md.zones.find((z) => z.name === phase.zone)!;
     const cam = this.cameras.main;
     cam.setBounds(sx(Z.x), sy(Z.y) - 60, sx(Z.w), sy(Z.h) + 60);
@@ -77,9 +79,8 @@ export class GameScene extends Phaser.Scene {
     this.camY = sy(st.y);
     cam.centerOn(this.camX, this.camY);
     // the light over the finished frame (style guide §5)
-    const amb = PAL.light.ambient[phase.light];
-    const col = (Math.round(amb[0] * 255) << 16) | (Math.round(amb[1] * 255) << 8) | Math.round(amb[2] * 255);
-    this.light = this.add.rectangle(0, 0, this.scale.width, this.scale.height, col).setOrigin(0).setScrollFactor(0).setDepth(3e6).setBlendMode(Phaser.BlendModes.MULTIPLY);
+    this.light = this.add.rectangle(this.scale.width / 2, this.scale.height / 2, this.scale.width, this.scale.height, lightHex(PAL.light.ambient[phase.light]))
+      .setScrollFactor(0).setDepth(3e6).setBlendMode(Phaser.BlendModes.MULTIPLY);
     this.scale.on("resize", this.onResize, this);
     document.addEventListener("visibilitychange", this.onVisibility);
     this.events.once("shutdown", () => {
@@ -95,7 +96,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onResize() {
-    this.light.setSize(this.scale.width, this.scale.height);
+    this.light.setPosition(this.scale.width / 2, this.scale.height / 2).setSize(this.scale.width, this.scale.height);
   }
 
   override update(time: number, delta: number) {
@@ -109,13 +110,12 @@ export class GameScene extends Phaser.Scene {
       if (e.t === "explosion") this.cameras.main.shake(180, 0.006);
     }
     if (events.length) this.events.emit("sim-events", events);
-    const f = phase.focus?.(sim);
-    this.world.focusStreet = f ? sim.grid.streetAt(f.x, f.y) : -1;
     this.world.update(sim, dt);
     this.fx.update(sim, dt);
+    // the camera settles first, so the overlay is laid under this frame's view
+    this.follow(dt);
     this.overlay.marks = phase.interactables(sim).filter((i) => i.ready(sim)).map((i) => ({ x: i.x, y: i.y, r: i.r, on: true }));
     this.overlay.draw(sim, this.cameras.main, time / 1000);
-    this.follow(dt);
     sound.listener(wx(this.cameras.main.midPoint.x), wy(this.cameras.main.midPoint.y));
     if (sim.state.outcome && !this.ended) this.ended = time;
     if (this.ended && time - this.ended > 2600) {
@@ -158,11 +158,14 @@ export class GameScene extends Phaser.Scene {
     if (on) {
       const Z = this.run.md.zones.find((z) => z.name === this.run.phase.zone)!;
       const zx = this.scale.width / sx(Z.w), zy = this.scale.height / (sy(Z.h) + 60);
-      cam.setZoom(Math.max(0.25, Math.min(1, Math.min(zx, zy))));
+      // a whole fraction (1/2, 1/3, 1/4), so the overview keeps every n-th art pixel evenly
+      cam.setZoom(1 / Math.min(4, Math.ceil(1 / Math.min(1, zx, zy))));
       cam.centerOn(sx(Z.x + Z.w / 2), sy(Z.y + Z.h / 2));
     } else {
       cam.setZoom(1);
     }
+    // the light is fixed to the screen, but the camera's zoom still scales it about the centre
+    this.light.setScale(1 / cam.zoom);
   }
 
   // ------------------------------------------------------------------ input (from the HUD)

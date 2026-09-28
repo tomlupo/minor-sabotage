@@ -105,6 +105,8 @@ export function paletteColours(): Set<string> {
 }
 
 export const hex = (c: RGB): number => (c[0] << 16) | (c[1] << 8) | c[2];
+/** A light's 0..1 multipliers (light.ambient, light.pool) as a colour number. */
+export const lightHex = (m: readonly [number, number, number]): number => hex([Math.round(m[0] * 255), Math.round(m[1] * 255), Math.round(m[2] * 255)]);
 export const css = (c: RGB, a = 1): string =>
   a >= 1 ? `rgb(${c[0]},${c[1]},${c[2]})` : `rgba(${c[0]},${c[1]},${c[2]},${a})`;
 export const mix = (a: RGB, b: RGB, t: number): RGB => [

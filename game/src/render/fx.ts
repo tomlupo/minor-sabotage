@@ -1,37 +1,65 @@
-// Effects driven by the rules' events: tracers and muzzle flashes, grenades and bottles in
-// flight, explosions with a shake and a scorch mark, fires with their light, blood on the
-// cobbles, glyphs over heads and short shouts. Juice, but every piece says something true.
+// Effects: tracers and muzzle flashes, grenades and bottles in flight, explosions with a shake
+// and a scorch mark, fires with their light, blood on the cobbles, glyphs over heads and short
+// shouts. Juice, but every piece says something true.
+//
+// What lasts (a fire and its light, the glyph over a head) is drawn from the rules' state every
+// frame, so a phase resumed from a snapshot (ADR-0001) shows what it was left with; what passes
+// (a shot, a burst, a shout) comes from the rules' events.
 import Phaser from "phaser";
 import type { Sim } from "../sim/sim";
-import type { SimEvent, Unit } from "../sim/types";
-import { PAL, hex } from "../art/palette";
-import { toCanvas, crop, type Sheet } from "../art/pixel";
-import { addSheet, fxSheet, art } from "./artbank";
+import type { Glyph, SimEvent, Unit } from "../sim/types";
+import { UF_SILENT_DEATH } from "../sim/types";
+import { PAL, hex, type RGB } from "../art/palette";
+import { crop, img, outline, toCanvas, type PixelImage, type Sheet } from "../art/pixel";
+import { buildFxSheet } from "../art/fx";
+import { MUZZLE } from "../art/troopers";
+import { buildGlyph, type GlyphName } from "../art/hud";
+import { FONT, drawText, measure } from "../art/font";
+import { buildPalettePool } from "../art/light";
+import { addImage, addSheet } from "./artbank";
 import { sx, sy, facingOf } from "./iso";
 import type { WorldView } from "./world";
 
 interface Tracer { x0: number; y0: number; x1: number; y1: number; t: number; side: string }
 interface Anim { spr: Phaser.GameObjects.Sprite; frames: string[]; fps: number; t: number; loop: boolean; vy?: number }
-interface Bubble { unit: number; text: Phaser.GameObjects.Text; t: number }
+interface Bubble { unit: number; img: Phaser.GameObjects.Image; t: number }
+interface FireView { x: number; y: number; sprs: Phaser.GameObjects.Sprite[]; light: Phaser.GameObjects.Image; flickerT: number }
+
+/** Who shouts: our side and the prisoners in chalk, the Germans in their field grey. */
+const VOICE: Record<"de" | "pl", RGB> = { de: PAL.troopers.occupier_field_grey[2], pl: PAL.shared.chalk };
+/** A fire's light steps between these, a few times a second (§5: stepped, never smooth). */
+const FLICKER = [0.8, 0.9, 1];
+/** Flashes are wider pools than a fire's: an explosion, a bottle bursting (x the fire's reach). */
+const FLASH = { explosion: 1.4, bottle: 0.95 } as const;
 
 export class Fx {
   private sheet: Sheet;
   private tracers: Tracer[] = [];
   private g: Phaser.GameObjects.Graphics;
   private anims: Anim[] = [];
-  private fires = new Map<number, { sprs: Phaser.GameObjects.Sprite[]; light: Phaser.GameObjects.Image }>();
-  private glyphs = new Map<number, Phaser.GameObjects.Text>();
+  private fires = new Map<number, FireView>();
+  private glyphs = new Map<number, { img: Phaser.GameObjects.Image; glyph: Glyph }>();
   private bubbles: Bubble[] = [];
   private proj = new Map<number, Phaser.GameObjects.Sprite>();
   private frameCanvas = new Map<string, HTMLCanvasElement>();
-  private muzzle = art.muzzle();
   shake = 0;
 
   constructor(private scene: Phaser.Scene, private world: WorldView) {
-    this.sheet = fxSheet();
+    this.sheet = buildFxSheet();
     addSheet(scene, "fx", this.sheet);
     this.g = scene.add.graphics().setDepth(1.5e6);
-    this.makeLightTexture();
+    addImage(scene, "light:fire", buildPalettePool("fire"));
+    for (const k of Object.values(FLASH)) addImage(scene, `light:flash:${k}`, buildPalettePool("fire", k));
+  }
+
+  /** A phase that starts from a snapshot: the blood under those already dead. Fires and glyphs
+   *  follow the state by themselves (update). */
+  fromState(sim: Sim) {
+    for (const u of sim.state.units) {
+      if (u.state === "dead" && !u.hidden && !(u.flags & UF_SILENT_DEATH)) this.world.decal(this.canvasOf("blood_1"), u.x, u.y + 0.2);
+    }
+    this.syncFires(sim);
+    this.syncGlyphs(sim);
   }
 
   private has(name: string) {
@@ -50,24 +78,6 @@ export class Fx {
     c = toCanvas(crop(this.sheet.image, f.x, f.y, f.w, f.h));
     this.frameCanvas.set(name, c);
     return c;
-  }
-
-  /** Three stepped bands of warm light (style guide §5: pools are stepped, never smooth). */
-  private makeLightTexture() {
-    const s = 96;
-    const c = document.createElement("canvas");
-    c.width = s;
-    c.height = Math.round(s * 0.75);
-    const g = c.getContext("2d")!;
-    const [r, gg, b] = PAL.shared.fire[1];
-    for (const [k, a] of [[1, 0.1], [0.66, 0.16], [0.36, 0.24]] as const) {
-      g.fillStyle = `rgba(${r},${gg},${b},${a})`;
-      g.beginPath();
-      g.ellipse(s / 2, c.height / 2, (s / 2) * k, (c.height / 2) * k, 0, 0, Math.PI * 2);
-      g.fill();
-    }
-    if (this.scene.textures.exists("lightpool")) this.scene.textures.remove("lightpool");
-    this.scene.textures.addCanvas("lightpool", c);
   }
 
   private play(prefix: string, x: number, y: number, depth: number, fps = 14, loop = false, vy = 0): Phaser.GameObjects.Sprite | null {
@@ -97,46 +107,20 @@ export class Fx {
       }
       case "death":
         if (!e.silent) this.world.decal(this.canvasOf("blood_1"), e.x, e.y + 0.2);
-        this.dropGlyph(e.unit);
         break;
       case "explosion":
         this.play("explosion_", sx(e.x), sy(e.y), sy(e.y) + 2, 16);
         for (let i = 0; i < 4; i++) this.play("smoke_", sx(e.x) + (Math.random() - 0.5) * 20, sy(e.y) - 4, sy(e.y) + 3, 7, false, -8);
         this.world.decal(this.canvasOf("scorch_0"), e.x, e.y);
         this.shake = Math.max(this.shake, 0.35);
-        this.flash(e.x, e.y, 1.2);
+        this.flash(e.x, e.y, FLASH.explosion);
         break;
       case "bottle":
         this.play("glass_", sx(e.x), sy(e.y), sy(e.y) + 2, 14);
-        this.flash(e.x, e.y, 0.8);
-        break;
-      case "fire":
-        if (e.on) {
-          const sprs: Phaser.GameObjects.Sprite[] = [];
-          for (let i = 0; i < 3; i++) {
-            const s = this.play("fire_", sx(e.x) + (i - 1) * 7, sy(e.y) + (i % 2) * 3, sy(e.y) + 1 + i, 10 + i, true);
-            if (s) sprs.push(s);
-          }
-          const light = this.scene.add.image(sx(e.x), sy(e.y), "lightpool").setBlendMode(Phaser.BlendModes.ADD).setDepth(1.8e6);
-          this.fires.set(e.id, { sprs, light });
-          this.world.decal(this.canvasOf("scorch_1"), e.x, e.y);
-        } else {
-          const f = this.fires.get(e.id);
-          if (f) {
-            for (const s of f.sprs) { this.anims = this.anims.filter((a) => a.spr !== s); s.destroy(); }
-            f.light.destroy();
-            this.fires.delete(e.id);
-            this.play("smoke_", sx(e.x), sy(e.y) - 4, sy(e.y) + 3, 5, false, -10);
-          }
-        }
-        break;
-      case "glyph":
-        this.setGlyph(sim.unit(e.unit), e.glyph);
+        this.flash(e.x, e.y, FLASH.bottle);
         break;
       case "say":
         this.say(sim.unit(e.unit), e.text);
-        break;
-      case "knife":
         break;
       case "vehicle":
         if (e.state === "burning") {
@@ -155,14 +139,13 @@ export class Fx {
   }
 
   private flash(x: number, y: number, k: number) {
-    const im = this.scene.add.image(sx(x), sy(y), "lightpool").setBlendMode(Phaser.BlendModes.ADD).setDepth(1.8e6).setScale(k * 1.6);
+    const im = this.scene.add.image(Math.round(sx(x)), Math.round(sy(y)), `light:flash:${k}`).setBlendMode(Phaser.BlendModes.ADD).setDepth(1.8e6);
     this.scene.tweens.add({ targets: im, alpha: 0, duration: 260, onComplete: () => im.destroy() });
   }
 
   private muzzleFlash(u: Unit) {
     const { f, flip } = facingOf(u.dir);
-    const table = this.muzzle?.[u.weapon];
-    const m = table?.[f];
+    const m = u.weapon === "none" ? undefined : MUZZLE[u.weapon][f];
     const ox = m ? (flip ? -m[0] : m[0]) : Math.cos(u.dir) * 8;
     const oy = m ? m[1] : -9;
     const name = `muzzle_${f}_${Math.random() < 0.5 ? 0 : 1}`;
@@ -174,29 +157,101 @@ export class Fx {
     this.scene.time.delayedCall(50, () => s.destroy());
   }
 
-  private setGlyph(u: Unit | undefined, glyph: string) {
-    if (!u) return;
-    this.dropGlyph(u.id);
-    if (glyph === "none") return;
-    const ch = glyph === "alert" ? "!" : glyph === "suspicious" ? "?" : glyph === "wounded" ? "+" : "†";
-    const col = glyph === "alert" ? PAL.shared.poppy_red : glyph === "wounded" ? PAL.hud.hp_low : PAL.shared.chalk;
-    const t = this.scene.add.text(0, 0, ch, { fontFamily: "monospace", fontSize: "10px", color: `#${hex(col).toString(16).padStart(6, "0")}`, stroke: "#24201a", strokeThickness: 2 })
-      .setOrigin(0.5, 1).setDepth(2.1e6).setResolution(2);
-    this.glyphs.set(u.id, t);
+  // ------------------------------------------------------------------ fires (from the state)
+
+  private syncFires(sim: Sim) {
+    const live = new Set<number>();
+    for (const f of sim.state.fires) {
+      live.add(f.id);
+      if (!this.fires.has(f.id)) this.lightFire(f.id, f.x, f.y);
+    }
+    for (const [id, f] of this.fires) if (!live.has(id)) this.putOut(id, f);
   }
 
-  private dropGlyph(id: number) {
-    const g = this.glyphs.get(id);
-    if (g) { g.destroy(); this.glyphs.delete(id); }
+  private lightFire(id: number, x: number, y: number) {
+    const sprs: Phaser.GameObjects.Sprite[] = [];
+    for (let i = 0; i < 3; i++) {
+      const s = this.play("fire_", sx(x) + (i - 1) * 7, sy(y) + (i % 2) * 3, sy(y) + 1 + i, 10 + i, true);
+      if (s) sprs.push(s);
+    }
+    const light = this.scene.add.image(Math.round(sx(x)), Math.round(sy(y)), "light:fire").setBlendMode(Phaser.BlendModes.ADD).setDepth(1.8e6);
+    this.fires.set(id, { x, y, sprs, light, flickerT: 0 });
+    this.world.decal(this.canvasOf("scorch_1"), x, y);
+  }
+
+  private putOut(id: number, f: FireView) {
+    for (const s of f.sprs) { this.anims = this.anims.filter((a) => a.spr !== s); s.destroy(); }
+    f.light.destroy();
+    this.fires.delete(id);
+    this.play("smoke_", sx(f.x), sy(f.y) - 4, sy(f.y) + 3, 5, false, -10);
+  }
+
+  // ------------------------------------------------------------------ head glyphs (from the state)
+
+  private glyphKey(g: Glyph): string {
+    const key = `glyph:${g}`;
+    if (!this.scene.textures.exists(key)) addImage(this.scene, key, buildGlyph(g as GlyphName));
+    return key;
+  }
+
+  /** The glyph over each head is the one the rules hold for him (alert, suspicious, wounded,
+   *  knife), whether an event said so or not; the dead and the hidden show none. */
+  private syncGlyphs(sim: Sim) {
+    const alive = new Set<number>();
+    for (const u of sim.state.units) {
+      alive.add(u.id);
+      let v = this.glyphs.get(u.id);
+      if (u.glyph === "none" || u.state === "dead") {
+        if (v) { v.img.destroy(); this.glyphs.delete(u.id); }
+        continue;
+      }
+      if (!v || v.glyph !== u.glyph) {
+        v?.img.destroy();
+        v = { img: this.scene.add.image(0, 0, this.glyphKey(u.glyph)).setOrigin(0).setDepth(2.1e6), glyph: u.glyph };
+        this.glyphs.set(u.id, v);
+      }
+      const spr = this.world.spriteOf(u.id);
+      if (!spr || u.hidden) { v.img.setVisible(false); continue; }
+      // 7 x 9, centred over the head with a pixel of air above the helmet
+      v.img.setVisible(true).setPosition(Math.round(spr.x) - 3, Math.round(spr.y) - 32);
+    }
+    for (const [id, v] of this.glyphs) if (!alive.has(id)) { v.img.destroy(); this.glyphs.delete(id); }
+  }
+
+  // ------------------------------------------------------------------ shouts
+
+  /** A shout in the game's text face, one colour per side, with a 1 px outline to read on the street. */
+  private shoutKey(text: string, side: "de" | "pl"): string {
+    const key = `shout:${side}:${text}`;
+    if (this.scene.textures.exists(key)) return key;
+    const w = measure(FONT, text) + 2, h = FONT.lineHeight + 4;
+    const im = img(w, h);
+    drawText(im, FONT, 1, 1, text, VOICE[side]);
+    outline(im, PAL.shared.outline);
+    addImage(this.scene, key, trimRows(im));
+    return key;
+  }
+
+  /** Where a shout sits (its bottom centre): over the man, or over the vehicle he is in. */
+  private voiceAt(sim: Sim, id: number): { x: number; y: number } | null {
+    const u = sim.unit(id);
+    if (!u) return null;
+    if (!u.hidden) {
+      const spr = this.world.spriteOf(id);
+      return spr ? { x: spr.x, y: spr.y - 26 } : null;
+    }
+    const v = sim.state.vehicles.find((q) => q.crew.includes(id));
+    return v ? { x: sx(v.x), y: sy(v.y, 3.2) } : null;
   }
 
   private say(u: Unit | undefined, text: string) {
     if (!u) return;
-    for (const b of this.bubbles) if (b.unit === u.id) { b.text.destroy(); b.t = 99; }
-    const t = this.scene.add.text(0, 0, text, { fontFamily: "monospace", fontSize: "8px", color: u.side === "de" ? "#f0d2c8" : "#e8e4d8", stroke: "#24201a", strokeThickness: 2 })
-      .setOrigin(0.5, 1).setDepth(2.2e6).setResolution(2);
-    this.bubbles.push({ unit: u.id, text: t, t: 0 });
+    for (const b of this.bubbles) if (b.unit === u.id) { b.img.destroy(); b.t = 99; }
+    const im = this.scene.add.image(0, 0, this.shoutKey(text, u.side === "de" ? "de" : "pl")).setOrigin(0).setDepth(2.2e6).setVisible(false);
+    this.bubbles.push({ unit: u.id, img: im, t: 0 });
   }
+
+  // ------------------------------------------------------------------ per frame
 
   update(sim: Sim, dt: number) {
     const g = this.g;
@@ -209,7 +264,7 @@ export class Fx {
       g.lineStyle(1, hex(col), 1 - k);
       // a short streak moving along the line
       const a = Math.min(1, k * 1.4), b = Math.max(0, a - 0.35);
-      g.lineBetween(tr.x0 + (tr.x1 - tr.x0) * b, tr.y0 + (tr.y1 - tr.y0) * b, tr.x0 + (tr.x1 - tr.x0) * a, tr.y0 + (tr.y1 - tr.y0) * a);
+      g.lineBetween(Math.round(tr.x0 + (tr.x1 - tr.x0) * b), Math.round(tr.y0 + (tr.y1 - tr.y0) * b), Math.round(tr.x0 + (tr.x1 - tr.x0) * a), Math.round(tr.y0 + (tr.y1 - tr.y0) * a));
     }
     this.tracers = this.tracers.filter((t) => t.t < 0.07);
     for (const a of this.anims) {
@@ -237,21 +292,32 @@ export class Fx {
       s.setPosition(Math.round(sx(x)), Math.round(sy(y, z))).setAngle(k * 720);
     }
     for (const [id, s] of this.proj) if (!live.has(id)) { s.destroy(); this.proj.delete(id); }
-    // glyphs and shouts ride above heads
-    for (const [id, t] of this.glyphs) {
-      const u = sim.unit(id);
-      const spr = this.world.spriteOf(id);
-      if (!u || !spr || u.hidden || u.state === "dead") { t.setVisible(false); continue; }
-      t.setVisible(true).setPosition(spr.x, spr.y - 23);
-    }
+    this.syncFires(sim);
+    this.syncGlyphs(sim);
+    // shouts ride above heads (or over the vehicle a man shouts from), rise a little and fade
     for (const b of this.bubbles) {
       b.t += dt;
-      const spr = this.world.spriteOf(b.unit);
-      if (!spr || b.t > 2.2) { b.text.destroy(); b.t = 99; continue; }
-      b.text.setPosition(spr.x, spr.y - 26 - Math.min(4, b.t * 10)).setAlpha(b.t > 1.8 ? (2.2 - b.t) / 0.4 : 1);
+      const at = b.t <= 2.2 ? this.voiceAt(sim, b.unit) : null;
+      if (!at) { b.img.destroy(); b.t = 99; continue; }
+      b.img.setVisible(true).setPosition(Math.round(at.x - b.img.width / 2), Math.round(at.y - Math.min(4, b.t * 10)) - b.img.height)
+        .setAlpha(b.t > 1.8 ? (2.2 - b.t) / 0.4 : 1);
     }
     this.bubbles = this.bubbles.filter((b) => b.t < 99);
-    for (const f of this.fires.values()) f.light.setAlpha(0.8 + Math.random() * 0.2);
+    for (const f of this.fires.values()) {
+      f.flickerT -= dt;
+      if (f.flickerT > 0) continue;
+      f.flickerT = 0.08 + Math.random() * 0.1;
+      f.light.setAlpha(FLICKER[Math.floor(Math.random() * FLICKER.length)]);
+    }
     if (this.shake > 0) this.shake = Math.max(0, this.shake - dt);
   }
+}
+
+/** Drop the empty rows above and below the ink (a shout's image is as tall as its letters). */
+function trimRows(im: PixelImage): PixelImage {
+  const rowInk = (y: number) => { for (let x = 0; x < im.w; x++) if (im.data[(y * im.w + x) * 4 + 3]) return true; return false; };
+  let y0 = 0, y1 = im.h - 1;
+  while (y0 < y1 && !rowInk(y0)) y0++;
+  while (y1 > y0 && !rowInk(y1)) y1--;
+  return crop(im, 0, y0, im.w, y1 - y0 + 1);
 }
