@@ -3,7 +3,7 @@
 // and body, with the game's bundle inlined as a module script, and the history photos
 // copied beside it. For sharing a playable build before it is merged and on Pages.
 //   node tools/artifact.mjs <out-dir>
-import { readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync } from "node:fs";
+import { readFileSync, writeFileSync, mkdirSync, readdirSync, copyFileSync, rmSync } from "node:fs";
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -25,6 +25,8 @@ const page = `<title>Minor Sabotage</title>
 ${body}
 <script type="module">${js}</script>
 `;
+// the photos are copied afresh: one dropped from the build must not linger from an older run
+rmSync(resolve(out, "history"), { recursive: true, force: true });
 mkdirSync(resolve(out, "history"), { recursive: true });
 writeFileSync(resolve(out, "index.html"), page);
 for (const f of readdirSync(resolve(dist, "history"))) copyFileSync(resolve(dist, "history", f), resolve(out, "history", f));

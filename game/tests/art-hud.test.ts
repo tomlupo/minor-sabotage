@@ -272,7 +272,7 @@ function allPieces(): { name: string; im: PixelImage; w: number; h: number }[] {
 describe("hud: sizes", () => {
   const pieces = allPieces();
   it("looks at every piece (4 hp x 8 ranks x 2 tags, 30 squad tags, 24 buttons, 22 icons, ...)", () => {
-    expect(pieces.length).toBe(177);
+    expect(pieces.length).toBe(180);
   });
   it("builds every piece at its size, with ink on it", () => {
     for (const p of pieces) {

@@ -69,5 +69,4 @@ export const PHOTO_PL: Record<string, string> = {
   "arsenal-1938.jpg": "Arsenał od rogu Długiej i Nalewek, 1938: sgraffito i arkady od strony Nalewek",
   "dluga-1939.jpg": "Ulica Długa spod Arsenału w stronę wschodnią, jesień 1939: Arsenał i wypalony Pasaż Simonsa (po lewej), Długa 53–45 do rogu Bielańskiej (po prawej)",
   "arsenal-plaque.jpg": "Tablica z 1968 roku na murze Arsenału, Długa 52 (podaną na niej liczbę 25 uwolnionych więźniów poprawiono później na 21)",
-  "arsenal-memorial-stone.jpg": "Kamień pamiątkowy ze znakiem Polski Walczącej przed Arsenałem, odsłonięty w 1993 roku; za nim, na murze, tablica z 1968 roku",
 };
