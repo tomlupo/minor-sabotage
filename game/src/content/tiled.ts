@@ -2,7 +2,7 @@
 // object properties (walkable, blocks sight, cover, building group id, street id). Tiles are
 // 12 x 9 px (1 m), so Tiled's pixel coordinates are the art's.
 import type { GroundMat } from "../art/types";
-import { emptyMap, type MapBuilding, type MapData, type MapProp, F_ROOF, F_SIGHT, F_WALK } from "./mapdata";
+import { emptyMap, type MapBuilding, type MapData, type MapProp, F_COVER, F_ROOF, F_SIGHT, F_WALK } from "./mapdata";
 
 export const TW = 12;
 export const TH = 9;
@@ -134,7 +134,7 @@ export function mapToTiled(md: MapData): TiledMap {
         firstgid: GID_FLAGS, name: "flags", tilewidth: TW, tileheight: TH, tilecount: 32, columns: 32,
         image: "tiles/flags.png", imagewidth: TW * 32, imageheight: TH, margin: 0, spacing: 0,
         tiles: Array.from({ length: 32 }, (_, f) => tile(f, [
-          p("walkable", !!(f & F_WALK)), p("blocksSight", !!(f & F_SIGHT)), p("cover", !!(f & 4)), p("roof", !!(f & F_ROOF)),
+          p("walkable", !!(f & F_WALK)), p("blocksSight", !!(f & F_SIGHT)), p("cover", !!(f & F_COVER)), p("roof", !!(f & F_ROOF)),
         ])),
       },
       {
@@ -147,17 +147,29 @@ export function mapToTiled(md: MapData): TiledMap {
   };
 }
 
+/** Every tile's properties by its gid (Tiled's flip bits stripped): the rules read what a tile
+ *  says it is, never where it sits in its tileset, so the map can be re-tiled in Tiled. */
+function tileProps(t: TiledMap): (gid: number) => Prop[] | undefined {
+  const byGid = new Map<number, Prop[]>();
+  for (const ts of t.tilesets) for (const tile of ts.tiles) byGid.set(ts.firstgid + tile.id, tile.properties);
+  return (gid) => (gid ? byGid.get(gid & 0x1fffffff) : undefined);
+}
+
 export function mapFromTiled(t: TiledMap): MapData {
   const materials = t.tilesets.find((s) => s.name === "materials")!;
-  const legend = materials.tiles.map((x) => getProp(x, "material") as GroundMat);
+  const legend = [...materials.tiles].sort((a, b) => a.id - b.id).map((x) => getProp(x, "material") as GroundMat);
   const md = emptyMap(String(getProp(t, "name") ?? "map"), t.width, t.height, legend);
   md.streets = JSON.parse(String(getProp(t, "streets") ?? "[]"));
   const layer = (n: string) => t.layers.find((l) => l.name === n)!;
   const g = layer("ground").data!, f = layer("blocking").data!, s = layer("streets").data!;
+  const props = tileProps(t);
+  const has = (ps: Prop[] | undefined, name: string) => ps?.find((q) => q.name === name)?.value;
   for (let i = 0; i < md.w * md.h; i++) {
-    md.ground[i] = Math.max(0, g[i] - 1);
-    md.flags[i] = f[i] ? f[i] - GID_FLAGS : 0;
-    md.street[i] = s[i] ? s[i] - GID_STREETS : -1;
+    md.ground[i] = Math.max(0, legend.indexOf(has(props(g[i]), "material") as GroundMat));
+    const fp = props(f[i]);
+    md.flags[i] = (has(fp, "walkable") ? F_WALK : 0) | (has(fp, "blocksSight") ? F_SIGHT : 0) | (has(fp, "cover") ? F_COVER : 0) | (has(fp, "roof") ? F_ROOF : 0);
+    const sid = has(props(s[i]), "streetId");
+    md.street[i] = typeof sid === "number" ? sid : -1;
   }
   for (const o of layer("buildings").objects!) {
     const b: MapBuilding = {

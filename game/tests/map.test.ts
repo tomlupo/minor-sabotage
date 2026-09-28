@@ -54,6 +54,27 @@ describe("arsenal map", () => {
     expect(tmj.tileheight).toBe(TH);
   });
 
+  it("reads what each tile says it is, not where it sits in its tileset (ADR-0001)", () => {
+    // re-tiled as someone might in Tiled: the flags and streets tilesets move and their tiles
+    // are stored in another order, and one tile is flipped
+    const t = JSON.parse(text);
+    for (const [name, layerName, shift] of [["flags", "blocking", 1000], ["streets", "streets", 2000]] as const) {
+      const ts = t.tilesets.find((s: { name: string }) => s.name === name);
+      const n = ts.tilecount;
+      const perm = (id: number) => n - 1 - id;
+      const layer = t.layers.find((l: { name: string }) => l.name === layerName);
+      layer.data = layer.data.map((gid: number) => (gid ? ts.firstgid + shift + perm(gid - ts.firstgid) : 0));
+      ts.tiles = ts.tiles.map((tile: { id: number }) => ({ ...tile, id: perm(tile.id) }));
+      ts.firstgid += shift;
+    }
+    const blocking = t.layers.find((l: { name: string }) => l.name === "blocking");
+    const i = blocking.data.findIndex((gid: number) => gid > 0);
+    blocking.data[i] |= 0x80000000; // flipped horizontally
+    const back = mapFromTiled(t);
+    expect(Array.from(back.flags)).toEqual(Array.from(md.flags));
+    expect(Array.from(back.street)).toEqual(Array.from(md.street));
+  });
+
   it("is playable: routes exist between the places the missions use", () => {
     const G = gridFromMap(md);
     const sim = new Sim(G);
