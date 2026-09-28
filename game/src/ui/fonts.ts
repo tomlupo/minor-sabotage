@@ -25,6 +25,15 @@ const FACES: [string, string, string, string][] = [
   [SANS, "700", bsLatin700, LATIN], [SANS, "700", bsExt700, LATIN_EXT],
 ];
 
+/** The bytes of an inlined font. Handed to FontFace as data, a face is never fetched, so a page
+ *  whose content policy refuses fonts from data: URLs (a preview host may) still gets it. */
+function bytesOf(dataUrl: string): ArrayBuffer {
+  const bin = atob(dataUrl.slice(dataUrl.indexOf(",") + 1));
+  const out = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+  return out.buffer;
+}
+
 /**
  * Load both faces before any text is drawn: a text measured in a face still loading is
  * measured in the fallback, and keeps that size. Never throws; a face that fails to load
@@ -33,7 +42,7 @@ const FACES: [string, string, string, string][] = [
 export async function loadFonts(): Promise<void> {
   await Promise.all(FACES.map(async ([family, weight, src, range]) => {
     try {
-      const face = new FontFace(family, `url(${src})`, { weight, unicodeRange: range });
+      const face = new FontFace(family, bytesOf(src), { weight, unicodeRange: range });
       document.fonts.add(face);
       await face.load();
     } catch {
