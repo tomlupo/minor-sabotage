@@ -138,7 +138,7 @@ export class BriefingScene extends Phaser.Scene {
       if (allDone) this.flow.toFinale();
       else if (!c.results[this.sel] && fit(c, c.assign[this.sel]).length) this.flow.play(this.sel);
     });
-    if (!allDone && !fit(c, c.assign[this.sel]).length) txt(this, cx, B - 70, "That squad has nobody left: give the task to another.", { font: PXS, color: PAL.hud.hp_low });
+    if (!allDone && !fit(c, c.assign[this.sel]).length) txt(this, cx, B - 70, "That squad has nobody left: give the task to another.", { font: PXS, face: "sans", color: PAL.hud.hp_low });
   }
 
   private effect(t: TaskId): string {

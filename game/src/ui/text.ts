@@ -65,7 +65,7 @@ export interface TxtOpts {
 export function txt(scene: Phaser.Scene, x: number, y: number, text: string, o: TxtOpts = {}): Phaser.GameObjects.Text {
   const face = o.face ?? FACE.get(scene) ?? "sans";
   const r = ROLES[face][o.font ?? PX] ?? ROLES[face][PX];
-  const t = scene.add.text(Math.round(x), Math.round(y), r.caps ? text.toLocaleUpperCase("pl") : text, {
+  const t = scene.add.text(Math.round(x), Math.round(y), "", {
     fontFamily: `"${face === "type" ? TYPEWRITER : SANS}"`,
     fontSize: `${r.size}px`,
     fontStyle: r.weight,
@@ -73,8 +73,10 @@ export function txt(scene: Phaser.Scene, x: number, y: number, text: string, o: 
     resolution: screen.s,
     wordWrap: o.wrap ? { width: o.wrap, useAdvancedWrap: true } : undefined,
   });
-  // the pitch the pixel face had, whatever the font's own ascent and descent
+  // the pitch the pixel face had, whatever the font's own ascent and descent; set before the
+  // words, so they are drawn once
   t.setLineSpacing(r.line - t.style.getTextMetrics().fontSize + (o.lineGap ?? 0));
+  t.setText(r.caps ? text.toLocaleUpperCase("pl") : text);
   t.y += capShift(t, face, o.font ?? PX);
   if (o.align !== undefined) t.setOrigin(o.align, 0);
   if (o.depth !== undefined) t.setDepth(o.depth);
@@ -120,8 +122,22 @@ export function capShift(t: Phaser.GameObjects.Text, face: Face, font: string): 
   return shift;
 }
 
+const FITTED = new Map<string, string>();
+
 /** The line cut to run no wider than `max` art px, ending in a full stop where it was cut (as the pixel face's fitText cuts). */
 export function fitLine(text: string, max: number, font = PX, face: Face = "sans"): string {
+  const key = `${face}|${font}|${max}|${text}`;
+  let out = FITTED.get(key);
+  if (out === undefined) {
+    out = cutToFit(text, max, font, face);
+    // the HUD asks every frame, for a handful of labels
+    if (FITTED.size > 500) FITTED.clear();
+    FITTED.set(key, out);
+  }
+  return out;
+}
+
+function cutToFit(text: string, max: number, font: string, face: Face): string {
   if (measureText(text, font, face) <= max) return text;
   const chars = [...text];
   for (let n = chars.length - 1; n > 0; n--) {

@@ -351,7 +351,9 @@ export class HudScene extends Phaser.Scene {
     const col = css(o.color ?? PAL.shared.chalk);
     if (t.style.color !== col) t.setColor(col);
     const shade = o.shadow ? css(o.shadow) : "";
-    if (shade && t.style.shadowColor !== shade) t.setShadow(1, 1, shade, 0, false, true);
+    // a canvas shadow's offset is in the text's own pixels, whatever its resolution: one art px
+    const off = Math.max(1, Math.round(screen.s));
+    if (shade && (t.style.shadowColor !== shade || t.style.shadowOffsetX !== off)) t.setShadow(off, off, shade, 0, false, true);
     return t;
   }
 

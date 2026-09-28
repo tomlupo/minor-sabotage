@@ -78,5 +78,17 @@ function relayout() {
 }
 window.addEventListener("resize", relayout);
 window.addEventListener("orientationchange", relayout);
+// a window moved to a screen of another density changes the ratio and fires no resize
+let density: MediaQueryList | null = null;
+function watchDensity() {
+  density?.removeEventListener("change", onDensity);
+  density = window.matchMedia(`(resolution: ${dpr()}dppx)`);
+  density.addEventListener("change", onDensity);
+}
+function onDensity() {
+  relayout();
+  watchDensity();
+}
+watchDensity();
 
 (window as unknown as { __ms: unknown }).__ms = { game, ready: false };

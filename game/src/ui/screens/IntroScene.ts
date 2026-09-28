@@ -64,7 +64,7 @@ export class IntroScene extends Phaser.Scene {
   private wrapFor(text: string, w: number): string {
     // the same wrapping the text helper does, done once so typing does not reflow
     const t = txt(this, -9999, -9999, text, { font: PX, wrap: w });
-    const s = t.text;
+    const s = t.getWrappedText(text).join("\n");
     t.destroy();
     return s;
   }

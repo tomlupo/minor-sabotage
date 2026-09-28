@@ -30,4 +30,8 @@ rmSync(resolve(out, "history"), { recursive: true, force: true });
 mkdirSync(resolve(out, "history"), { recursive: true });
 writeFileSync(resolve(out, "index.html"), page);
 for (const f of readdirSync(resolve(dist, "history"))) copyFileSync(resolve(dist, "history", f), resolve(out, "history", f));
-console.log(`${resolve(out, "index.html")} ${(page.length / 1024 / 1024).toFixed(2)} MB, history: ${readdirSync(resolve(out, "history")).length} files`);
+// the fonts' licences travel with the fonts (SIL OFL)
+rmSync(resolve(out, "licenses"), { recursive: true, force: true });
+mkdirSync(resolve(out, "licenses"), { recursive: true });
+for (const f of readdirSync(resolve(dist, "licenses"))) copyFileSync(resolve(dist, "licenses", f), resolve(out, "licenses", f));
+console.log(`${resolve(out, "index.html")} ${(page.length / 1024 / 1024).toFixed(2)} MB, history: ${readdirSync(resolve(out, "history")).length} files, licenses: ${readdirSync(resolve(out, "licenses")).length}`);

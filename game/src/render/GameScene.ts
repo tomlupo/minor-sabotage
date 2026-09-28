@@ -15,6 +15,12 @@ import { Fx } from "./fx";
 import { sx, sy, wx, wy } from "./iso";
 import { sound } from "./sound";
 import { store } from "../game/store";
+
+/** A grenade's jolt in art px, either way: 0.6 % of the 480 x 270 view, as before the canvas
+ *  went to the screen's resolution. */
+const SHAKE = { x: 2.9, y: 1.6 };
+/** How far the light layer reaches past the screen, so a shake never bares its edge. */
+const LIGHT_BLEED = 1.1;
 import type { Flow } from "../game/flow";
 
 export interface PhaseRun {
@@ -82,7 +88,7 @@ export class GameScene extends Phaser.Scene {
     this.camY = sy(st.y);
     cam.centerOn(this.camX, this.camY);
     // the light over the finished frame (style guide §5)
-    this.light = this.add.rectangle(this.scale.width / 2, this.scale.height / 2, this.scale.width, this.scale.height, lightHex(PAL.light.ambient[phase.light]))
+    this.light = this.add.rectangle(this.scale.width / 2, this.scale.height / 2, this.scale.width * LIGHT_BLEED, this.scale.height * LIGHT_BLEED, lightHex(PAL.light.ambient[phase.light]))
       .setScrollFactor(0).setDepth(3e6).setBlendMode(Phaser.BlendModes.MULTIPLY);
     this.light.setScale(1 / cam.zoom);
     this.scale.on("resize", this.onResize, this);
@@ -100,7 +106,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   private onResize() {
-    this.light.setPosition(this.scale.width / 2, this.scale.height / 2).setSize(this.scale.width, this.scale.height);
+    this.light.setPosition(this.scale.width / 2, this.scale.height / 2).setSize(this.scale.width * LIGHT_BLEED, this.scale.height * LIGHT_BLEED);
     // the zoom (the street's, or the map view's fraction of it) follows the screen
     this.toggleMap(this.mapView);
   }
@@ -113,7 +119,11 @@ export class GameScene extends Phaser.Scene {
     for (const e of events) {
       this.fx.handle(sim, e);
       sound.event(sim, e);
-      if (e.t === "explosion") this.cameras.main.shake(180, 0.006);
+      if (e.t === "explosion") {
+        // Phaser moves the camera by intensity x its size in physical px, inside the zoom
+        const cam = this.cameras.main;
+        cam.shake(180, new Phaser.Math.Vector2(SHAKE.x / (cam.width * cam.zoom), SHAKE.y / (cam.height * cam.zoom)));
+      }
       // ironman: a man falling, going down or being got up reaches the save at once
       if (e.t === "death" || e.t === "down" || e.t === "up") {
         const u = sim.unit(e.unit);
