@@ -89,6 +89,21 @@ export function objectiveDone(sim: Sim, id: string): boolean {
   return sim.state.objectives.find((q) => q.id === id)?.status === "done";
 }
 
+/**
+ * A guard post is silenced when its door is blown, or when every sentry at it is dead before
+ * it has begun sending men: once it sends them, only blowing it up stops it (mission-shape
+ * decision). Marks its objective done and the post quiet; returns whether it is silenced.
+ */
+export function silencePost(sim: Sim, spawnerTag: string, sentryTags: string[], objectiveId: string): boolean {
+  const s = sim.state;
+  const post = s.spawners.find((p) => p.tag === spawnerTag);
+  const sentriesDead = sentryTags.every((t) => s.units.find((u) => u.tag === t)?.state === "dead");
+  if (!post?.destroyed && !(sentriesDead && !post?.active)) return false;
+  if (!objectiveDone(sim, objectiveId)) setObjective(sim, objectiveId, "done");
+  if (post) { post.destroyed = true; post.active = false; }
+  return true;
+}
+
 /** Every trooper of the fielded squads is dead, down or gone. */
 export function squadsBroken(sim: Sim): boolean {
   return !sim.state.units.some((u) => u.side === "pl" && u.squad >= 0 && u.state === "ok" && !u.hidden);

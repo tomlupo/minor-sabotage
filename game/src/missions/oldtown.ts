@@ -14,7 +14,7 @@ import { goTo } from "../sim/move";
 import { DLUGA, W } from "../content/arsenal/map";
 import type { Campaign, TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
-import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, squadsBroken } from "./helpers";
+import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, silencePost, squadsBroken } from "./helpers";
 
 const GATE_X = 211.5;
 const UNLOAD_S = 75;
@@ -138,12 +138,7 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
         }
       }
       // the gate: both sentries down, or the door blown
-      const gate = s.spawners.find((p) => p.tag === "arbeitsamt");
-      const sentries = ["gate_a", "gate_b"].map((tag) => s.units.find((u) => u.tag === tag));
-      if ((gate?.destroyed || sentries.every((u) => u?.state === "dead")) && !objectiveDone(sim, "gate")) {
-        setObjective(sim, "gate", "done");
-        if (gate) { gate.destroyed = true; gate.active = false; }
-      }
+      silencePost(sim, "arbeitsamt", ["gate_a", "gate_b"], "gate");
       if (objectiveDone(sim, "gate") && (objectiveDone(sim, "truck") || s.vars.truckGone === true)) {
         if (!sim.anyAlarm()) setObjective(sim, "quiet", "done");
         s.outcome = objectiveDone(sim, "truck") ? "success" : "partial";

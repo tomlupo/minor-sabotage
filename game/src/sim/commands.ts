@@ -3,8 +3,8 @@
 // an unaware sentry close enough is knifed.
 import type { Sim } from "./sim";
 import type { Squad, Unit } from "./types";
-import { goTo, restSlots } from "./move";
-import { KNIFE, THROW } from "./tuning";
+import { goTo } from "./move";
+import { THROW } from "./tuning";
 
 /** The man picked on the portrait strip, while he can still act for the squad you lead. */
 export function pickedOf(sim: Sim): Unit | undefined {
@@ -230,9 +230,3 @@ export function cmdPause(sim: Sim, on: boolean): void {
   if (!on) for (const sq of sim.state.squads) sq.plannedThisPause = false;
 }
 
-/** Where a squad would stand if told to hold at (x, y), for drawing the order marker. */
-export function previewSlots(sim: Sim, x: number, y: number, dir: number, n: number) {
-  return restSlots(sim, x, y, dir, n);
-}
-
-export const KNIFE_REACH = KNIFE.reach;

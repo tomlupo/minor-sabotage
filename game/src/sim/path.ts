@@ -156,9 +156,3 @@ export function smooth(G: Grid, start: Pt, pts: Pt[]): Pt[] {
   out.push(pts[pts.length - 1]);
   return out;
 }
-
-export function pathLength(from: Pt, pts: Pt[]): number {
-  let d = 0, p = from;
-  for (const q of pts) { d += Math.hypot(q.x - p.x, q.y - p.y); p = q; }
-  return d;
-}

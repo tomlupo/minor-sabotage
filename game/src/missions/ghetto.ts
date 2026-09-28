@@ -10,7 +10,7 @@ import { cmdWork } from "../sim/commands";
 import { DLUGA, PRZEJAZD, GHETTO_WALL_Y, ARSENAL } from "../content/arsenal/map";
 import type { Campaign, TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
-import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, squadsBroken } from "./helpers";
+import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, silencePost, squadsBroken } from "./helpers";
 
 const COVER = { x: ARSENAL.x - 4, y: DLUGA.n - 6, w: 14, h: 9 };
 
@@ -59,9 +59,7 @@ export function ghettoTask(md: MapData, c: Campaign): Phase {
       const s = sim.state;
       if (s.outcome) return;
       if (sim.anyAlarm()) setObjective(sim, "quiet", "failed");
-      const post = s.spawners.find((p) => p.tag === "wall_post");
-      const guardsDead = postTags.every((t) => s.units.find((u) => u.tag === t)?.state === "dead");
-      if ((post?.destroyed || guardsDead) && !objectiveDone(sim, "post")) { setObjective(sim, "post", "done"); if (post) { post.destroyed = true; post.active = false; } }
+      silencePost(sim, "wall_post", postTags, "post");
       if (s.vars.lineCut === true) {
         const L = sim.leaderOf(sim.state.squads[squad]);
         if (L && L.x >= COVER.x && L.y >= COVER.y && L.x < COVER.x + COVER.w && L.y < COVER.y + COVER.h) setObjective(sim, "cover", "done");
