@@ -41,7 +41,7 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
       fieldFromCampaign(sim, c, squad, 202, 108, -Math.PI / 2, true);
       guard(sim, GATE_X - 3.5, DLUGA.n + 1.4, Math.PI / 2 + 0.3, { tag: "gate_a" });
       guard(sim, GATE_X + 3.5, DLUGA.n + 1.4, Math.PI / 2 - 0.3, { tag: "gate_b" });
-      sim.addSpawner({ x: GATE_X, y: DLUGA.n - 1, ox: GATE_X, oy: DLUGA.n + 4, district: 1, interval: 9, left: 4, maxAlive: 2, tag: "arbeitsamt", look: "de_rifle" });
+      sim.addSpawner({ x: GATE_X, y: DLUGA.n - 1, ox: GATE_X, oy: DLUGA.n + 4, district: 1, interval: 9, left: -1, maxAlive: 2, tag: "arbeitsamt", look: "de_rifle" });
       patrol(sim, path(md, "patrol_oldtown"), { start: 1, tag: "patrol" });
       civilians(sim, 6,
         [{ x: 150, y: DLUGA.n + 1.5 }, { x: 236, y: DLUGA.n + 1.5 }, { x: 160, y: DLUGA.s - 1.5 }, { x: 230, y: DLUGA.s - 1.5 }],

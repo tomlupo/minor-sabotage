@@ -39,7 +39,7 @@ export function ghettoTask(md: MapData, c: Campaign): Phase {
       guard(sim, PRZEJAZD.w + 2, wy, Math.PI / 2, { tag: "wall_a", coneR: 16 });
       guard(sim, PRZEJAZD.e - 2, wy, Math.PI / 2 - 0.25, { tag: "wall_b", coneR: 16 });
       guard(sim, (PRZEJAZD.w + PRZEJAZD.e) / 2, GHETTO_WALL_Y + 2.2, Math.PI / 2, { look: "de_officer", tag: "wall_officer" });
-      sim.addSpawner({ x: (PRZEJAZD.w + PRZEJAZD.e) / 2, y: GHETTO_WALL_Y + 1.5, ox: (PRZEJAZD.w + PRZEJAZD.e) / 2, oy: GHETTO_WALL_Y + 8, district: 1, interval: 9, left: 4, maxAlive: 2, tag: "wall_post", look: "de_rifle" });
+      sim.addSpawner({ x: (PRZEJAZD.w + PRZEJAZD.e) / 2, y: GHETTO_WALL_Y + 1.5, ox: (PRZEJAZD.w + PRZEJAZD.e) / 2, oy: GHETTO_WALL_Y + 8, district: 1, interval: 9, left: -1, maxAlive: 2, tag: "wall_post", look: "de_rifle" });
       const route = path(md, "patrol_ghetto");
       patrol(sim, route, { start: 0, tag: "patrol_a" });
       patrol(sim, route.slice().reverse(), { start: 0, tag: "patrol_b" });

@@ -281,13 +281,13 @@ export function processNoises(sim: Sim): void {
 export function stepSpawners(sim: Sim, dt: number): void {
   const s = sim.state;
   for (const sp of s.spawners) {
-    if (!sp.active || sp.destroyed || sp.left <= 0) continue;
+    if (!sp.active || sp.destroyed || sp.left === 0) continue;
     sp.cd -= dt;
     if (sp.cd > 0) continue;
     const tag = `spawn:${sp.id}`;
     const alive = s.units.filter((u) => u.tag === tag && u.state !== "dead").length;
     if (alive >= sp.maxAlive) { sp.cd = 1; continue; }
-    sp.left--;
+    if (sp.left > 0) sp.left--;
     sp.cd = sp.interval;
     const at = s.alarm[sp.district] !== undefined ? nearestPartisan(sim, sp.ox, sp.oy) : null;
     const g = sim.spawnUnit({

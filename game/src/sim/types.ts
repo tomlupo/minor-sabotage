@@ -235,6 +235,7 @@ export interface Spawner {
   active: boolean;
   cd: number;
   interval: number;
+  /** Men it still sends; -1: it sends them until it is blown up (vault decision, Fodder's huts). */
   left: number;
   maxAlive: number;
   destroyed: boolean;

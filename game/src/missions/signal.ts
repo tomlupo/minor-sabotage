@@ -42,7 +42,7 @@ export function signalTask(md: MapData, c: Campaign): Phase {
       // the Bank Polski: two sentries and a guard room
       guard(sim, BIEL.e - 0.8, 151, Math.PI * 0.95, { tag: "bank_a" });
       guard(sim, BIEL.e - 0.8, 158, Math.PI * 0.8, { tag: "bank_b" });
-      sim.addSpawner({ x: BIEL.e + 0.6, y: 154.5, ox: BIEL.e - 2, oy: 154.5, district: 1, interval: 9, left: 4, maxAlive: 2, tag: "bank_door", look: "de_rifle" });
+      sim.addSpawner({ x: BIEL.e + 0.6, y: 154.5, ox: BIEL.e - 2, oy: 154.5, district: 1, interval: 9, left: -1, maxAlive: 2, tag: "bank_door", look: "de_rifle" });
       // a patrol pair walking the pavements
       const route = path(md, "patrol_signal");
       patrol(sim, route, { start: 0, tag: "patrol_a" });

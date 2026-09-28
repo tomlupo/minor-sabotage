@@ -293,12 +293,12 @@ export function finale(md: MapData, c: Campaign): Phase {
         const wy = GHETTO_WALL_Y + 4.2;
         guard(sim, PRZEJAZD.w + 2, wy, Math.PI / 2, { district: D_WEST, tag: "wall" });
         guard(sim, PRZEJAZD.e - 2, wy, Math.PI / 2, { district: D_WEST, tag: "wall" });
-        sim.addSpawner({ x: (PRZEJAZD.w + PRZEJAZD.e) / 2, y: GHETTO_WALL_Y + 1.5, ox: 12, oy: DLUGA.n + 3, district: D_WEST, interval: 8, left: lineCut ? 2 : 5, maxAlive: 3, tag: "wall_post", look: "de_rifle" });
+        sim.addSpawner({ x: (PRZEJAZD.w + PRZEJAZD.e) / 2, y: GHETTO_WALL_Y + 1.5, ox: 12, oy: DLUGA.n + 3, district: D_WEST, interval: lineCut ? 16 : 8, left: -1, maxAlive: 3, tag: "wall_post", look: "de_rifle" });
       }
       if (!gateSilenced) {
         guard(sim, 208, DLUGA.n + 1.4, Math.PI / 2 + 0.3, { district: D_EAST, tag: "gate" });
         guard(sim, 215, DLUGA.n + 1.4, Math.PI / 2 - 0.3, { district: D_EAST, tag: "gate" });
-        sim.addSpawner({ x: 211.5, y: DLUGA.n - 1, ox: 211.5, oy: DLUGA.n + 4, district: D_EAST, interval: 6, left: 6, maxAlive: 3, tag: "arbeitsamt", look: "de_rifle" });
+        sim.addSpawner({ x: 211.5, y: DLUGA.n - 1, ox: 211.5, oy: DLUGA.n + 4, district: D_EAST, interval: 6, left: -1, maxAlive: 3, tag: "arbeitsamt", look: "de_rifle" });
       }
       if (!truckDisabled) {
         sim.spawnVehicle("german_truck", W - 12, 80.5, Math.PI, [], "block");
