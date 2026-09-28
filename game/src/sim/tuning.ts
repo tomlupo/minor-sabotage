@@ -32,6 +32,18 @@ export const GERMAN_SPREAD = 2.4;
 /** Rank narrows the spread: rank 7 shoots with about half the spread of a rookie. */
 export const spreadForRank = (w: WeaponSpec, rank: number) => w.spread * (1 - Math.min(rank, 7) * 0.07);
 
+/**
+ * The phone shows about 47 m across and 29 m into the screen (568 × 262 art px at 12 and 9 px a
+ * metre), so a range drawn as a circle would reach off the top and bottom of the view. Ranges
+ * are measured on the view's own ellipse instead: into the screen they reach VIEW_DEPTH of what
+ * they reach across (14.6 / 23.7 m, the view's half-extents), which keeps every shooter on
+ * screen. Vault decision: ranges counted in soldier heights, so nothing fires from off-screen.
+ */
+export const VIEW_DEPTH = 0.62;
+
+/** Distance as ranges count it: metres across, stretched into the screen by 1 / VIEW_DEPTH. */
+export const reach = (dx: number, dy: number) => Math.hypot(dx, dy / VIEW_DEPTH);
+
 export const SPEED = {
   partisan: 3.1,
   partisanWounded: 2.3,

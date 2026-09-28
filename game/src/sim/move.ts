@@ -191,7 +191,7 @@ export function stepSquads(sim: Sim, dt: number): void {
     const moving = L.moving || L.path.length > 0;
     const slots = moving ? null : restSlots(sim, sq.restX, sq.restY, sq.restDir, followers.length);
     followers.forEach((u, k) => {
-      if (busy(u)) return;
+      if (busy(u) || u.yieldUntil > s.time) return;
       const target = moving ? trailPoint(sq, L, SQUAD.spacing * (k + 1)) : slots![k];
       const d = Math.hypot(target.x - u.x, target.y - u.y);
       if (d < (moving ? 0.35 : 0.25)) { if (!moving) u.path = []; return; }
@@ -218,7 +218,7 @@ function stepFollowers(sim: Sim, _dt: number): void {
   // how many already tail each trooper, so they queue instead of crowding
   const queue = new Map<number, number>();
   for (const u of s.units) {
-    if (u.side !== "pris" || !sim.active(u) || u.tag === "rudy") continue;
+    if (u.side !== "pris" || !sim.active(u) || u.tag === "rudy" || u.yieldUntil > s.time) continue;
     let f = sim.unit(u.follow);
     if (!sim.active(f) || f!.side !== "pl") {
       u.follow = -1;

@@ -8,7 +8,7 @@ import { F_COVER } from "./grid";
 import { gauss } from "./rng";
 import { goTo, setAnim } from "./move";
 import { outOfColumn } from "./tasks";
-import { GERMAN_SPREAD, THROW, UNIT_RADIUS, WEAPONS, spreadForRank } from "./tuning";
+import { GERMAN_SPREAD, THROW, UNIT_RADIUS, WEAPONS, reach, spreadForRank } from "./tuning";
 
 interface Aim {
   x: number;
@@ -38,7 +38,7 @@ export function stepCombat(sim: Sim, dt: number): void {
 function visibleEnemy(sim: Sim, u: Unit, id: number, range: number): Unit | null {
   const v = sim.unit(id);
   if (!v || v.state === "dead" || v.hidden) return null;
-  if (Math.hypot(v.x - u.x, v.y - u.y) > range) return null;
+  if (reach(v.x - u.x, v.y - u.y) > range) return null;
   if (!sim.grid.los(u.x, u.y, v.x, v.y)) return null;
   return v;
 }
@@ -58,7 +58,7 @@ function partisanAim(sim: Sim, u: Unit): Aim | null {
   }
   // 2. FIRE held on a point
   if (sq.fireUntil > s.time) {
-    const d = Math.hypot(sq.fireAtX - u.x, sq.fireAtY - u.y);
+    const d = reach(sq.fireAtX - u.x, sq.fireAtY - u.y);
     if (d <= W.range * 1.05) return { x: sq.fireAtX, y: sq.fireAtY, target: -1 };
   }
   if (s.controlled === sq.id && sq.order === "follow") return null;
@@ -67,7 +67,7 @@ function partisanAim(sim: Sim, u: Unit): Aim | null {
     let best: Unit | null = null, bd = Infinity;
     for (const v of s.units) {
       if (v.side !== "de" || v.state === "dead" || v.hidden) continue;
-      const d = Math.hypot(v.x - u.x, v.y - u.y);
+      const d = reach(v.x - u.x, v.y - u.y);
       if (d > W.range || d >= bd) continue;
       const a = Math.atan2(v.y - sq.restY, v.x - sq.restX);
       if (Math.abs(angDiff(a, sq.coverDir)) > sq.coverHalf) continue;
@@ -95,9 +95,11 @@ function closeIn(sim: Sim, sq: Squad, t: Unit, range: number) {
   const L = sim.leaderOf(sq);
   if (!L || L.path.length || L.task) return;
   const d = Math.hypot(t.x - L.x, t.y - L.y);
+  const r = reach(t.x - L.x, t.y - L.y);
   const los = sim.grid.los(L.x, L.y, t.x, t.y);
-  if (d <= range * 0.85 && los) return;
-  const k = los ? Math.max(0, d - range * 0.7) / d : Math.max(0, d - 4) / d;
+  if (r <= range * 0.85 && los) return;
+  // along the line, reach grows in step with distance: stop where it is 70% of the range
+  const k = los ? Math.max(0, r - range * 0.7) / r : Math.max(0, d - 4) / d;
   goTo(sim, L, L.x + (t.x - L.x) * k, L.y + (t.y - L.y) * k, 4000);
 }
 
@@ -110,7 +112,7 @@ function guardAim(sim: Sim, u: Unit): Aim | null {
     if (v.side !== "pl" || v.state === "dead" || v.hidden) continue;
     // a man already down is left alone while others are fighting, unless he is close
     if (v.state === "down" && Math.hypot(v.x - u.x, v.y - u.y) > 5) continue;
-    const d = Math.hypot(v.x - u.x, v.y - u.y) - (v.id === u.shotBy ? 4 : 0);
+    const d = reach(v.x - u.x, v.y - u.y) - (v.id === u.shotBy ? 4 : 0);
     if (d > W.range || d >= bd) continue;
     if (!sim.grid.los(u.x, u.y, v.x, v.y)) continue;
     best = v; bd = d;
@@ -138,7 +140,8 @@ function fireRound(sim: Sim, u: Unit, aim: Aim): void {
   const ang = base + gauss(sim.state.rng) * spread * 0.5;
   const cos = Math.cos(ang), sin = Math.sin(ang);
   const x0 = u.x + Math.cos(base) * 0.35, y0 = u.y + Math.sin(base) * 0.35;
-  const maxD = W.range * 1.15;
+  // the round flies as far as the range reaches in its own direction
+  const maxD = (W.range * 1.15) / reach(cos, sin);
   let hitT = maxD;
   const sx = Math.floor(u.x), sy = Math.floor(u.y);
   const coverTs: number[] = [];
@@ -174,6 +177,9 @@ function fireRound(sim: Sim, u: Unit, aim: Aim): void {
   }
   const x1 = x0 + cos * hitT, y1 = y0 + sin * hitT;
   sim.emit({ t: "shot", x0, y0, x1, y1, weapon: u.weapon, side: u.side, by: u.id, hit: hitUnit ? hitUnit.id : hitVeh ? -2 : -1 });
+  // whoever it was aimed at knows who is shooting at him, hit or miss: a squad on hold answers
+  const aimed = aim.target >= 0 ? sim.unit(aim.target) : undefined;
+  if (aimed && aimed.side !== u.side) { aimed.shotBy = u.id; aimed.shotByT = sim.state.time; }
   u.sinceShot = 0;
   sim.noise(u.x, u.y, W.noise, true);
   setAnim(u, "fire", 0.16);

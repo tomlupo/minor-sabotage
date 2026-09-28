@@ -46,13 +46,18 @@ export class NoteScene extends Phaser.Scene {
     if (!f) return "";
     const fallen = Object.values(c.soldiers).filter((s) => s.state === "dead").map((s) => PEOPLE[s.key]);
     const taken = Object.values(c.soldiers).filter((s) => s.state === "captured").map((s) => PEOPLE[s.key]);
+    // how many of the van's prisoners got away in this game, beside the day's figure (vault
+    // decision: the note counts them next to the real result; research: 21, Rudy among them)
+    const total = PRISONERS + 1;
+    const rudyOut = f.rudy === "escaped";
+    const got = f.freed + (rudyOut ? 1 : 0);
+    const k = f.prisonersKilled;
     if (this.lang === "pl") {
       const who = (ps: typeof fallen) => ps.map((p) => `${p.name} „${p.pseudonym}”`).join(", ");
       lines.push(f.rudy === "escaped" ? "W twojej akcji DKW wywiózł Rudego." : f.rudy === "killed" ? "W twojej akcji Rudy zginął." : "W twojej akcji nie udało się odbić Rudego.");
-      if (f.freed > 0) {
-        const k = f.prisonersKilled;
-        lines.push(`${f.freed} z ${PRISONERS} pozostałych więźniów z więźniarki ${f.freed === 1 ? "ocalał" : "ocalało"}${k ? `, a ${k} ${k === 1 ? "zginął" : "zginęło"} na ulicy` : ""}.`);
-      }
+      lines.push(got
+        ? `${got} z ${total} więźniów z więźniarki ${got === 1 ? "uciekł" : "uciekło"}${rudyOut ? ", wśród nich Rudy" : ""}${k ? `; ${k} ${k === 1 ? "zginął" : "zginęło"} na ulicy` : ""}. 26 marca 1943: 21, wśród nich Rudy.`
+        : `Nikt z ${total} więźniów nie wydostał się z więźniarki. 26 marca 1943 uwolniono 21, wśród nich Rudego.`);
       if (fallen.length) lines.push(`${fallen.length === 1 ? "Poległ" : "Polegli"}: ${who(fallen)}.`);
       if (taken.length) lines.push(`${taken.length === 1 ? "Wzięty" : "Wzięci"} przez Niemców: ${who(taken)}.`);
       if (!fallen.length && !taken.length) lines.push("Nikt z twoich ludzi nie zginął ani nie wpadł w ręce Niemców.");
@@ -60,7 +65,9 @@ export class NoteScene extends Phaser.Scene {
     } else {
       const who = (ps: typeof fallen) => ps.map((p) => `${p.name} “${p.pseudonym}”`).join(", ");
       lines.push(f.rudy === "escaped" ? "In your operation the DKW got Rudy away." : f.rudy === "killed" ? "In your operation Rudy was killed." : "In your operation Rudy was not freed.");
-      if (f.freed > 0) lines.push(`${f.freed} of the ${PRISONERS} other prisoners in the van reached safety${f.prisonersKilled ? `, and ${f.prisonersKilled} were killed in the street` : ""}.`);
+      lines.push(got
+        ? `${got} of the ${total} prisoners in the van got away${rudyOut ? ", Rudy among them" : ""}${k ? `; ${k} ${k === 1 ? "was" : "were"} killed in the street` : ""}. On 26 March 1943: 21, Rudy among them.`
+        : `None of the ${total} prisoners got out of the van. On 26 March 1943, 21 were freed, Rudy among them.`);
       if (fallen.length) lines.push(`Fell: ${who(fallen)}.`);
       if (taken.length) lines.push(`Taken by the Germans: ${who(taken)}.`);
       if (!fallen.length && !taken.length) lines.push("None of your men was lost.");

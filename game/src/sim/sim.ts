@@ -231,6 +231,7 @@ export class Sim {
       ai: null,
       glyph: "none",
       follow: -1,
+      yieldUntil: 0,
       hidden: o.hidden ?? false,
       kills: 0,
       sinceShot: 99,
@@ -281,10 +282,17 @@ export class Sim {
     const v: Vehicle = {
       id: this.state.nextId++, kind, x, y, px: x, py: y, heading, speed: 0, maxSpeed, route, routeI: 0,
       state: "intact", hp, burnT: 0, len, wid, crew: [], stopped: route.length === 0, driverDead: false, tag, holdAt: -1, doorsOpen: false,
+      reverse: false, blockedT: 0,
     };
     this.state.vehicles.push(v);
     rebuildVehicleCells(this);
     return v;
+  }
+
+  /** A vehicle leaves the map: gone from the state, and the cells it stood on are free again. */
+  removeVehicle(v: Vehicle): void {
+    this.state.vehicles = this.state.vehicles.filter((o) => o !== v);
+    rebuildVehicleCells(this);
   }
 
   addProp(kind: PropKindSim, x: number, y: number, o: Partial<Prop> = {}): Prop {
@@ -371,7 +379,19 @@ export class Sim {
     const clamp = (p: Pt) => ({ x: Math.min(b.x + b.w - 0.5, Math.max(b.x + 0.5, p.x)), y: Math.min(b.y + b.h - 0.5, Math.max(b.y + 0.5, p.y)) });
     const G = this.grid;
     const full = b.x === 0 && b.y === 0 && b.w === G.w && b.h === G.h;
-    return this.pf.find(from, clamp(to), maxNodes, full ? undefined : (cx, cy) => (this.inBounds(cx + 0.5, cy + 0.5) ? 0 : 1e6));
+    const fires = this.state.fires;
+    // outside the phase's bounds is out of the question; burning petrol is walked round
+    const cost = (cx: number, cy: number) => {
+      let c = full || this.inBounds(cx + 0.5, cy + 0.5) ? 0 : 1e6;
+      for (const f of fires) if (Math.hypot(cx + 0.5 - f.x, cy + 0.5 - f.y) < f.r * 0.8 + 0.5) c += 40;
+      return c;
+    };
+    return this.pf.find(from, clamp(to), maxNodes, full && !fires.length ? undefined : cost);
+  }
+
+  /** The fire burning where it would hurt someone at (x, y), grown by `margin`, or null. */
+  fireAt(x: number, y: number, margin = 0) {
+    return this.state.fires.find((f) => Math.hypot(x - f.x, y - f.y) < f.r * 0.8 + margin) ?? null;
   }
 
   // ------------------------------------------------------------------ harm

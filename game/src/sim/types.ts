@@ -90,6 +90,9 @@ export interface Unit {
   glyph: Glyph;
   /** Prisoners and civilians: the unit they follow, or -1. */
   follow: number;
+  /** Until this time he is stepping out of a vehicle's way: his column or the man he
+   *  follows does not call him back. */
+  yieldUntil: number;
   /** Removed from the street: inside a vehicle, escaped, evacuated. */
   hidden: boolean;
   kills: number;
@@ -170,6 +173,10 @@ export interface Vehicle {
   /** Where on its route to stop and wait (index), or -1. */
   holdAt: number;
   doorsOpen: boolean;
+  /** Backing along its route: it keeps its heading and moves tail first (the DKW did). */
+  reverse: boolean;
+  /** Seconds it has stood blocked by people in its way. */
+  blockedT: number;
 }
 
 export interface Fire {

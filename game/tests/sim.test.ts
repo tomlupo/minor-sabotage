@@ -193,6 +193,66 @@ describe("snapshot", () => {
   });
 });
 
+describe("fire", () => {
+  it("a miss still tells the squad who is shooting at it, and a squad on hold answers", () => {
+    // the first German shot that misses, before anything has hit the squad
+    const play = (seed: number) => {
+      const sim = new Sim(yard(), seed);
+      const { sq, us } = squadOf4(sim, 10, 20);
+      // you lead another squad, out of it; this one holds
+      const other = makeSquad(sim, 1, "Kołczan", 1);
+      fieldSquad(sim, other, [{ ...TROOPER, name: "Kołczan", rank: 4 }], 8, 36, 0);
+      sim.state.controlled = 1;
+      other.order = "follow";
+      sq.order = "hold";
+      const g = sim.spawnUnit({ side: "de", look: "de", x: 24, y: 20, dir: Math.PI, weapon: "rifle", ai: { district: 1, mode: "alert", stay: true } });
+      for (let i = 0; i < 30 * 10; i++) {
+        sim.state.paused = false;
+        sim.step();
+        for (const e of sim.drainEvents()) {
+          if (e.t === "shot" && e.by === g.id && e.hit !== -1) return null; // hit first: no use
+          if (e.t === "shot" && e.by === g.id) {
+            // the man he aimed at knows it this very tick, though nothing hit him
+            const marked = us.some((u) => u.shotBy === g.id && u.shotByT === sim.state.time);
+            const t0 = sim.state.time;
+            let answered = false;
+            for (let k = 0; k < 30 * 4 && !answered; k++) {
+              sim.state.paused = false;
+              sim.step();
+              answered = sim.drainEvents().some((f) => f.t === "shot" && f.side === "pl") && sim.state.time - t0 < 4;
+            }
+            return { marked, answered };
+          }
+        }
+      }
+      return null;
+    };
+    let r: ReturnType<typeof play> = null;
+    for (let seed = 1; seed < 60 && !r; seed++) r = play(seed);
+    expect(r, "some seed's first German shot misses").not.toBeNull();
+    expect(r!.marked).toBe(true);
+    expect(r!.answered).toBe(true);
+  });
+
+  it("reaches across the view further than into it, so nobody fires from off-screen", () => {
+    const shotsFrom = (dx: number, dy: number) => {
+      const sim = new Sim(new Grid(80, 80), 5);
+      sim.state.bounds = { x: 0, y: 0, w: 80, h: 80 };
+      sim.grid.flags.fill(F_WALK);
+      const sq = makeSquad(sim, 0, "Zośka", 0);
+      fieldSquad(sim, sq, [{ ...TROOPER, name: "Zośka", rank: 5 }], 40, 40, 0);
+      // he stays at his post: an alerted German otherwise walks in until he is in reach
+      const g = sim.spawnUnit({ side: "de", look: "de", x: 40 + dx, y: 40 + dy, dir: Math.atan2(-dy, -dx), weapon: "rifle", ai: { district: 1, mode: "alert", stay: true } });
+      let n = 0;
+      for (let i = 0; i < 30 * 8; i++) { sim.state.paused = false; sim.step(); n += sim.drainEvents().filter((e) => e.t === "shot" && e.by === g.id).length; }
+      return n;
+    };
+    // a rifle reaches 22 m: 18 m along the street is in reach, 18 m into the screen is off it
+    expect(shotsFrom(18, 0)).toBeGreaterThan(0);
+    expect(shotsFrom(0, -18)).toBe(0);
+  });
+});
+
 describe("events", () => {
   it("reach the mission once each, however many ticks a frame runs", () => {
     const sim = new Sim(yard());

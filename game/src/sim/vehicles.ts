@@ -3,12 +3,16 @@
 // people in the road, and stop when the driver is hit or they catch fire. The crew bails
 // out alerted. A vehicle blocks the cells it stands on.
 import type { Sim } from "./sim";
-import type { Vehicle } from "./types";
+import type { Unit, Vehicle } from "./types";
 import { F_VEH } from "./grid";
 import { angDiff, setVehicleState } from "./combat";
 import { SPEED } from "./tuning";
+import { goTo } from "./move";
 
 const cellsOf = new Map<number, number[]>();
+
+/** The way a vehicle moves: along its heading, or tail first when it is backing. */
+const travel = (v: Vehicle) => (v.reverse ? v.heading + Math.PI : v.heading);
 
 export function stepVehicles(sim: Sim, dt: number): void {
   let moved = false;
@@ -23,8 +27,8 @@ export function stepVehicles(sim: Sim, dt: number): void {
       if (v.speed > 0) {
         // a vehicle whose driver is hit or whose engine died rolls on a while (the van did)
         v.speed = Math.max(0, v.speed - (disabled ? 2.2 : 7) * dt);
-        v.x += Math.cos(v.heading) * v.speed * dt;
-        v.y += Math.sin(v.heading) * v.speed * dt;
+        v.x += Math.cos(travel(v)) * v.speed * dt;
+        v.y += Math.sin(travel(v)) * v.speed * dt;
         moved = true;
         if (v.speed === 0) {
           sim.emit({ t: "brake", id: v.id });
@@ -48,14 +52,15 @@ function drive(sim: Sim, v: Vehicle, dt: number): void {
   if (!target) {
     v.speed = Math.max(0, v.speed - 6 * dt);
     if (v.speed === 0) { v.stopped = true; sim.emit({ t: "brake", id: v.id }); }
-    v.x += Math.cos(v.heading) * v.speed * dt;
-    v.y += Math.sin(v.heading) * v.speed * dt;
+    v.x += Math.cos(travel(v)) * v.speed * dt;
+    v.y += Math.sin(travel(v)) * v.speed * dt;
     return;
   }
   const want = Math.atan2(target.y - v.y, target.x - v.x);
-  const turn = angDiff(want, v.heading);
+  const turn = angDiff(want, travel(v));
   const maxTurn = (0.9 + v.speed * 0.12) * dt;
-  v.heading += Math.max(-maxTurn, Math.min(maxTurn, turn));
+  const h = v.heading + Math.max(-maxTurn, Math.min(maxTurn, turn));
+  v.heading = Math.atan2(Math.sin(h), Math.cos(h));
   // slow down for the corner ahead
   const next = v.route[v.routeI + 1];
   let cap = v.maxSpeed;
@@ -66,30 +71,51 @@ function drive(sim: Sim, v: Vehicle, dt: number): void {
     if (bend > 0.5 && dist < 14) cap = Math.min(cap, v.maxSpeed * (bend > 1.2 ? 0.28 : 0.5));
   }
   if (Math.abs(turn) > 0.6) cap = Math.min(cap, v.maxSpeed * 0.3);
+  if (v.reverse) cap = Math.min(cap, v.maxSpeed * 0.6);
   if (v.holdAt >= 0 && v.routeI >= v.holdAt) cap = 0;
-  if (someoneInFront(sim, v) || vehicleInFront(sim, v)) cap = 0;
+  const inWay = peopleInWay(sim, v);
+  if (inWay.length || vehicleInFront(sim, v)) cap = 0;
+  v.blockedT = inWay.length ? v.blockedT + dt : 0;
+  // our own car does not wait for ever on a crowd of friends: they step out of its way
+  if (v.blockedT > 1.2 && sim.unit(v.crew[0])?.side === "pl") {
+    v.blockedT = 0;
+    for (const u of inWay) if (u.side !== "de") stepAside(sim, v, u);
+  }
   const acc = cap > v.speed ? 2.6 : 7;
   v.speed += Math.max(-acc * dt, Math.min(acc * dt, cap - v.speed));
   if (v.speed < 0) v.speed = 0;
-  v.x += Math.cos(v.heading) * v.speed * dt;
-  v.y += Math.sin(v.heading) * v.speed * dt;
+  v.x += Math.cos(travel(v)) * v.speed * dt;
+  v.y += Math.sin(travel(v)) * v.speed * dt;
 }
 
-function someoneInFront(sim: Sim, v: Vehicle): boolean {
-  const c = Math.cos(v.heading), s = Math.sin(v.heading);
+/** Everyone standing in the vehicle's way, ahead in the direction it is moving. */
+function peopleInWay(sim: Sim, v: Vehicle): Unit[] {
+  const c = Math.cos(travel(v)), s = Math.sin(travel(v));
+  const out: Unit[] = [];
   for (const u of sim.state.units) {
     if (u.state === "dead" || u.hidden) continue;
     const ox = u.x - v.x, oy = u.y - v.y;
     const along = ox * c + oy * s;
     const side = -ox * s + oy * c;
-    if (along > v.len / 2 && along < v.len / 2 + 2.2 + v.speed * 0.25 && Math.abs(side) < v.wid / 2 + 0.3) return true;
+    if (along > v.len / 2 && along < v.len / 2 + 2.2 + v.speed * 0.25 && Math.abs(side) < v.wid / 2 + 0.3) out.push(u);
   }
-  return false;
+  return out;
+}
+
+/** A step to the side of the vehicle's path, on the side he already stands. */
+function stepAside(sim: Sim, v: Vehicle, u: Unit): void {
+  const d = travel(v), c = Math.cos(d), s = Math.sin(d);
+  const side = -(u.x - v.x) * s + (u.y - v.y) * c >= 0 ? 1 : -1;
+  const off = v.wid / 2 + 1.6;
+  const p = sim.grid.nearestWalkable(u.x - s * side * off, u.y + c * side * off, 2);
+  if (!p) return;
+  goTo(sim, u, p.x, p.y, 800);
+  u.yieldUntil = sim.state.time + 2.5;
 }
 
 /** Another intact vehicle across the way (a burning wreck can be squeezed past on the pavement). */
 function vehicleInFront(sim: Sim, v: Vehicle): boolean {
-  const c = Math.cos(v.heading), s = Math.sin(v.heading);
+  const c = Math.cos(travel(v)), s = Math.sin(travel(v));
   for (const o of sim.state.vehicles) {
     if (o === v || (o.state !== "intact" && o.state !== "doors_open")) continue;
     const ox = o.x - v.x, oy = o.y - v.y;

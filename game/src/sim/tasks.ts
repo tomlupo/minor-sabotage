@@ -129,6 +129,20 @@ function throwTask(sim: Sim, u: Unit): void {
 function work(sim: Sim, u: Unit): void {
   const t = u.task as Extract<Unit["task"], { kind: "work" }>;
   const d = Math.hypot(t.x - u.x, t.y - u.y);
+  // petrol burning on the spot: he waits at its edge, facing the job, until it goes out
+  const f = sim.fireAt(t.x, t.y, 0.4);
+  if (f && (t.phase === "work" || d <= WORK_DETACH || isLeader(sim, u))) {
+    if (t.phase === "work") { t.phase = "approach"; setAnim(u, "idle"); }
+    const a = Math.atan2(u.y - f.y, u.x - f.x);
+    const wx = f.x + Math.cos(a) * (f.r * 0.8 + 1), wy = f.y + Math.sin(a) * (f.r * 0.8 + 1);
+    if (Math.hypot(wx - u.x, wy - u.y) > 0.6) {
+      if (!u.path.length || (sim.state.tick + u.id) % 10 === 0) goTo(sim, u, wx, wy, 3000);
+    } else {
+      u.path = [];
+      u.dir = Math.atan2(t.y - u.y, t.x - u.x);
+    }
+    return;
+  }
   if (t.phase === "approach") {
     if (d <= 0.9) {
       t.phase = "work";

@@ -1,6 +1,6 @@
 // A scripted player plays the finale headless: signal, bottles on the cab at the bend,
-// open the tailgate, call the DKW, withdraw. It checks the operation can be won end to
-// end, and that a van left alone gets away.
+// open the tailgate, the DKW backs up for Rudy and gets away. It checks the operation can be
+// won end to end, and that a van left alone gets away.
 import { describe, expect, it } from "vitest";
 import { buildArsenalMap } from "../src/content/arsenal/map";
 import { gridFromMap } from "../src/content/mapdata";
@@ -52,7 +52,7 @@ function step(sim: Sim, seconds: number, until?: () => boolean): boolean {
 }
 
 describe("finale", () => {
-  it("can be won: bottles at the bend, the tailgate, the DKW, the withdrawal", () => {
+  it("can be won: bottles at the bend, the tailgate, the DKW backing up for Rudy", () => {
     const { sim, phase, c } = setup("signal,line,post,gate,truck");
     expect(sim.state.signalReady).toBe(true);
     cmdSignal(sim);
@@ -83,17 +83,27 @@ describe("finale", () => {
     expect(step(sim, 40, () => sim.state.vars.doorsOpened === true)).toBe(true);
     // prisoners come out; Rudy last; the DKW comes (Jeremi calls himself if we do not)
     expect(step(sim, 30, () => sim.state.units.some((u) => u.tag === "rudy"))).toBe(true);
+    // 20 others and Rudy: the 21 freed on the day
     expect(sim.state.units.filter((u) => u.side === "pris").length).toBe(PRISONERS + 1);
-    expect(step(sim, 60, () => sim.state.vars.loaded === true)).toBe(true);
+    expect(PRISONERS + 1).toBe(21);
+    // the DKW backs up to the van, tail first, and never turns round (research §3)
+    const car = () => sim.state.vehicles.find((v) => v.tag === "dkw");
+    const x0 = car()!.x;
+    let facedWest = false;
+    expect(step(sim, 60, () => { const v = car(); if (v && Math.cos(v.heading) < 0.3) facedWest = true; return sim.state.vars.loaded === true; })).toBe(true);
+    expect(facedWest).toBe(false);
+    expect(car()!.x).toBeLessThan(x0 - 5);
+    // the squads you are not leading stay where their orders put them
+    const others = sim.state.squads.filter((q) => q && q.id !== sim.state.controlled && q.inPlay).map((q) => sim.leaderOf(q)!).filter(Boolean);
     expect(step(sim, 60, () => sim.state.vars.carEscaped === true)).toBe(true);
-    // on the whistle the other squads withdraw on their own; lead yours out east
-    for (let k = 0; k < 60 && !sim.state.outcome; k++) {
-      cmdMove(sim, 238, 79);
-      step(sim, 2);
-    }
+    const at = others.map((u) => [u.x, u.y]);
+    // the getaway is the success: a few seconds for the whistle, then it is over
+    expect(step(sim, 12, () => !!sim.state.outcome)).toBe(true);
     expect(sim.state.outcome).toBe("success");
+    others.forEach((u, k) => expect(Math.hypot(u.x - at[k][0], u.y - at[k][1])).toBeLessThan(3));
     const res = phase.finish(sim, c) as { rudy: string; freed: number };
     expect(res.rudy).toBe("escaped");
+    expect(res.freed).toBeGreaterThan(PRISONERS / 2);
   });
 
   it("left alone, the van turns into Nalewki and gets away", () => {

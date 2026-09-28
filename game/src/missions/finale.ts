@@ -21,7 +21,11 @@ import { fit, type Campaign, type FinaleResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
 import { civilians, fieldFromCampaign, guard, objective, recordSoldiers, setObjective } from "./helpers";
 
-export const PRISONERS = 19;
+/** The other prisoners in the van. With Rudy they are the 21 freed on the day (research §1),
+ *  about a transport's load, so a clean run can match what happened. */
+export const PRISONERS = 20;
+/** Seconds between the DKW getting through and the end: Orsza's whistle, time to get a man up. */
+const WITHDRAW = 8;
 const D_ESCORT = 1, D_WEST = 2, D_EAST = 3, D_SOUTH = 4, D_NORTH = 5;
 /** Seconds after the first shot when the gendarmerie arrive in force. */
 export const LATE = 270;
@@ -48,6 +52,8 @@ export function finale(md: MapData, c: Campaign): Phase {
   const vanOf = (sim: Sim): Vehicle | undefined => sim.state.vehicles.find((v) => v.tag === "van");
   const carOf = (sim: Sim): Vehicle | undefined => sim.state.vehicles.find((v) => v.tag === "dkw");
   const rearOf = (v: Vehicle) => ({ x: v.x - Math.cos(v.heading) * (v.len / 2 + 0.9), y: v.y - Math.sin(v.heading) * (v.len / 2 + 0.9) });
+  /** The other prisoners out of the van and alive: they scatter into the dusk. */
+  const freedOf = (sim: Sim) => sim.state.units.filter((u) => u.side === "pris" && u.tag !== "rudy" && u.state !== "dead").length;
   const since = (sim: Sim) => (typeof sim.state.vars.actionT === "number" ? sim.state.time - (sim.state.vars.actionT as number) : -1);
 
   const failWith = (sim: Sim, why: string) => {
@@ -147,7 +153,8 @@ export function finale(md: MapData, c: Campaign): Phase {
     car.routeI = 0;
     car.stopped = false;
     car.maxSpeed = 7;
-    sim.message("Jeremi brings the DKW round to the van.", "info");
+    car.reverse = true;
+    sim.message("Jeremi backs the DKW up to the van.", "info");
   };
 
   const releaseTick = (sim: Sim) => {
@@ -180,11 +187,18 @@ export function finale(md: MapData, c: Campaign): Phase {
     const s = sim.state;
     const rudy = s.units.find((u) => u.tag === "rudy");
     if (s.vars.carCalled !== true && typeof s.vars.autoCar === "number" && s.time >= s.vars.autoCar) callCar(sim);
-    // the car arrives: Rudy in, and anyone of ours lying wounded close by
-    if (s.vars.carCalled === true && s.vars.loaded !== true && car.stopped && car.speed < 0.1 && rudy && rudy.state !== "dead") {
-      if (Math.hypot(car.x - rudy.x, car.y - rudy.y) < 7) {
-        if (typeof s.vars.loadT !== "number") { s.vars.loadT = s.time; car.doorsOpen = true; }
-        else if (s.time - Number(s.vars.loadT) > 1.6) {
+    // the car stops by the van (or as near as the crowd lets it): they carry Rudy to it, and
+    // anyone of ours lying wounded close by
+    if (s.vars.carCalled === true && s.vars.loaded !== true && car.speed < 0.1 && rudy && rudy.state !== "dead") {
+      const d = Math.hypot(car.x - rudy.x, car.y - rudy.y);
+      if (d < 10) {
+        if (typeof s.vars.loadT !== "number") {
+          s.vars.loadT = s.time;
+          s.vars.carryT = 1.6 + Math.max(0, d - 4) / 1.5;
+          car.doorsOpen = true;
+          car.stopped = true;
+          if (d > 6) sim.message("Jeremi can get no closer: they carry Rudy to the car.", "info");
+        } else if (s.time - Number(s.vars.loadT) > Number(s.vars.carryT)) {
           rudy.hidden = true;
           s.vars.loaded = true;
           setObjective(sim, "rudy", "done");
@@ -195,6 +209,7 @@ export function finale(md: MapData, c: Campaign): Phase {
           car.route = [{ x: car.x + 12, y: 80.5 }, ...path(md, "car_escape")];
           car.routeI = 0;
           car.stopped = false;
+          car.reverse = false;
           car.maxSpeed = 9;
           s.vars.phase = "escape";
         }
@@ -204,20 +219,11 @@ export function finale(md: MapData, c: Campaign): Phase {
       s.vars.carEscaped = true;
       s.vars.escapeT = s.time;
       setObjective(sim, "escape", "done");
-      s.vehicles = s.vehicles.filter((v) => v !== car);
-      objective(sim, "withdraw", "Withdraw along Długa to the Old Town", true);
+      sim.removeVehicle(car);
+      // success is the car getting away with Rudy (vault decision): a few seconds to get a
+      // man up, then the action is over; squads on orders are not marched anywhere
       s.vars.phase = "withdraw";
       sim.message("The DKW is through. Orsza's whistle: withdraw!", "good");
-      // on the whistle everyone goes: the squads you are not leading make for the Old Town
-      const east = zone(md, "exit_east");
-      for (const sq of s.squads) {
-        if (!sq || !sq.inPlay || sq.id === s.controlled) continue;
-        const L = sim.leaderOf(sq);
-        if (!L) continue;
-        sq.order = "hold";
-        sq.target = -1;
-        goTo(sim, L, east.x + east.w / 2, east.y + east.h / 2 + (sq.id - 1) * 3, 20000);
-      }
       return;
     }
     if ((car.state === "burning" || car.state === "wreck") && s.vars.carEscaped !== true && s.vars.carLost !== true) {
@@ -231,16 +237,7 @@ export function finale(md: MapData, c: Campaign): Phase {
     const s = sim.state;
     for (const u of s.units) {
       if (u.hidden || u.state !== "ok") continue;
-      if (u.side === "pris" && u.tag !== "rudy") {
-        if (exits.some((z) => inZone(z, u.x, u.y))) { u.hidden = true; u.flags |= UF_ESCAPED; }
-      } else if (u.side === "pl" && u.squad >= 0 && s.vars.phase === "withdraw") {
-        if (exits.some((z) => inZone(z, u.x, u.y))) {
-          u.hidden = true;
-          u.flags |= UF_ESCAPED;
-          // prisoners at his heels go with him
-          for (const q of s.units) if (q.side === "pris" && q.follow === u.id && !q.hidden && Math.hypot(q.x - u.x, q.y - u.y) < 8) { q.hidden = true; q.flags |= UF_ESCAPED; }
-        }
-      }
+      if (u.side === "pris" && u.tag !== "rudy" && exits.some((z) => inZone(z, u.x, u.y))) { u.hidden = true; u.flags |= UF_ESCAPED; }
     }
   };
 
@@ -284,7 +281,8 @@ export function finale(md: MapData, c: Campaign): Phase {
       for (let i = 0; i < SQUADS.length; i++) if (!s.squads[i]) makeSquad(sim, i, SQUADS[i].name, SQUADS[i].colour);
       if (first >= 0) { s.controlled = first; s.squads[first].order = "follow"; }
       // the DKW and Jeremi at the corner of Długa and Bielańska
-      const car = sim.spawnVehicle("car", BIEL.e + 5, DLUGA.s - 3.2, Math.PI, [], "dkw");
+      // facing east, the way it will leave: it backs up to the van when called
+      const car = sim.spawnVehicle("car", BIEL.e + 5, DLUGA.s - 3.2, 0, [], "dkw");
       const jeremi = sim.spawnUnit({ side: "pl", look: "jeremi", name: "Jeremi", realName: "Jerzy Zborowski", x: car.x, y: car.y, weapon: "pistol", hidden: true, tag: "jeremi", rank: 3 });
       car.crew = [jeremi.id];
       car.hp = 16;
@@ -316,7 +314,7 @@ export function finale(md: MapData, c: Campaign): Phase {
       objective(sim, "tailgate", "Open the tailgate", true);
       objective(sim, "rudy", "Get Rudy into the DKW", true);
       objective(sim, "escape", "The DKW gets away along Długa", true);
-      objective(sim, "freed", `Freed prisoners reach safety: 0/${PRISONERS}`, false);
+      objective(sim, "freed", `Prisoners freed: 0/${PRISONERS}`, false);
       s.vars.phase = "setup";
       if (signal) {
         s.signalReady = true;
@@ -343,13 +341,11 @@ export function finale(md: MapData, c: Campaign): Phase {
       if (car) carTick(sim, car);
       if (s.outcome) return;
       exitsTick(sim);
-      const freed = s.units.filter((u) => u.side === "pris" && u.tag !== "rudy" && (u.flags & UF_ESCAPED)).length;
+      const freed = freedOf(sim);
       const pObj = s.objectives.find((o) => o.id === "freed");
-      if (pObj) pObj.text = `Freed prisoners reach safety: ${freed}/${PRISONERS}`;
+      if (pObj) pObj.text = `Prisoners freed: ${freed}/${PRISONERS}`;
       if (s.vars.phase === "withdraw") {
-        const left = s.units.filter((u) => u.side === "pl" && u.squad >= 0 && u.state === "ok" && !u.hidden);
-        if (!left.length || s.time - Number(s.vars.escapeT) > 150) {
-          setObjective(sim, "withdraw", "done");
+        if (s.time - Number(s.vars.escapeT) > WITHDRAW) {
           if (freed > 0) setObjective(sim, "freed", "done");
           s.outcome = "success";
           sim.emit({ t: "phase", outcome: "success" });
@@ -395,7 +391,7 @@ export function finale(md: MapData, c: Campaign): Phase {
     banner(sim: Sim) {
       const s = sim.state;
       if (s.vars.phase === "setup") return s.signalReady ? "Place the squads, then give the signal: GO" : `The van in ${Math.max(0, Math.ceil(Number(s.vars.autoVan) - s.time))} s`;
-      if (s.vars.phase === "withdraw") return "Orsza's whistle: withdraw along Długa to the east";
+      if (s.vars.phase === "withdraw") return `Orsza's whistle: withdraw! ${Math.max(0, Math.ceil(WITHDRAW - (s.time - Number(s.vars.escapeT))))} s`;
       const a = since(sim);
       if (a > LATE - 70 && a < LATE) return `Gendarmerie in ${Math.ceil(LATE - a)} s`;
       return null;
@@ -416,7 +412,7 @@ export function finale(md: MapData, c: Campaign): Phase {
     finish(sim: Sim, cc: Campaign): FinaleResult {
       const s = sim.state;
       const fallen = recordSoldiers(sim, cc);
-      const freed = s.units.filter((u) => u.side === "pris" && u.tag !== "rudy" && (u.flags & UF_ESCAPED)).length;
+      const freed = freedOf(sim);
       const prisonersKilled = s.units.filter((u) => u.side === "pris" && u.state === "dead").length;
       const rudyU = s.units.find((u) => u.tag === "rudy");
       const rudy = s.vars.carEscaped === true ? "escaped" : rudyU?.state === "dead" ? "killed" : "lost";
