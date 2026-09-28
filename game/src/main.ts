@@ -7,7 +7,8 @@ import { BriefingScene } from "./ui/screens/BriefingScene";
 import { DecisionScene } from "./ui/screens/DecisionScene";
 import { NoteScene } from "./ui/screens/NoteScene";
 import { IntroScene } from "./ui/screens/IntroScene";
-import { Flow, fakeResults } from "./game/flow";
+import { CardScene } from "./ui/screens/CardScene";
+import { Flow, fakeResults, bootDone } from "./game/flow";
 import { registerFonts } from "./ui/text";
 
 const parent = document.getElementById("game")!;
@@ -33,7 +34,7 @@ class Boot extends Phaser.Scene {
     const phase = q.get("phase");
     const screen = q.get("screen");
     if (phase) flow.play(phase);
-    else if (screen) this.game.scene.start(screen, { flow });
+    else if (screen) { bootDone(this.game.scene.getScene(screen)); this.game.scene.start(screen, { flow }); }
     else flow.toTitle();
     ms.ready = true;
   }
@@ -51,7 +52,7 @@ const game = new Phaser.Game({
   audio: { noAudio: true },
   disableContextMenu: true,
   banner: false,
-  scene: [Boot, TitleScene, IntroScene, BriefingScene, DecisionScene, NoteScene, GameScene, HudScene],
+  scene: [Boot, TitleScene, IntroScene, BriefingScene, DecisionScene, NoteScene, GameScene, HudScene, CardScene],
 });
 
 let pending = 0;

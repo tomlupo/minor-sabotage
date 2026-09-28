@@ -1,5 +1,5 @@
 [
-  {"until": "__ms.ready && __ms.game.scene.isActive('title')"},
+  {"until": "__ms.ready && __ms.game.scene.isActive('title') && !document.getElementById('boot')"},
   {"wait": 1200},
   {"shot": "flow-01-title"},
   {"tap": [426, 238]},
@@ -14,7 +14,10 @@
   {"shot": "flow-03-briefing"},
 
   {"tap": [730, 316]},
+  {"until": "__ms.game.scene.isActive('card')"},
+  {"shot": "flow-03b-card"},
   {"until": "__ms.game.scene.isActive('game') && __ms.game.scene.getScene('game').run && !__ms.game.scene.getScene('game').run.sim.state.outcome"},
+  {"until": "!__ms.game.scene.isActive('card')", "timeout": 5000},
   {"wait": 2500},
   {"shot": "flow-04-task1"},
   {"eval": "(() => { const r = __ms.game.scene.getScene('game').run; r.sim.state.outcome = 'success'; return r.phase.id; })()"},

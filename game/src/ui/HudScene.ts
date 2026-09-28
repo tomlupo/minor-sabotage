@@ -10,7 +10,7 @@ import { PAL, SQUAD_COLOURS, hex, css } from "../art/palette";
 import { readSafeInsets } from "../render/view";
 import { sound } from "../render/sound";
 import { hudArt, type HudArt } from "./hudart";
-import { registerFonts, PX, PXS } from "./text";
+import { registerFonts, PX, PXS, PXB } from "./text";
 import { nextHint, markSeen, type Hint } from "./hints";
 import type { RGB } from "../art/palette";
 
@@ -328,7 +328,7 @@ export class HudScene extends Phaser.Scene {
       t = this.add.bitmapText(0, 0, font, "").setDepth(20);
       this.texts.set(key, t);
     }
-    const body = font === PXS ? str.toLocaleUpperCase("pl") : str;
+    const body = font === PXS || font === PXB ? str.toLocaleUpperCase("pl") : str;
     if (t.text !== body) t.setText(body);
     t.setPosition(Math.round(x), Math.round(y)).setOrigin(o.align ?? 0, 0).setVisible(true).setAlpha(1);
     t.setTint(hex(o.color ?? PAL.shared.chalk));

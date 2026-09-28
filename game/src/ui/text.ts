@@ -52,8 +52,8 @@ export interface TxtOpts {
 /** Crisp pixel text. Wrapping uses the font's own measure so lines break like the art. */
 export function txt(scene: Phaser.Scene, x: number, y: number, text: string, o: TxtOpts = {}): Phaser.GameObjects.BitmapText {
   const key = o.font ?? PX;
-  // the small face is capitals only (it stamps identity tags)
-  const s = key === PXS ? text.toLocaleUpperCase("pl") : text;
+  // the small face (it stamps identity tags) and the big one are capitals only
+  const s = key === PXS || key === PXB ? text.toLocaleUpperCase("pl") : text;
   const body = o.wrap ? wrapText(fontOf(key), s, o.wrap).join("\n") : s;
   const t = scene.add.bitmapText(Math.round(x), Math.round(y), key, body);
   if (o.color) t.setTint(hex(o.color));

@@ -49,7 +49,13 @@ export function simForMap(md: MapData, seed: number): Sim {
   return sim;
 }
 
-const SCENES = ["game", "hud", "intro", "briefing", "decision", "note", "title"];
+const SCENES = ["game", "hud", "card", "intro", "briefing", "decision", "note", "title"];
+
+/** The page's boot line (index.html) stays until the first screen has been created. */
+export function bootDone(scene: Phaser.Scene) {
+  const el = document.getElementById("boot");
+  if (el) scene.events.once(Phaser.Scenes.Events.CREATE, () => el.remove());
+}
 
 export class Flow {
   campaign: Campaign;
@@ -71,6 +77,8 @@ export class Flow {
 
   private start(key: string, data: object) {
     this.stopAll();
+    // before the start: called from a scene's create, the start (and its create) is immediate
+    bootDone(this.game.scene.getScene(key));
     this.game.scene.start(key, data);
   }
 
@@ -86,7 +94,8 @@ export class Flow {
       if (id === "finale") this.start("note", { flow: this });
       else this.start("briefing", { flow: this });
     };
-    this.start("game", { run: { ...run, onEnd }, flow: this });
+    // the chapter card first: it covers the moment the phase's art takes to draw
+    this.start("card", { phase: run.phase, next: () => this.game.scene.start("game", { run: { ...run, onEnd }, flow: this }) });
   }
 
   /** After the three tasks: settle the wounded and the taken, then the Arsenal. */
