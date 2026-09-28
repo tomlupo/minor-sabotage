@@ -1,0 +1,22 @@
+{
+  "_about": "Written by tools/art/blender_trooper.py; the art lab's bakeoff section reads it.",
+  "cell": 24,
+  "anchor": [
+    12.0,
+    19.0
+  ],
+  "columns": [
+    "idle_0",
+    "walk_0",
+    "walk_1",
+    "walk_2",
+    "walk_3"
+  ],
+  "rows": [
+    "s",
+    "se",
+    "e",
+    "ne",
+    "n"
+  ]
+}
