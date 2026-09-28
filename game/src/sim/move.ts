@@ -6,7 +6,6 @@ import type { Squad, Unit } from "./types";
 import type { Pt } from "./path";
 import { SPEED, SQUAD, UNIT_RADIUS } from "./tuning";
 import { outOfColumn } from "./tasks";
-import { F_FIRE, F_VEH } from "./grid";
 
 const TRAIL_MAX = 80;
 
@@ -22,7 +21,6 @@ export function setAnim(u: Unit, a: Unit["anim"], lock = 0): void {
 export function goTo(sim: Sim, u: Unit, x: number, y: number, maxNodes = 12000): boolean {
   u.goalX = x;
   u.goalY = y;
-  u.waitT = 0;
   if (Math.hypot(x - u.x, y - u.y) < 0.2) { u.path = []; return true; }
   if (sim.grid.walkLine(u.x, u.y, x, y, 0.3) && sim.inBounds(x, y)) {
     u.path = [{ x, y }];
@@ -34,18 +32,22 @@ export function goTo(sim: Sim, u: Unit, x: number, y: number, maxNodes = 12000):
   return true;
 }
 
-/** A route to (x, y) that gets there (within 3 m), or none: the route finder's nearest-point
- *  fallback would walk a man away from a way that is only shut for now. Waiting, he tries again
- *  in a second. */
-function reroute(sim: Sim, u: Unit, x: number, y: number): Pt[] {
-  const r = sim.route({ x: u.x, y: u.y }, { x, y });
-  const end = r?.[r.length - 1];
-  if (r && end && Math.hypot(end.x - x, end.y - y) < 3) { u.waitT = 0; return r; }
-  u.goalX = x;
-  u.goalY = y;
-  u.waitT = sim.state.time + 1;
-  return [];
+/**
+ * A fire is a pause, not a wall. Routes run where they always ran; a man about to step into
+ * burning petrol, or deeper into it, stays where he is and goes on when it has burnt out (a
+ * bottle's fire lasts seconds). Whether (x1, y1) is such a step.
+ */
+function entersFire(sim: Sim, x0: number, y0: number, x1: number, y1: number): boolean {
+  for (const f of sim.state.fires) {
+    const R = f.r * 0.8 + FIRE_MARGIN;
+    const d1 = Math.hypot(x1 - f.x, y1 - f.y);
+    if (d1 < R && d1 < Math.hypot(x0 - f.x, y0 - f.y)) return true;
+  }
+  return false;
 }
+
+/** How far outside a fire's harm (0.8 of its radius) a man keeps. */
+const FIRE_MARGIN = 0.3;
 
 export function stepMovement(sim: Sim, dt: number): void {
   const G = sim.grid;
@@ -53,43 +55,51 @@ export function stepMovement(sim: Sim, dt: number): void {
   for (const u of units) {
     if (u.state !== "ok" || u.hidden) continue;
     const kneeling = u.task && (u.task.kind === "work" || u.task.kind === "help") && u.task.phase === "work";
-    // stopped where the only way was shut: is it open again?
-    if (u.waitT && !u.path.length && sim.state.time >= u.waitT) u.path = reroute(sim, u, u.goalX, u.goalY);
-    // ground closed under him (a fire caught him, a vehicle pulled in): he gets off it first,
-    // then goes on where he was going
-    if (!kneeling && (sim.state.tick + u.id) % 5 === 0 && (G.flagAt(u.x, u.y) & (F_FIRE | F_VEH))) {
-      const out = G.nearestWalkable(u.x, u.y, 4);
-      if (out && !(u.path.length && Math.hypot(u.path[0].x - out.x, u.path[0].y - out.y) < 0.1)) {
-        const last = u.path[u.path.length - 1];
-        u.path = [out, ...(last ? sim.route(out, last) ?? [] : [])];
+    const sp = u.speed * (u.wounded ? 0.75 : 1);
+    // a man a fire catches steps straight out of it, onto open ground (at a job he kneels at,
+    // the job itself waits for the fire: tasks.ts)
+    const f = kneeling ? null : sim.fireAt(u.x, u.y, FIRE_MARGIN);
+    if (f) {
+      const d = Math.hypot(u.x - f.x, u.y - f.y) || 0.01;
+      const ox = u.x + ((u.x - f.x) / d) * sp * dt, oy = u.y + ((u.y - f.y) / d) * sp * dt;
+      if (G.walkable(ox, oy)) {
+        if (u.animLock <= 0) u.dir = Math.atan2(oy - u.y, ox - u.x);
+        u.x = ox;
+        u.y = oy;
+        u.moving = true;
+        if (u.animLock <= 0) setAnim(u, "walk");
+        continue;
       }
     }
     if (u.path.length && !kneeling) {
       const p = u.path[0];
       const dx = p.x - u.x, dy = p.y - u.y;
       const d = Math.hypot(dx, dy);
-      const sp = u.speed * (u.wounded ? 0.75 : 1);
       const stepLen = sp * dt;
-      if (d <= stepLen || d < 0.04) {
+      const arrive = d <= stepLen || d < 0.04;
+      const nx = arrive ? p.x : u.x + (dx / d) * stepLen, ny = arrive ? p.y : u.y + (dy / d) * stepLen;
+      if (entersFire(sim, u.x, u.y, nx, ny)) {
+        // he waits at the fire's edge until it is out
+        u.moving = false;
+      } else if (arrive) {
         u.x = p.x;
         u.y = p.y;
         u.path.shift();
+        u.moving = true;
       } else {
-        const nx = u.x + (dx / d) * stepLen, ny = u.y + (dy / d) * stepLen;
-        // (a man standing on closed ground may step off it; a slide along one axis counts only
-        // when it moves him, or walking square into a closed cell would stall him for ever)
-        if (G.walkable(nx, ny) || !G.walkable(u.x, u.y)) { u.x = nx; u.y = ny; }
+        // (a slide along one axis counts only when it moves him: walking square into a closed
+        // cell, a zero step "succeeded" and he stood still for ever)
+        if (G.walkable(nx, ny)) { u.x = nx; u.y = ny; }
         else if (Math.abs(nx - u.x) > 1e-4 && G.walkable(nx, u.y)) u.x = nx;
         else if (Math.abs(ny - u.y) > 1e-4 && G.walkable(u.x, ny)) u.y = ny;
         else {
-          // blocked (a vehicle pulled in, a fire lit across the way): around it if there is a way;
-          // if the only way is shut he waits here, at its edge, and tries again (a fire burns out)
+          // blocked (a vehicle pulled in): try again around it
           const last = u.path[u.path.length - 1];
-          u.path = reroute(sim, u, last.x, last.y);
+          u.path = sim.route({ x: u.x, y: u.y }, last) ?? [];
         }
+        u.moving = true;
       }
       if (d > 0.01 && u.animLock <= 0) u.dir = Math.atan2(dy, dx);
-      u.moving = true;
     } else {
       u.moving = false;
     }

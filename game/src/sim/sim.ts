@@ -9,7 +9,7 @@ import type {
 } from "./types";
 import { UF_SILENT_DEATH } from "./types";
 import { stepMovement, stepSquads, recordTrails } from "./move";
-import { stepCombat, stepProjectiles, stepFires, syncFireCells } from "./combat";
+import { stepCombat, stepProjectiles, stepFires } from "./combat";
 import { stepAI, stepSpawners, processNoises } from "./ai";
 import { stepVehicles, rebuildVehicleCells } from "./vehicles";
 import { stepTasks } from "./tasks";
@@ -49,8 +49,6 @@ export class Sim {
   readonly pf: PathFinder;
   state: SimState;
   mission: Mission | null = null;
-  /** Which fires the grid's burning cells were last drawn for (syncFireCells). */
-  fireSig = "";
   /** Noises heard this tick (processed by the AI, not serialised). */
   noises: { x: number; y: number; r: number; gun: boolean }[] = [];
   /** Street names by id, for messages ("Alek is down on Długa"). */
@@ -259,7 +257,6 @@ export class Sim {
       glyph: "none",
       follow: -1,
       yieldUntil: 0,
-      waitT: 0,
       hidden: o.hidden ?? false,
       kills: 0,
       sinceShot: 99,
@@ -407,7 +404,6 @@ export class Sim {
     const clamp = (p: Pt) => ({ x: Math.min(b.x + b.w - 0.5, Math.max(b.x + 0.5, p.x)), y: Math.min(b.y + b.h - 0.5, Math.max(b.y + 0.5, p.y)) });
     const G = this.grid;
     const full = b.x === 0 && b.y === 0 && b.w === G.w && b.h === G.h;
-    // burning ground is closed in the grid itself (syncFireCells), like a vehicle's footprint
     return this.pf.find(from, clamp(to), maxNodes, full ? undefined : (cx, cy) => (this.inBounds(cx + 0.5, cy + 0.5) ? 0 : 1e6));
   }
 
@@ -519,7 +515,5 @@ export class Sim {
     this.state = JSON.parse(json) as SimState;
     for (let i = 0; i < this.grid.flags.length; i++) this.grid.flags[i] &= ~F_VEH;
     rebuildVehicleCells(this);
-    this.fireSig = "";
-    syncFireCells(this);
   }
 }
