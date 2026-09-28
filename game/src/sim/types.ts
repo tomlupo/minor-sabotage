@@ -112,7 +112,7 @@ export const UF_ESCAPED = 2;
 export const UF_CAPTURED = 4;
 export const UF_EVACUATED = 8;
 
-export type SquadOrder = "follow" | "hold" | "cover" | "signal" | "tail";
+export type SquadOrder = "follow" | "hold" | "cover" | "signal";
 
 export interface Squad {
   id: number;
@@ -296,6 +296,8 @@ export interface SimState {
   squads: Squad[];
   /** The squad the player is leading. */
   controlled: number;
+  /** The man picked on the portrait strip: he acts alone and the column leaves him be, or -1. */
+  picked: number;
   /** Alarm per district bit: time it was raised, or -1. */
   alarm: Record<number, number>;
   paused: boolean;

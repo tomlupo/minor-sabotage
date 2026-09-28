@@ -6,11 +6,31 @@ import type { Squad, Unit } from "./types";
 import { goTo, restSlots } from "./move";
 import { KNIFE, THROW } from "./tuning";
 
-/** Walk the squad you lead to (x, y). */
+/** The man picked on the portrait strip, while he can still act for the squad you lead. */
+export function pickedOf(sim: Sim): Unit | undefined {
+  const u = sim.unit(sim.state.picked);
+  return u && u.state === "ok" && !u.hidden && u.squad === sim.state.controlled ? u : undefined;
+}
+
+/**
+ * Pick one man of the squad you lead (design brief: the portrait strip is the main way to
+ * pick a soldier): he walks, knifes, throws and works alone until his tag is tapped again,
+ * when he rejoins the column. Returns whether he is picked now.
+ */
+export function cmdPick(sim: Sim, id: number): boolean {
+  const s = sim.state;
+  if (s.picked === id) { s.picked = -1; return false; }
+  const u = sim.unit(id);
+  if (!u || u.state !== "ok" || u.hidden || u.squad !== s.controlled) return false;
+  s.picked = id;
+  return true;
+}
+
+/** Walk the squad you lead to (x, y), or only the man picked on the strip. */
 export function cmdMove(sim: Sim, x: number, y: number): boolean {
   const sq = sim.controlledSquad;
   if (!sq) return false;
-  const L = sim.leaderOf(sq);
+  const L = pickedOf(sim) ?? sim.leaderOf(sq);
   if (!L) return false;
   if (L.task && L.task.kind !== "help") L.task = null;
   // a new walk cancels the squad's lock-on only if it was on something now out of sight
@@ -39,7 +59,8 @@ export function cmdTapEnemy(sim: Sim, targetId: number, knifeRange = 14): TapRes
   const v = sim.unit(targetId);
   if (!sq || !v || v.state === "dead" || v.side !== "de") return "none";
   const unaware = v.ai && v.ai.mode !== "alert" && !v.ai.blind;
-  const k = pickKnifer(sim, sq, v.x, v.y);
+  const p = pickedOf(sim);
+  const k = p && !p.task ? p : pickKnifer(sim, sq, v.x, v.y);
   if (unaware && k && Math.hypot(k.x - v.x, k.y - v.y) <= knifeRange) {
     // one knifer goes in, the rest of the squad halts where it is
     for (const u of sim.membersOf(sq)) if (u !== k && !u.task) u.path = [];
@@ -73,7 +94,10 @@ export function cmdThrow(sim: Sim, x: number, y: number, what: "grenade" | "bott
   const sq = sim.controlledSquad;
   if (!sq) return null;
   let best: Unit | null = null, bd = Infinity, kind: "grenade" | "bottle" = "grenade";
-  for (const u of sim.membersOf(sq)) {
+  // the man picked on the strip throws, if he carries something to throw
+  const p = pickedOf(sim);
+  const carries = (u: Unit) => (what !== "bottle" && u.grenades > 0) || (what !== "grenade" && u.bottles > 0);
+  for (const u of p && !p.task && carries(p) ? [p] : sim.membersOf(sq)) {
     if (u.state !== "ok" || u.task) continue;
     const opts: ("grenade" | "bottle")[] = what === "any" ? ["bottle", "grenade"] : [what];
     for (const k of opts) {
@@ -104,7 +128,8 @@ export function cmdWork(sim: Sim, x: number, y: number, what: string, ref: strin
   let best: Unit | null = sim.membersOf(sq).find((u) => u.state === "ok" && u.task?.kind === "work" && u.task.what === what) ?? null;
   if (!best) {
     let bd = Infinity;
-    for (const u of sim.membersOf(sq)) {
+    const p = pickedOf(sim);
+    for (const u of p && !p.task ? [p] : sim.membersOf(sq)) {
       if (u.state !== "ok" || u.task) continue;
       const d = Math.hypot(u.x - x, u.y - y) - (prefer ? prefer(u) : 0);
       if (d < bd) { bd = d; best = u; }
@@ -126,7 +151,8 @@ export function cmdHelp(sim: Sim, downId: number): Unit | null {
   const v = sim.unit(downId);
   if (!v || v.state !== "down") return null;
   let best: Unit | null = null, bd = Infinity;
-  for (const u of sim.state.units) {
+  const p = pickedOf(sim);
+  for (const u of p && !p.task ? [p] : sim.state.units) {
     if (u.side !== "pl" || u.state !== "ok" || u.hidden || u.task) continue;
     if (u.squad !== sim.state.controlled && u.squad !== v.squad) continue;
     const d = Math.hypot(u.x - v.x, u.y - v.y);
@@ -152,17 +178,18 @@ export function cmdSelectSquad(sim: Sim, i: number): boolean {
     prev.fireUntil = 0;
   }
   s.controlled = i;
+  s.picked = -1;
   next.order = "follow";
   next.signalRoute = null;
   return true;
 }
 
 /** Orders for a squad you are not leading (decision 2026-09-28: hold, cover a cone, go on
- *  a signal; plus "follow me"). During the tactical pause, one order per team. */
+ *  a signal, and nothing else). During the tactical pause, one order per team. */
 export function cmdOrder(
   sim: Sim,
   i: number,
-  order: "hold" | "cover" | "signal" | "tail",
+  order: "hold" | "cover" | "signal",
   p?: { dir?: number; half?: number; route?: { x: number; y: number }[] },
 ): boolean {
   const s = sim.state;

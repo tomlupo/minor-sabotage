@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { Grid, F_SIGHT, F_WALK } from "../src/sim/grid";
 import { Sim } from "../src/sim/sim";
 import { makeSquad, fieldSquad } from "../src/sim/setup";
-import { cmdMove, cmdTapEnemy, cmdThrow, cmdHelp, cmdSelectSquad, cmdOrder } from "../src/sim/commands";
+import { cmdMove, cmdTapEnemy, cmdThrow, cmdHelp, cmdSelectSquad, cmdOrder, cmdPick } from "../src/sim/commands";
 import { goTo } from "../src/sim/move";
 
 /** An open 60 x 40 m yard with a wall across the middle, gap at the north end. */
@@ -190,6 +190,25 @@ describe("snapshot", () => {
     run(b, 4);
     const pick = (s: Sim) => s.state.units.map((u) => [u.id, u.state, u.x.toFixed(4), u.y.toFixed(4)]);
     expect(pick(b)).toEqual(pick(a));
+  });
+});
+
+describe("picking a man on the strip", () => {
+  it("sends him alone while the squad stays, and tapping him again brings him back", () => {
+    const sim = new Sim(yard());
+    const { us } = squadOf4(sim, 10, 20);
+    run(sim, 1);
+    const at = us.map((u) => [u.x, u.y]);
+    const him = us[2];
+    expect(cmdPick(sim, him.id)).toBe(true);
+    cmdMove(sim, 20, 30);
+    run(sim, 6);
+    expect(Math.hypot(him.x - 20, him.y - 30)).toBeLessThan(1.5);
+    for (const k of [0, 1, 3]) expect(Math.hypot(us[k].x - at[k][0], us[k].y - at[k][1])).toBeLessThan(1.5);
+    // tapped again, he walks back into the column
+    expect(cmdPick(sim, him.id)).toBe(false);
+    run(sim, 8);
+    expect(Math.hypot(him.x - us[0].x, him.y - us[0].y)).toBeLessThan(4);
   });
 });
 

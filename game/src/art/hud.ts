@@ -218,14 +218,14 @@ export function buildSquadTag(o: SquadTagSpec): PixelImage {
 
 // ---------------------------------------------------------------- buttons
 
-export type ButtonKind = "fire" | "grenade" | "bottle" | "go" | "pause" | "map" | "hold" | "follow" | "cover" | "signal" | "ok" | "close";
-export const BUTTON_KINDS: readonly ButtonKind[] = ["fire", "grenade", "bottle", "go", "pause", "map", "hold", "follow", "cover", "signal", "ok", "close"];
+export type ButtonKind = "fire" | "grenade" | "bottle" | "go" | "pause" | "play" | "map" | "hold" | "follow" | "cover" | "signal" | "ok" | "close";
+export const BUTTON_KINDS: readonly ButtonKind[] = ["fire", "grenade", "bottle", "go", "pause", "play", "map", "hold", "follow", "cover", "signal", "ok", "close"];
 export const BUTTON_SIZE: Readonly<Record<ButtonKind, { w: number; h: number }>> = {
   fire: { w: 44, h: 44 },
   grenade: { w: 36, h: 36 },
   bottle: { w: 36, h: 36 },
   go: { w: 48, h: 30 },
-  pause: { w: 30, h: 30 }, map: { w: 30, h: 30 },
+  pause: { w: 30, h: 30 }, play: { w: 30, h: 30 }, map: { w: 30, h: 30 },
   hold: { w: 30, h: 30 }, follow: { w: 30, h: 30 }, cover: { w: 30, h: 30 }, signal: { w: 30, h: 30 },
   ok: { w: 30, h: 30 }, close: { w: 30, h: 30 },
 };

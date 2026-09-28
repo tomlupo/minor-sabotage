@@ -170,16 +170,6 @@ export function stepSquads(sim: Sim, dt: number): void {
       sq.signalRoute = null;
       sq.order = "hold";
     }
-    if (sq.order === "tail") {
-      const C = s.squads[s.controlled];
-      const CL = C && sim.leaderOf(C);
-      if (C && CL && C !== sq) {
-        const back = trailPoint(C, CL, SQUAD.spacing * (C.members.length + 1.5));
-        if (Math.hypot(back.x - L.x, back.y - L.y) > 2.2 && !busy(L)) {
-          if (!L.path.length || Math.hypot(L.goalX - back.x, L.goalY - back.y) > 2) goTo(sim, L, back.x, back.y, 5000);
-        }
-      }
-    }
     if (L.moving || L.path.length) {
       sq.restX = L.x; sq.restY = L.y; sq.restDir = L.dir;
     } else if (Math.hypot(sq.restX - L.x, sq.restY - L.y) > 0.6) {
@@ -191,7 +181,8 @@ export function stepSquads(sim: Sim, dt: number): void {
     const moving = L.moving || L.path.length > 0;
     const slots = moving ? null : restSlots(sim, sq.restX, sq.restY, sq.restDir, followers.length);
     followers.forEach((u, k) => {
-      if (busy(u) || u.yieldUntil > s.time) return;
+      // the man picked on the strip goes where he is sent, not back into the column
+      if (busy(u) || u.yieldUntil > s.time || u.id === s.picked) return;
       const target = moving ? trailPoint(sq, L, SQUAD.spacing * (k + 1)) : slots![k];
       const d = Math.hypot(target.x - u.x, target.y - u.y);
       if (d < (moving ? 0.35 : 0.25)) { if (!moving) u.path = []; return; }

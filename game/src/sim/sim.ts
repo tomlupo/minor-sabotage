@@ -70,6 +70,7 @@ export class Sim {
       spawners: [],
       squads: [],
       controlled: 0,
+      picked: -1,
       alarm: {},
       paused: false,
       events: [],

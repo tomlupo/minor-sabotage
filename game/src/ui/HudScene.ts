@@ -5,8 +5,8 @@
 import Phaser from "phaser";
 import type { GameScene } from "../render/GameScene";
 import type { SimEvent, Unit } from "../sim/types";
-import { cmdSelectSquad, cmdOrder, cmdPause, cmdSignal, cmdTapEnemy, cmdHelp } from "../sim/commands";
-import { PAL, SQUAD_COLOURS, hex, css } from "../art/palette";
+import { cmdSelectSquad, cmdOrder, cmdPause, cmdSignal, cmdTapEnemy, cmdHelp, cmdPick } from "../sim/commands";
+import { PAL, hex } from "../art/palette";
 import { readSafeInsets } from "../render/view";
 import { sound } from "../render/sound";
 import { hudArt, type HudArt } from "./hudart";
@@ -14,8 +14,15 @@ import { registerFonts, PX, PXS, PXB } from "./text";
 import { nextHint, markSeen, type Hint } from "./hints";
 import type { RGB } from "../art/palette";
 
+type OrderKind = "hold" | "cover" | "signal";
+
 type Btn = {
-  id: string;
+  kind: "squad" | "order" | "chip" | "pause" | "map" | "fire" | "grenade" | "go";
+  /** Which squad or which chip it stands for. */
+  index: number;
+  order?: OrderKind;
+  /** Its image's name, fixed for the scene. */
+  key: string;
   x: number; y: number; w: number; h: number;
   visible: () => boolean;
   onDown?: (p: Phaser.Input.Pointer) => void;
@@ -101,17 +108,17 @@ export class HudScene extends Phaser.Scene {
     // squad tags
     for (let i = 0; i < 3; i++) {
       this.btns.push({
-        id: `squad${i}`, x: L + i * 60, y: S.top + 5, w: 56, h: 22,
+        kind: "squad", index: i, key: `squad${i}`, x: L + i * 60, y: S.top + 5, w: 56, h: 22,
         visible: () => !!sim().state.squads[i]?.inPlay,
         onUp: () => this.tapSquad(i),
         onLong: () => { this.orderMenu = this.orderMenu === i ? -1 : i; sound.ui("ui_tap"); },
       });
     }
     // order menu for a squad you are not leading
-    const orders: ("hold" | "cover" | "signal" | "tail")[] = ["hold", "cover", "signal", "tail"];
+    const orders: OrderKind[] = ["hold", "cover", "signal"];
     orders.forEach((o, k) => {
       this.btns.push({
-        id: `order_${o}`, x: 0, y: S.top + 31 + k * 33, w: 30, h: 30,
+        kind: "order", index: k, order: o, key: `order_${o}`, x: 0, y: S.top + 31 + k * 33, w: 30, h: 30,
         visible: () => this.orderMenu >= 0 && this.orderMenu !== sim().state.controlled,
         onUp: () => this.giveOrder(o),
       });
@@ -119,17 +126,17 @@ export class HudScene extends Phaser.Scene {
     // roster chips of the squad you lead
     for (let k = 0; k < 6; k++) {
       this.btns.push({
-        id: `chip${k}`, x: L + k * 36, y: S.top + 31, w: 34, h: 28,
+        kind: "chip", index: k, key: `chip${k}`, x: L + k * 36, y: S.top + 31, w: 34, h: 28,
         visible: () => this.orderMenu < 0 && k < this.members().length,
         onUp: () => this.tapChip(k),
       });
     }
     // pause and map
-    this.btns.push({ id: "pause", x: R - 30, y: S.top + 5, w: 30, h: 30, visible: () => true, onUp: () => this.togglePause() });
-    this.btns.push({ id: "map", x: R - 64, y: S.top + 5, w: 30, h: 30, visible: () => true, onUp: () => { this.g.toggleMap(!this.g.mapView); sound.ui("ui_tap"); } });
+    this.btns.push({ kind: "pause", index: 0, key: "pause", x: R - 30, y: S.top + 5, w: 30, h: 30, visible: () => true, onUp: () => this.togglePause() });
+    this.btns.push({ kind: "map", index: 0, key: "map", x: R - 64, y: S.top + 5, w: 30, h: 30, visible: () => true, onUp: () => { this.g.toggleMap(!this.g.mapView); sound.ui("ui_tap"); } });
     // thumb buttons
     this.btns.push({
-      id: "fire", x: L + 2, y: B - 44, w: 44, h: 44, visible: () => true,
+      kind: "fire", index: 0, key: "fire", x: L + 2, y: B - 44, w: 44, h: 44, visible: () => true,
       onDown: () => { this.fireHeld = true; },
       onUp: (_p, held) => {
         this.fireHeld = false;
@@ -137,11 +144,11 @@ export class HudScene extends Phaser.Scene {
       },
     });
     this.btns.push({
-      id: "grenade", x: L + 50, y: B - 38, w: 36, h: 36, visible: () => this.throwables() > 0,
+      kind: "grenade", index: 0, key: "grenade", x: L + 50, y: B - 38, w: 36, h: 36, visible: () => this.throwables() > 0,
       onUp: () => { this.grenadeArmed = !this.grenadeArmed; sound.ui("ui_tap"); },
     });
     this.btns.push({
-      id: "go", x: L + 90, y: B - 32, w: 48, h: 30,
+      kind: "go", index: 0, key: "go", x: L + 90, y: B - 32, w: 48, h: 30,
       visible: () => sim().state.signalReady && !sim().state.signalGiven,
       onUp: () => { cmdSignal(sim()); sound.ui("ui_go"); this.say("Orsza's whistle: go!", "good"); },
     });
@@ -151,7 +158,7 @@ export class HudScene extends Phaser.Scene {
   private positionOrderMenu() {
     const i = this.orderMenu;
     const x = this.safe.left + 6 + Math.max(0, i) * 60 + 13;
-    for (const b of this.btns) if (b.id.startsWith("order_")) b.x = x;
+    for (const b of this.btns) if (b.kind === "order") b.x = x;
   }
 
   private members(): Unit[] {
@@ -180,12 +187,12 @@ export class HudScene extends Phaser.Scene {
     if (cmdSelectSquad(sim, i)) { this.orderMenu = -1; sound.ui("ui_ok"); this.say(`You lead ${sim.state.squads[i].name}'s squad`, "info"); }
   }
 
-  private giveOrder(o: "hold" | "cover" | "signal" | "tail") {
+  private giveOrder(o: OrderKind) {
     const sim = this.g.run.sim;
     const i = this.orderMenu;
     if (i < 0) return;
-    if (o === "hold" || o === "tail") {
-      if (cmdOrder(sim, i, o)) this.say(`${sim.state.squads[i].name}: ${o === "hold" ? "hold here" : "follow me"}`, "info");
+    if (o === "hold") {
+      if (cmdOrder(sim, i, o)) this.say(`${sim.state.squads[i].name}: hold here`, "info");
       else this.say("One order per squad during the pause", "bad");
       this.orderMenu = -1;
     } else {
@@ -196,12 +203,18 @@ export class HudScene extends Phaser.Scene {
     sound.ui("ui_ok");
   }
 
+  /** The portrait strip picks a man (design brief): he acts alone until his tag is tapped
+   *  again. A man lying wounded is got up instead. */
   private tapChip(k: number) {
     const u = this.members()[k];
     if (!u) return;
     const sim = this.g.run.sim;
-    if (u.state === "down") { cmdHelp(sim, u.id); sound.ui("ui_ok"); return; }
     this.g.toggleMap(false);
+    if (u.state === "down") { if (cmdHelp(sim, u.id)) sound.ui("ui_ok"); return; }
+    if (u.state !== "ok") return;
+    const picked = cmdPick(sim, u.id);
+    this.say(picked ? `${u.name} goes alone: tap the street, a guard or a job` : `${u.name} is back in the column`, "info");
+    sound.ui(picked ? "ui_ok" : "ui_back");
   }
 
   private togglePause() {
@@ -365,9 +378,8 @@ export class HudScene extends Phaser.Scene {
     const sim = this.g.run.sim;
     const s = sim.state;
     for (const b of this.btns) {
-      const img = this.images.get(b.id);
-      if (!b.visible()) { img?.setVisible(false); continue; }
-      this.drawButton(b, keep);
+      if (!b.visible()) { this.images.get(b.key)?.setVisible(false); continue; }
+      this.drawButton(b);
     }
     // objectives: top right, under pause and map, on a dark panel
     const objs = s.objectives.filter((o) => o.primary || o.status !== "open");
@@ -419,29 +431,37 @@ export class HudScene extends Phaser.Scene {
         const b = t.getBounds();
         const box = { x: Math.floor(b.x - 7), y: Math.floor(b.y - 4), w: Math.ceil(b.width + 14), h: Math.ceil(b.height + 8) };
         g.fillStyle(hex(PAL.hud.paper[1]), 0.97).fillRect(box.x, box.y, box.w, box.h);
-        g.lineStyle(1, hex(PAL.shared.select_gold), 1).strokeRect(box.x, box.y, box.w, box.h);
+        g.lineStyle(1, hex(PAL.shared.outline), 1).strokeRect(box.x, box.y, box.w, box.h);
         this.hintBox = box;
       }
     }
-    if (this.pendingOrder) { keep.add("pending"); const t = this.text("pending", W / 2, this.scale.height - 22, this.pendingOrder.kind === "cover" ? "Tap where they should cover" : "Tap where they go on the signal", { align: 0.5, color: PAL.shared.select_gold }); this.panelBehind(t); }
+    if (this.pendingOrder) { keep.add("pending"); const t = this.text("pending", W / 2, this.scale.height - 22, this.pendingOrder.kind === "cover" ? "Tap where they should cover" : "Tap where they go on the signal", { align: 0.5, color: PAL.shared.chalk }); this.panelBehind(t); }
     if (this.grenadeArmed) { keep.add("armed"); const t = this.text("armed", W / 2, this.scale.height - 22, "Tap where to throw", { align: 0.5, color: PAL.shared.chalk }); this.panelBehind(t); }
     this.hideTextsExcept(keep);
   }
 
-  private drawButton(b: Btn, keep: Set<string>) {
-    const g = this.gfx;
+  private drawButton(b: Btn) {
     const sim = this.g.run.sim;
-    const pressed = [...this.gestures.values()].some((q) => q.btn === b) || (b.id === "grenade" && this.grenadeArmed) || (b.id === "fire" && this.fireHeld);
-    const art = this.art.button(b, pressed, sim);
-    if (art) {
-      let img = this.images.get(b.id);
-      if (!img) { img = this.add.image(0, 0, art).setOrigin(0).setDepth(12); this.images.set(b.id, img); }
-      img.setTexture(art).setPosition(b.x, b.y).setVisible(true);
-      const label = this.art.label(b, sim);
-      if (label) { keep.add(`lb_${b.id}`); this.text(`lb_${b.id}`, b.x + label.x, b.y + label.y, label.text, { size: label.size ?? 7, align: label.align ?? 0, color: label.color }).setDepth(13); }
-      return;
+    const s = sim.state;
+    const pressed = [...this.gestures.values()].some((q) => q.btn === b) || (b.kind === "grenade" && this.grenadeArmed) || (b.kind === "fire" && this.fireHeld);
+    let art: string | null = null;
+    switch (b.kind) {
+      case "squad": { const sq = s.squads[b.index]; if (sq) art = this.art.squadTag(sim, sq, s.controlled === b.index); break; }
+      case "chip": { const u = this.members()[b.index]; if (u) art = this.art.chip(u, s.picked === u.id); break; }
+      case "order": art = this.art.button(b.order!, pressed); break;
+      case "pause": art = this.art.button(s.paused ? "play" : "pause", pressed); break;
+      case "grenade": {
+        // the petrol bottle's icon when only bottles are left; the badge counts both
+        const ok = this.members().filter((u) => u.state === "ok");
+        const g = ok.reduce((a, u) => a + u.grenades, 0), bt = ok.reduce((a, u) => a + u.bottles, 0);
+        art = this.art.button(g === 0 && bt > 0 ? "bottle" : "grenade", pressed, g + bt);
+        break;
+      }
+      default: art = this.art.button(b.kind, pressed);
     }
+    let img = this.images.get(b.key);
+    if (!art) { img?.setVisible(false); return; }
+    if (!img) { img = this.add.image(0, 0, art).setOrigin(0).setDepth(12); this.images.set(b.key, img); }
+    img.setTexture(art).setPosition(b.x, b.y).setVisible(true);
   }
 }
-
-export { SQUAD_COLOURS };
