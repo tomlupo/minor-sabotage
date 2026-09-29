@@ -47,7 +47,7 @@ function spotFrom(sim: Sim, x: number, y: number, r: number, from = 0) {
 }
 
 /** A drag, as the HUD sends it: the finger goes down on the leader (or at `start`) and moves to `to`,
- *  a walk toward it every `dt` s, and is let go (unless `letGo` is false: its lifting never heard). */
+ *  a walk toward it every `dt` s, and is let go (unless `letGo` is false: the test lets go itself). */
 function drag(
   sim: Sim,
   to: { x: number; y: number },
@@ -56,7 +56,7 @@ function drag(
   const L = sim.leaderOf(sim.state.squads[sim.state.controlled])!;
   const from = start ?? { x: L.x, y: L.y };
   for (let k = 1; k <= steps; k++) {
-    cmdDrag(sim, from.x + ((to.x - from.x) * k) / steps, from.y + ((to.y - from.y) * k) / steps, k === 1);
+    cmdDrag(sim, from.x + ((to.x - from.x) * k) / steps, from.y + ((to.y - from.y) * k) / steps);
     wait(sim, dt);
   }
   if (letGo) cmdDragEnd(sim);
@@ -566,6 +566,7 @@ describe("a man handed a job goes to it himself, and gets there", () => {
     const back = spotFrom(sim, L.x, L.y, 10, Math.atan2(L.y - bank.y, L.x - bank.x));
     drag(sim, back);
     expect(sim.unit(kadlubek)!.task, "his job dropped").toBeNull();
+    expect(sim.drag, "the drag over").toBeNull();
   }, 60_000);
 
   it("a ring tapped, then a drag toward it begun behind the leader: the man goes on with his job", () => {
@@ -619,24 +620,75 @@ describe("a man handed a job goes to it himself, and gets there", () => {
     expect(sim.state.vars.post_bank).not.toBe(true);
   }, 60_000);
 
-  it("a drag whose lifting was never heard, then a drag back: judged from where the drag back began", () => {
-    // review round 19: let go under FIRE, or with the phase ending under it, a drag lent its start to
-    // the next, and a drag back kept the man on his job
+  it("a drag back, the other thumb tapping a ring meanwhile: its man comes back with the squad when the finger lifts", () => {
+    // review round 20: noted only when the drag began, he was never judged, and walked on alone
+    const { sim, phase, sq, id } = setup(signalTask);
+    blind(sim);
+    const kadlubek = id((t) => t === "kadlubek");
+    const bank = phase.interactables(sim).find((i) => i.id === "bank")!;
+    const L = sim.leaderOf(sq)!;
+    const from = { x: L.x, y: L.y };
+    const back = spotFrom(sim, L.x, L.y, 10, Math.atan2(L.y - bank.y, L.x - bank.x));
+    for (let k = 1; k <= 10; k++) {
+      if (k === 4) bank.act(sim);
+      cmdDrag(sim, from.x + ((back.x - from.x) * k) / 10, from.y + ((back.y - from.y) * k) / 10);
+      wait(sim, 0.12);
+    }
+    expect(sim.unit(kadlubek)!.task?.kind, "sent with the squad during the drag").toBe("work");
+    cmdDragEnd(sim);
+    expect(sim.unit(kadlubek)!.task, "his job dropped").toBeNull();
+  });
+
+  it("a ring tapped, then a drag begun ahead of the leader and pulled back, though still ahead of him: the man goes on", () => {
+    // spec-r20: judged from where the leader stood when the drag began, not from where the finger
+    // went down
     const { sim, phase, sq, id } = setup(signalTask);
     blind(sim);
     const kadlubek = id((t) => t === "kadlubek");
     const bank = phase.interactables(sim).find((i) => i.id === "bank")!;
     bank.act(sim);
     wait(sim, 1);
-    const L0 = sim.leaderOf(sq)!;
-    const ahead = Math.atan2(bank.y - L0.y, bank.x - L0.x);
-    drag(sim, { x: L0.x + Math.cos(ahead) * 12, y: L0.y + Math.sin(ahead) * 12 }, { letGo: false });
-    wait(sim, 4);
     const L = sim.leaderOf(sq)!;
-    const back = spotFrom(sim, L.x, L.y, 10, Math.atan2(L.y - bank.y, L.x - bank.x));
-    drag(sim, back);
-    expect(sim.unit(kadlubek)!.task, "his job dropped").toBeNull();
+    const ahead = Math.atan2(bank.y - L.y, bank.x - L.x);
+    drag(sim, spotFrom(sim, L.x, L.y, 3, ahead), { start: spotFrom(sim, L.x, L.y, 8, ahead) });
+    expect(sim.unit(kadlubek)!.task?.kind, "his job kept").toBe("work");
   }, 60_000);
+
+  it("a ring tapped, then a drag back begun with him within reach of his job: he finishes it", () => {
+    // spec-r20: who is within reach is read when the drag begins, as a tap reads it
+    const { sim, phase, sq, id } = setup(signalTask);
+    blind(sim);
+    const kadlubek = id((t) => t === "kadlubek");
+    const bank = phase.interactables(sim).find((i) => i.id === "bank")!;
+    bank.act(sim);
+    const near = () => Math.hypot(sim.unit(kadlubek)!.x - bank.x, sim.unit(kadlubek)!.y - bank.y) < 6;
+    for (let n = 0; n < 240 && !near(); n++) wait(sim, 0.25);
+    expect(near()).toBe(true);
+    const L = sim.leaderOf(sq)!;
+    drag(sim, spotFrom(sim, L.x, L.y, 8, Math.atan2(L.y - bank.y, L.x - bank.x)));
+    for (let n = 0; n < 40 && sim.state.vars.post_bank !== true; n++) wait(sim, 0.5);
+    expect(sim.state.vars.post_bank).toBe(true);
+  }, 60_000);
+
+  it("a drag back, the other thumb sending the squad with another man meanwhile: the first, sent alone now, goes on", () => {
+    // spec-r20: a ring tapped for another man during the drag takes the squad's mark off the first
+    const { sim, phase, sq, id } = setup(signalTask);
+    blind(sim);
+    const kadlubek = id((t) => t === "kadlubek");
+    const ring = (p: string) => phase.interactables(sim).find((i) => i.id === p)!;
+    ring("bank").act(sim);
+    wait(sim, 1);
+    const L = sim.leaderOf(sq)!;
+    const from = { x: L.x, y: L.y };
+    const back = spotFrom(sim, L.x, L.y, 10, Math.atan2(L.y - ring("bank").y, L.x - ring("bank").x));
+    for (let k = 1; k <= 10; k++) {
+      if (k === 5) ring("tlomackie").act(sim);
+      cmdDrag(sim, from.x + ((back.x - from.x) * k) / 10, from.y + ((back.y - from.y) * k) / 10);
+      wait(sim, 0.12);
+    }
+    cmdDragEnd(sim);
+    expect(sim.unit(kadlubek)!.task?.kind, "he goes on alone").toBe("work");
+  });
 
   it("a ring tapped, then a tap 3 m back: the man comes back", () => {
     // review round 19: every walk back tested was 8 m or more, so a walk under 5 m could have gone

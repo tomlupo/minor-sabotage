@@ -63,24 +63,23 @@ function walker(sim: Sim): Unit | undefined {
 export function cmdMove(sim: Sim, x: number, y: number): boolean {
   const L = walker(sim);
   if (!L) return false;
-  judgeWalk(sim, L.x, L.y, x, y, recallable(sim));
+  judgeWalk(sim, L.x, L.y, x, y, farFromJob);
   // a new walk cancels the squad's lock-on only if it was on something now out of sight
   return goTo(sim, L, x, y);
 }
 
 /**
- * Drag to lead: the squad walks toward the finger, a walk every 0.12 s, none of them judged. The walk
- * the drag led is judged once it is let go (cmdDragEnd), from where the leader stood when it began
- * (`begins`: the first walk of a new drag), for the men who were then off their jobs. Review round
- * 18: judged touch by touch, a drag never called a man back; round 19: read when the finger lifted,
- * a drag let him walk into reach of his job and on alone, and a drag never let go lent its start to
- * the next.
+ * Drag to lead: the squad walks toward the finger, a walk every 0.12 s, none of them judged. The first
+ * walk of a drag notes where the leader stood and the men then off their jobs; the walk the drag led
+ * is judged from there once it is let go (cmdDragEnd). Review round 18: judged touch by touch, a drag
+ * never called a man back.
  */
-export function cmdDrag(sim: Sim, x: number, y: number, begins: boolean): boolean {
+export function cmdDrag(sim: Sim, x: number, y: number): void {
+  const sq = sim.controlledSquad;
   const L = walker(sim);
-  if (!L) return false;
-  if (begins || !sim.drag) sim.drag = { x: L.x, y: L.y, men: recallable(sim) };
-  return goTo(sim, L, x, y);
+  if (!sq || !L) return;
+  if (!sim.drag) sim.drag = { x: L.x, y: L.y, far: sim.membersOf(sq).filter(farFromJob).map((u) => u.id) };
+  goTo(sim, L, x, y);
 }
 
 /** A drag let go: the walk it led, from where it began to where the squad is bound, is judged. */
@@ -88,31 +87,25 @@ export function cmdDragEnd(sim: Sim): void {
   const d = sim.drag;
   sim.drag = null;
   const L = actorOf(sim);
-  if (d && L) judgeWalk(sim, d.x, d.y, L.goalX, L.goalY, d.men);
-}
-
-/** The men a walk of the squad may call back: each it was sent along with to a job, and not yet
- *  within reach of it. */
-function recallable(sim: Sim): number[] {
-  const sq = sim.controlledSquad;
-  if (!sq) return [];
-  return sim.membersOf(sq).filter((u) => u.task?.kind === "work" && u.task.escort && farFromJob(u)).map((u) => u.id);
+  // off his job now, or when the drag began (review round 19: under a slow drag back he walked into
+  // reach of it, and on alone)
+  if (d && L) judgeWalk(sim, d.x, d.y, L.goalX, L.goalY, (u) => farFromJob(u) || d.far.includes(u.id));
 }
 
 /**
  * A walk of the squad from (fx, fy) to (x, y) that does not go toward a job it was sent along to
  * with a man (within 60 degrees of the way there) calls him back, and he drops it: back or aside
  * (review round 15: the squad turned back and he walked on alone, into the cones; round 17: aside
- * too). Only `men` are judged (recallable): a man sent alone carries on, as does one within reach
- * of his job; and a walk under 1.5 m is not judged.
+ * too). A man sent alone carries on, as does one within reach of his job (`off`: who is still off
+ * his); and a walk under 1.5 m is not judged.
  */
-function judgeWalk(sim: Sim, fx: number, fy: number, x: number, y: number, men: number[]): void {
+function judgeWalk(sim: Sim, fx: number, fy: number, x: number, y: number, off: (u: Unit) => boolean): void {
+  const sq = sim.controlledSquad;
   const len = Math.hypot(x - fx, y - fy);
-  if (pickedOf(sim) || len < 1.5) return;
-  for (const id of men) {
-    const u = sim.unit(id);
-    const t = u?.task;
-    if (!u || t?.kind !== "work" || !t.escort) continue;
+  if (!sq || pickedOf(sim) || len < 1.5) return;
+  for (const u of sim.membersOf(sq)) {
+    const t = u.task;
+    if (t?.kind !== "work" || !t.escort || !off(u)) continue;
     const jl = Math.hypot(t.x - fx, t.y - fy) || 1;
     if (((x - fx) * (t.x - fx) + (y - fy) * (t.y - fy)) / (len * jl) <= 0.5) u.task = null;
   }

@@ -5,7 +5,7 @@ import type { Sim } from "../sim/sim";
 import type { Unit } from "../sim/types";
 import type { MapData } from "../content/mapdata";
 import type { Phase, Interactable } from "../missions/types";
-import { actorOf, cmdMove, cmdDrag, cmdDragEnd, cmdTapEnemy, cmdHelp, cmdThrow, cmdFireAt } from "../sim/commands";
+import { actorOf, cmdMove, cmdDrag, cmdTapEnemy, cmdHelp, cmdThrow, cmdFireAt } from "../sim/commands";
 import { PAL, lightHex } from "../art/palette";
 import { allLooks } from "../content/arsenal/roster";
 import { WorldView } from "./world";
@@ -283,16 +283,11 @@ export class GameScene extends Phaser.Scene {
     return ok ? "move" : "none";
   }
 
-  /** Drag to lead: the squad walks toward the finger (`begins`: the first walk of a new drag). */
-  dragWorld(px: number, py: number, begins: boolean) {
+  /** Drag to lead: the squad walks toward the finger (commands.ts cmdDrag). */
+  dragWorld(px: number, py: number) {
     if (this.mapView) return;
     const w = this.toWorld(px, py);
-    cmdDrag(this.run.sim, w.x, w.y, begins);
-  }
-
-  /** A drag let go: the walk it led is judged, once (commands.ts cmdDragEnd). */
-  dragEnded() {
-    cmdDragEnd(this.run.sim);
+    cmdDrag(this.run.sim, w.x, w.y);
   }
 
   /** Hold on a spot: throw a grenade or a bottle there. */

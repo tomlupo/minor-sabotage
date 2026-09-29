@@ -5,7 +5,7 @@
 import Phaser from "phaser";
 import type { GameScene } from "../render/GameScene";
 import type { SimEvent, Unit } from "../sim/types";
-import { cmdSelectSquad, cmdOrder, cmdPause, cmdSignal, cmdTapEnemy, cmdHelp, cmdPick } from "../sim/commands";
+import { cmdSelectSquad, cmdOrder, cmdPause, cmdSignal, cmdTapEnemy, cmdHelp, cmdPick, cmdDragEnd } from "../sim/commands";
 import { PAL, hex, css } from "../art/palette";
 import { readSafeInsets } from "../render/view";
 import { screen, fitCamera, artPoint } from "../render/screen";
@@ -281,7 +281,7 @@ export class HudScene extends Phaser.Scene {
     if (this.fireHeld) { this.g.fireAt(p.x, p.y); return; }
     if (g.moved && this.time.now - g.lastDrag > 120 && !this.pendingOrder && !this.grenadeArmed) {
       g.lastDrag = this.time.now;
-      this.g.dragWorld(p.x, p.y, !g.dragged);
+      this.g.dragWorld(p.x, p.y);
       g.dragged = true;
     }
   }
@@ -296,11 +296,12 @@ export class HudScene extends Phaser.Scene {
       else g.btn.onUp?.(p, held);
       return;
     }
-    // a drag let go: the walk it led is judged now, once, whatever else the finger does (review
-    // round 19: let go with FIRE held, a grenade armed or an order waiting, it was never judged)
-    if (g.dragged) this.g.dragEnded();
-    if (this.fireHeld) return;
     const sim = this.g.run.sim;
+    // a drag let go: the walk it led is judged now, and the finger answers nothing else (review round
+    // 19: let go with FIRE held, a grenade armed or an order waiting, it was never judged; round 20:
+    // it threw a grenade armed meanwhile where it lifted)
+    if (g.dragged) { cmdDragEnd(sim); return; }
+    if (this.fireHeld) return;
     if (this.pendingOrder) {
       const w = this.g.toWorld(p.x, p.y);
       const po = this.pendingOrder;
