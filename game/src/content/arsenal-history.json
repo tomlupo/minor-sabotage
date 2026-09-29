@@ -1,0 +1,1881 @@
+{
+  "_about": "Historical content for the Operation Arsenal (Akcja pod Arsenałem) demo. Researched 2026-09-28; the human-readable version with the conflicts between sources is docs/research/arsenal.md. Times are local (CET). Source ids refer to 'sources'.",
+  "sources": [
+    {
+      "id": 1,
+      "title": "Wikipedia (pl): Akcja pod Arsenałem (cites Broniewski, Borkiewicz-Celińska, Strzembosz, Domańska, Jastrzębski)",
+      "url": "https://pl.wikipedia.org/wiki/Akcja_pod_Arsena%C5%82em"
+    },
+    {
+      "id": 2,
+      "title": "Wikipedia (en): Operation Arsenal",
+      "url": "https://en.wikipedia.org/wiki/Operation_Arsenal"
+    },
+    {
+      "id": 3,
+      "title": "Akcja pod Arsenałem (PDF, batalionzoska.pl; text of Anna Borkiewicz-Celińska's chapter in Batalion „Zośka”, PIW 1990)",
+      "url": "http://www.batalionzoska.pl/wp-content/uploads/akcja_pod_arsenalem.pdf"
+    },
+    {
+      "id": 4,
+      "title": "Julian Borkowski, Warszawska konspiracja harcerska przy ulicy Grochowskiej 354 (Muzeum Warszawy, 2018)",
+      "url": "https://muzeumwarszawy.pl/wp-content/uploads/2018/06/Borkowski_Warszawska-konspiracja.pdf"
+    },
+    {
+      "id": 5,
+      "title": "Muzeum Warszawy: Akcja pod Arsenałem (Miasto od A do Z, text Julian Borkowski)",
+      "url": "https://kolekcje.muzeumwarszawy.pl/pl/teksty/miasto-od-a-do-z/akcja-pod-arsenalem-akcja-zbrojna-Grup-Szturmowych-Szarych-Szeregow-przeprowadzona-26-marca-1943"
+    },
+    {
+      "id": 6,
+      "title": "IPN: 80 lat temu Grupy Szturmowe Szarych Szeregów przeprowadziły Akcję pod Arsenałem (2023)",
+      "url": "https://ipn.gov.pl/pl/dla-mediow/komunikaty/181222,TEKST-AUDIO-80-lat-temu-Grupy-Szturmowe-Szarych-Szeregow-przeprowadzily-Akcje-po.html"
+    },
+    {
+      "id": 7,
+      "title": "Michał Szukała, dzieje.pl (2024): W Akcji pod Arsenałem harcerze Szarych Szeregów odbili 21 więźniów",
+      "url": "https://dzieje.pl/artykuly-historyczne/w-akcji-pod-arsenalem-harcerze-szarych-szeregow-odbili-21-wiezniow-niemcy"
+    },
+    {
+      "id": 8,
+      "title": "Robert Sendek, Polska Zbrojna (2018): „Meksyk” w Warszawie",
+      "url": "https://polska-zbrojna.pl/Mobile/ArticleShow/25063"
+    },
+    {
+      "id": 9,
+      "title": "Historykon.pl: 27 marca 1943 roku Niemcy zamordowali 140 więźniów Pawiaka",
+      "url": "https://historykon.pl/27-marca-1943-roku-niemcy-zamordowali-140-wiezniow-pawiaka/"
+    },
+    {
+      "id": 10,
+      "title": "Wikipedia (pl): Jan Bytnar",
+      "url": "https://pl.wikipedia.org/wiki/Jan_Bytnar"
+    },
+    {
+      "id": 11,
+      "title": "Wikipedia (pl): Maciej Aleksy Dawidowski",
+      "url": "https://pl.wikipedia.org/wiki/Maciej_Aleksy_Dawidowski"
+    },
+    {
+      "id": 12,
+      "title": "Wikipedia (pl): Tadeusz Zawadzki (harcmistrz)",
+      "url": "https://pl.wikipedia.org/wiki/Tadeusz_Zawadzki_(harcmistrz)"
+    },
+    {
+      "id": 13,
+      "title": "Wikipedia (pl): Stanisław Broniewski (harcerz)",
+      "url": "https://pl.wikipedia.org/wiki/Stanis%C5%82aw_Broniewski_(harcerz)"
+    },
+    {
+      "id": 14,
+      "title": "Wikipedia (pl): Tadeusz Krzyżewicz",
+      "url": "https://pl.wikipedia.org/wiki/Tadeusz_Krzy%C5%BCewicz"
+    },
+    {
+      "id": 15,
+      "title": "Wikipedia (pl): Hubert Lenk",
+      "url": "https://pl.wikipedia.org/wiki/Hubert_Lenk"
+    },
+    {
+      "id": 16,
+      "title": "Wikipedia (pl): Władysław Cieplak",
+      "url": "https://pl.wikipedia.org/wiki/W%C5%82adys%C5%82aw_Cieplak"
+    },
+    {
+      "id": 17,
+      "title": "Wikipedia (pl): Jan Rodowicz",
+      "url": "https://pl.wikipedia.org/wiki/Jan_Rodowicz"
+    },
+    {
+      "id": 18,
+      "title": "Wikipedia (pl): Tadeusz Chojko",
+      "url": "https://pl.wikipedia.org/wiki/Tadeusz_Chojko"
+    },
+    {
+      "id": 19,
+      "title": "Wikipedia (pl): Sławomir Bittner",
+      "url": "https://pl.wikipedia.org/wiki/S%C5%82awomir_Bittner"
+    },
+    {
+      "id": 20,
+      "title": "Wikipedia (pl): Eugeniusz Koecher",
+      "url": "https://pl.wikipedia.org/wiki/Eugeniusz_Koecher"
+    },
+    {
+      "id": 21,
+      "title": "Wikipedia (pl): Wiesław Krajewski (żołnierz AK)",
+      "url": "https://pl.wikipedia.org/wiki/Wies%C5%82aw_Krajewski_(%C5%BCo%C5%82nierz_AK)"
+    },
+    {
+      "id": 22,
+      "title": "Wikipedia (pl): Jerzy Gawin",
+      "url": "https://pl.wikipedia.org/wiki/Jerzy_Gawin"
+    },
+    {
+      "id": 23,
+      "title": "Wikipedia (pl): Tadeusz Szajnoch",
+      "url": "https://pl.wikipedia.org/wiki/Tadeusz_Szajnoch"
+    },
+    {
+      "id": 24,
+      "title": "Wikipedia (pl): Jerzy Zapadko",
+      "url": "https://pl.wikipedia.org/wiki/Jerzy_Zapadko"
+    },
+    {
+      "id": 25,
+      "title": "Wikipedia (pl): Konrad Okolski (powstaniec)",
+      "url": "https://pl.wikipedia.org/wiki/Konrad_Okolski_(powstaniec)"
+    },
+    {
+      "id": 26,
+      "title": "Wikipedia (pl): Witold Bartnicki",
+      "url": "https://pl.wikipedia.org/wiki/Witold_Bartnicki"
+    },
+    {
+      "id": 27,
+      "title": "Wikipedia (pl): Andrzej Wolski",
+      "url": "https://pl.wikipedia.org/wiki/Andrzej_Wolski"
+    },
+    {
+      "id": 28,
+      "title": "Wikipedia (pl): Józef Saski",
+      "url": "https://pl.wikipedia.org/wiki/J%C3%B3zef_Saski"
+    },
+    {
+      "id": 29,
+      "title": "Wikipedia (pl): Stanisław Jastrzębski",
+      "url": "https://pl.wikipedia.org/wiki/Stanis%C5%82aw_Jastrz%C4%99bski"
+    },
+    {
+      "id": 30,
+      "title": "Wikipedia (pl): Żelisław Olech",
+      "url": "https://pl.wikipedia.org/wiki/%C5%BBelis%C5%82aw_Olech"
+    },
+    {
+      "id": 31,
+      "title": "Wikipedia (pl): Kazimierz Łodziński",
+      "url": "https://pl.wikipedia.org/wiki/Kazimierz_%C5%81odzi%C5%84ski"
+    },
+    {
+      "id": 32,
+      "title": "Wikipedia (pl): Feliks Pendelski",
+      "url": "https://pl.wikipedia.org/wiki/Feliks_Pendelski"
+    },
+    {
+      "id": 33,
+      "title": "Wikipedia (pl): Jerzy Zborowski",
+      "url": "https://pl.wikipedia.org/wiki/Jerzy_Zborowski"
+    },
+    {
+      "id": 34,
+      "title": "Wikipedia (pl): Jerzy Pepłowski (podporucznik)",
+      "url": "https://pl.wikipedia.org/wiki/Jerzy_Pep%C5%82owski_(podporucznik)"
+    },
+    {
+      "id": 35,
+      "title": "Wikipedia (pl): Akcja Wilanów",
+      "url": "https://pl.wikipedia.org/wiki/Akcja_Wilan%C3%B3w"
+    },
+    {
+      "id": 36,
+      "title": "Wikipedia (pl): Florian Marciniak",
+      "url": "https://pl.wikipedia.org/wiki/Florian_Marciniak"
+    },
+    {
+      "id": 37,
+      "title": "Wikipedia (pl): Zygmunt Kaczyński (harcmistrz)",
+      "url": "https://pl.wikipedia.org/wiki/Zygmunt_Kaczy%C5%84ski_(harcmistrz)"
+    },
+    {
+      "id": 38,
+      "title": "Wikipedia (pl): Jan Wojciech Kiwerski",
+      "url": "https://pl.wikipedia.org/wiki/Jan_Wojciech_Kiwerski"
+    },
+    {
+      "id": 39,
+      "title": "Wikipedia (pl): Henryk Ostrowski (harcmistrz)",
+      "url": "https://pl.wikipedia.org/wiki/Henryk_Ostrowski_(harcmistrz)"
+    },
+    {
+      "id": 40,
+      "title": "Wikipedia (pl): Arsenał w Warszawie",
+      "url": "https://pl.wikipedia.org/wiki/Arsena%C5%82_w_Warszawie"
+    },
+    {
+      "id": 41,
+      "title": "Wikipedia (pl): Pasaż Simonsa w Warszawie",
+      "url": "https://pl.wikipedia.org/wiki/Pasa%C5%BC_Simonsa_w_Warszawie"
+    },
+    {
+      "id": 42,
+      "title": "Wikipedia (pl): Ulica Bielańska w Warszawie",
+      "url": "https://pl.wikipedia.org/wiki/Ulica_Biela%C5%84ska_w_Warszawie"
+    },
+    {
+      "id": 43,
+      "title": "Wikipedia (pl): Ulica Długa w Warszawie",
+      "url": "https://pl.wikipedia.org/wiki/Ulica_D%C5%82uga_w_Warszawie"
+    },
+    {
+      "id": 44,
+      "title": "Wikipedia (pl): Ulica Nalewki w Warszawie",
+      "url": "https://pl.wikipedia.org/wiki/Ulica_Nalewki_w_Warszawie"
+    },
+    {
+      "id": 45,
+      "title": "Wikipedia (pl): Ulica Stare Nalewki w Warszawie",
+      "url": "https://pl.wikipedia.org/wiki/Ulica_Stare_Nalewki_w_Warszawie"
+    },
+    {
+      "id": 46,
+      "title": "Wikipedia (pl): Ulica Tłomackie w Warszawie",
+      "url": "https://pl.wikipedia.org/wiki/Ulica_T%C5%82omackie_w_Warszawie"
+    },
+    {
+      "id": 47,
+      "title": "Wikipedia (pl): Budynek Banku Polskiego w Warszawie",
+      "url": "https://pl.wikipedia.org/wiki/Budynek_Banku_Polskiego_w_Warszawie"
+    },
+    {
+      "id": 48,
+      "title": "Wikipedia (pl): Pałac Pod Czterema Wiatrami w Warszawie",
+      "url": "https://pl.wikipedia.org/wiki/Pa%C5%82ac_Pod_Czterema_Wiatrami_w_Warszawie"
+    },
+    {
+      "id": 49,
+      "title": "Wikipedia (pl): Tramwaje w Warszawie",
+      "url": "https://pl.wikipedia.org/wiki/Tramwaje_w_Warszawie"
+    },
+    {
+      "id": 50,
+      "title": "OpenStreetMap contributors (ODbL), Overpass query 2026-09-28: Długa, Bielańska, Stare Nalewki, old tram track, Arsenał relation 2916781",
+      "url": "https://www.openstreetmap.org/relation/2916781"
+    },
+    {
+      "id": 51,
+      "title": "Wikimedia Commons: Bundesarchiv Bild 101I-001-0285-Ulica Długa.jpg (1939 panorama with building list)",
+      "url": "https://commons.wikimedia.org/wiki/File:Bundesarchiv_Bild_101I-001-0285-Ulica_D%C5%82uga.jpg"
+    },
+    {
+      "id": 52,
+      "title": "Wikimedia Commons: Bundesarchiv Bild 101I-001-0285-01A (the Arsenal gate on Długa, 1939)",
+      "url": "https://commons.wikimedia.org/wiki/File:Bundesarchiv_Bild_101I-001-0285-01A,_Warschau,_Stra%C3%9Fenszene.jpg"
+    },
+    {
+      "id": 53,
+      "title": "Wikimedia Commons: Arsenał w Warszawie 1938.jpg (Henryk Poddębski)",
+      "url": "https://commons.wikimedia.org/wiki/File:Arsena%C5%82_w_Warszawie_1938.jpg"
+    },
+    {
+      "id": 54,
+      "title": "Wikimedia Commons: Tramwaja Warszawa 1941 getto.png (user-drawn schematic, not authoritative)",
+      "url": "https://commons.wikimedia.org/wiki/File:Tramwaja_Warszawa_1941_getto.png"
+    },
+    {
+      "id": 55,
+      "title": "Wikipedia (en): Jan Bytnar (and the other English biographies used to cross-check dates)",
+      "url": "https://en.wikipedia.org/wiki/Jan_Bytnar"
+    },
+    {
+      "id": 56,
+      "title": "IANA time zone database, Europe/Warsaw (CET on 26 March 1943)",
+      "url": "https://www.iana.org/time-zones"
+    }
+  ],
+  "people": [
+    {
+      "pseudonym": "Orsza",
+      "name": "Stanisław Broniewski",
+      "born": 1915,
+      "section": "Command",
+      "category": "participant",
+      "roleInAction": "Commander of the action (appointed by the Grey Ranks' chief, Florian Marciniak, because Zośka was Rudy's closest friend). Started and ended the action with his whistle.",
+      "fate": "Head of the Grey Ranks from May 1943 to October 1944; fought in the Warsaw Uprising; prisoner of war. After the war an economist and urban planner; wrote a full account of the action (Pod Arsenałem, 1957); Order of the White Eagle (1995). Died in Wesoła on 30 December 2000.",
+      "diedOn": "2000-12-30",
+      "sources": [
+        1,
+        3,
+        13
+      ]
+    },
+    {
+      "pseudonym": "Zośka",
+      "name": "Tadeusz Zawadzki",
+      "born": 1921,
+      "section": "Atak (command)",
+      "category": "participant",
+      "roleInAction": "Planned the action and commanded the attack group. Shot a Polish policeman who walked into the site, whose shots made the driver swerve. Led the rush from the Arsenal arcades to the truck and left with Rudy in the escape car.",
+      "fate": "Cross of Valour (May 1943). Killed on 20 August 1943 in the attack on a German border-police post at Sieczychy (Operation Taśma), where he took part as an observer. The Home Army battalion formed from the Storm Groups was named \"Zośka\" after him.",
+      "diedOn": "1943-08-20",
+      "sources": [
+        1,
+        3,
+        12
+      ]
+    },
+    {
+      "pseudonym": "Anoda",
+      "name": "Jan Rodowicz",
+      "born": 1923,
+      "section": "Atak / Butelki (leader)",
+      "category": "participant",
+      "roleInAction": "Led the bottle section and threw the first bottle, which missed. During the withdrawal he shot a German civilian who was holding a pistol to Alek's head.",
+      "fate": "Cross of Valour; fought in the Warsaw Uprising. Arrested by the communist security service on 24 December 1948 and died during interrogation on 7 January 1949.",
+      "diedOn": "1949-01-07",
+      "sources": [
+        1,
+        3,
+        17
+      ]
+    },
+    {
+      "pseudonym": "Bolec",
+      "name": "Tadeusz Chojko",
+      "born": 1920,
+      "section": "Atak / Butelki",
+      "category": "participant",
+      "roleInAction": "His bottle, the third thrown, broke the windscreen and set the truck on fire.",
+      "fate": "Fought in the Warsaw Uprising (Parasol battalion); prisoner of war; served in the Polish II Corps; farmed in Canada; returned to Poland in the late 1990s. Died in Warsaw on 8 October 2007.",
+      "diedOn": "2007-10-08",
+      "sources": [
+        1,
+        18
+      ]
+    },
+    {
+      "pseudonym": "Heniek",
+      "name": "Henryk Kupis",
+      "born": null,
+      "section": "Atak / Butelki",
+      "category": "participant",
+      "roleInAction": "Member of the bottle section.",
+      "fate": "Did not survive the war (he is not among the eleven participants who did); when and how he died is not verified.",
+      "diedOn": null,
+      "sources": [
+        1,
+        2,
+        3
+      ],
+      "uncertain": [
+        "fate"
+      ]
+    },
+    {
+      "pseudonym": "Stasiek",
+      "name": "Stanisław Pomykalski",
+      "born": null,
+      "section": "Atak / Butelki",
+      "category": "participant",
+      "roleInAction": "Member of the bottle section.",
+      "fate": "Did not survive the war (he is not among the eleven participants who did); when and how he died is not verified.",
+      "diedOn": null,
+      "sources": [
+        1,
+        2,
+        3
+      ],
+      "uncertain": [
+        "fate"
+      ]
+    },
+    {
+      "pseudonym": "Maciek",
+      "name": "Sławomir Maciej Bittner",
+      "born": 1923,
+      "section": "Atak / Sten I (leader)",
+      "category": "participant",
+      "roleInAction": "Led Sten I and carried one of the Storm Groups' only two Sten guns. His section crossed Nalewki and fired from under the Arsenal arcades.",
+      "fate": "Cross of Valour (3 May 1943); led the killing of Rudy's interrogator Herbert Schulz on 6 May 1943; first commander of the 1st company of the Zośka battalion. Arrested on 18 February 1944 and disappeared, probably shot in the ghetto ruins.",
+      "diedOn": null,
+      "sources": [
+        1,
+        3,
+        19
+      ],
+      "diedApprox": "1944-02 (probably)"
+    },
+    {
+      "pseudonym": "Kołczan",
+      "name": "Eugeniusz Koecher",
+      "born": 1920,
+      "section": "Atak / Sten I",
+      "category": "participant",
+      "roleInAction": "Pistol cover for the Sten. First to reach the truck; he opened the tailgate.",
+      "fate": "Cross of Valour (May 1943). Killed on 8 August 1944 in the Warsaw Uprising, defending the Evangelical cemetery in Wola.",
+      "diedOn": "1944-08-08",
+      "sources": [
+        1,
+        3,
+        20
+      ]
+    },
+    {
+      "pseudonym": "Sem",
+      "name": "Wiesław Krajewski",
+      "born": 1923,
+      "section": "Atak / Sten I",
+      "category": "participant",
+      "roleInAction": "Pistol cover for the Sten.",
+      "fate": "Killed on 20 September 1944 in the Warsaw Uprising, at Wilanowska 5 in Czerniaków.",
+      "diedOn": "1944-09-20",
+      "sources": [
+        2,
+        3,
+        21
+      ]
+    },
+    {
+      "pseudonym": "Słoń",
+      "name": "Jerzy Gawin",
+      "born": 1922,
+      "section": "Atak / Sten II (leader)",
+      "category": "participant",
+      "roleInAction": "Led Sten II and carried the second Sten. It jammed under fire; once Zośka took the safety off, he fired bursts that covered the rush to the truck.",
+      "fate": "Cross of Valour (May 1943). Killed on 23 September 1944 in the Warsaw Uprising, trying to break out of Czerniaków.",
+      "diedOn": "1944-09-23",
+      "sources": [
+        1,
+        3,
+        22
+      ]
+    },
+    {
+      "pseudonym": "Buzdygan",
+      "name": "Tadeusz Krzyżewicz",
+      "born": 1924,
+      "section": "Atak / Sten II",
+      "category": "participant",
+      "roleInAction": "Pistol cover for the Sten. Shot in the stomach and leg while crossing to the Arsenal arcades, by the wounded Polish policeman lying in the road. Evacuated in the escape car with Rudy.",
+      "fate": "Died of his wounds on 2 April 1943 in the Hospital of the Transfiguration. Posthumous Cross of Valour.",
+      "diedOn": "1943-04-02",
+      "sources": [
+        1,
+        3,
+        14
+      ]
+    },
+    {
+      "pseudonym": "Cielak",
+      "name": "Tadeusz Szajnoch",
+      "born": 1920,
+      "section": "Atak / Sten II",
+      "category": "participant",
+      "roleInAction": "Pistol cover for the Sten.",
+      "fate": "Fought in the Warsaw Uprising and was badly wounded in the Old Town. Sources disagree on his death: 1 May 1962 in France, or 1945.",
+      "diedOn": null,
+      "sources": [
+        3,
+        23
+      ],
+      "uncertain": [
+        "fate"
+      ]
+    },
+    {
+      "pseudonym": "Alek",
+      "name": "Maciej Aleksy Dawidowski",
+      "born": 1920,
+      "section": "Atak / Granaty (leader)",
+      "category": "participant",
+      "roleInAction": "Led the grenade section, the northernmost post, which also covered Nalewki. Shot an SS officer who reached for his gun on Nalewki. During the withdrawal he was shot in the stomach from the Arbeitsamt, yet threw grenades that cleared the way twice.",
+      "fate": "Died on 30 March 1943 in the Dzieciątka Jezus hospital. Posthumous Silver Cross of Virtuti Militari, the first Grey Ranks scout to receive it. Buried under a false name and reburied beside Rudy in 1946.",
+      "diedOn": "1943-03-30",
+      "sources": [
+        1,
+        3,
+        11
+      ]
+    },
+    {
+      "pseudonym": "Hubert",
+      "name": "Hubert Lenk",
+      "born": 1924,
+      "section": "Atak / Granaty",
+      "category": "participant",
+      "roleInAction": "Member of the grenade section. While reloading in the gateway of Długa 27 during the withdrawal, he was seized by Edmund (Ernest) Sommer, a German bar owner, and handed to the police.",
+      "fate": "Killed by the Germans. Older accounts say he was beaten to death under interrogation, probably about 28 March 1943. The Pawiak Museum card index (cited in 2018) says he was shot at Dzielna 21 on 7 May 1943.",
+      "diedOn": "1943-05-07",
+      "sources": [
+        1,
+        4,
+        5,
+        15
+      ],
+      "diedOnAlt": "1943-03-28",
+      "uncertain": [
+        "diedOn"
+      ]
+    },
+    {
+      "pseudonym": "Mirski",
+      "name": "Jerzy Zapadko",
+      "born": 1924,
+      "section": "Atak / Granaty",
+      "category": "participant",
+      "roleInAction": "Member of the grenade section.",
+      "fate": "Last commander of the Parasol battalion in the Warsaw Uprising; Virtuti Militari. Later an economist at the World Bank. Died in Washington on 23 April 1998.",
+      "diedOn": "1998-04-23",
+      "sources": [
+        1,
+        3,
+        24
+      ]
+    },
+    {
+      "pseudonym": "Giewont",
+      "name": "Władysław Cieplak",
+      "born": 1917,
+      "section": "Ubezpieczenie (command)",
+      "category": "participant",
+      "roleInAction": "Commanded the cover group. With Orsza, stopped a passing Opel to carry off a wounded freed prisoner.",
+      "fate": "Company commander in the Zośka battalion. Killed on 30 August 1944 in the Warsaw Uprising, under the rubble of a bombed building at Zakroczymska 7.",
+      "diedOn": "1944-08-30",
+      "sources": [
+        1,
+        3,
+        16
+      ]
+    },
+    {
+      "pseudonym": "Kuba",
+      "name": "Konrad Okolski",
+      "born": 1923,
+      "section": "Ubezpieczenie / Sygnalizacja (leader)",
+      "category": "participant",
+      "roleInAction": "Had been driven in the prison van himself after an earlier arrest and knew it by sight. Stood on Bielańska at the mouth of Tłomackie, watching the reflection in a shop window, and waved his cap as the signal.",
+      "fate": "Killed on 11 August 1944 in the Warsaw Uprising, in Wola. Awarded the Silver Cross of Virtuti Militari on the day of his death.",
+      "diedOn": "1944-08-11",
+      "sources": [
+        1,
+        3,
+        25
+      ]
+    },
+    {
+      "pseudonym": "Kadłubek",
+      "name": "Witold Bartnicki",
+      "born": 1925,
+      "section": "Ubezpieczenie / Sygnalizacja",
+      "category": "participant",
+      "roleInAction": "In a Tyrolean hat at the kerb outside the Bank Polski on Bielańska. The first to spot the van; he bowed deeply as it passed.",
+      "fate": "Fought in the Warsaw Uprising (Zośka battalion). Died in Warsaw on 9 July 2008.",
+      "diedOn": "2008-07-09",
+      "sources": [
+        1,
+        3,
+        26
+      ]
+    },
+    {
+      "pseudonym": "Jur",
+      "name": "Andrzej Wolski",
+      "born": 1924,
+      "section": "Ubezpieczenie / Sygnalizacja",
+      "category": "participant",
+      "roleInAction": "Held the telephone in a small restaurant at the corner of Długa and Bielańska and passed on that the van had left Szucha with Rudy.",
+      "fate": "Fought in the Warsaw Uprising. Imprisoned by the communist authorities until 1954; later a university professor in Zaire and Canada. Died in Montreal on 28 April 2011.",
+      "diedOn": "2011-04-28",
+      "sources": [
+        1,
+        3,
+        27
+      ]
+    },
+    {
+      "pseudonym": "Katoda",
+      "name": "Józef Saski",
+      "born": 1922,
+      "section": "Ubezpieczenie / Stare Miasto (leader)",
+      "category": "participant",
+      "roleInAction": "Covered Długa towards the Old Town. Swapped pistols with Anoda, then was shot at by an SA man while reloading.",
+      "fate": "Parasol battalion; later a lawyer. Died in Warsaw on 20 July 1979.",
+      "diedOn": "1979-07-20",
+      "sources": [
+        1,
+        3,
+        28
+      ]
+    },
+    {
+      "pseudonym": "Kopeć",
+      "name": "Stanisław Jastrzębski",
+      "born": 1920,
+      "section": "Ubezpieczenie / Stare Miasto",
+      "category": "participant",
+      "roleInAction": "Shot the SA man who was firing at Katoda.",
+      "fate": "Parasol battalion; Virtuti Militari; wrote the memoir Zaczęło się pod Arsenałem. Died in Warsaw on 13 April 2000.",
+      "diedOn": "2000-04-13",
+      "sources": [
+        1,
+        3,
+        29
+      ]
+    },
+    {
+      "pseudonym": "Rawicz",
+      "name": "Żelisław Olech",
+      "born": 1915,
+      "section": "Ubezpieczenie / Stare Miasto",
+      "category": "participant",
+      "roleInAction": "Member of the Stare Miasto cover section.",
+      "fate": "Parasol battalion; fought in the Warsaw Uprising. Died on 14 December 2005.",
+      "diedOn": "2005-12-14",
+      "sources": [
+        1,
+        3,
+        30
+      ]
+    },
+    {
+      "pseudonym": "Tytus",
+      "name": "Jerzy Trzciński",
+      "born": null,
+      "section": "Ubezpieczenie / Getto (leader)",
+      "category": "participant",
+      "roleInAction": "Led the Getto section, covering Długa to the west towards Przejazd and the ghetto walls. Arrived at the last moment.",
+      "fate": "Survived the war. On 27 March 1943 the Gestapo arrested his parents and three sisters at Marszałkowska 74.",
+      "diedOn": null,
+      "sources": [
+        1,
+        3
+      ],
+      "nameVariants": [
+        "Tytus Trzciński"
+      ],
+      "uncertain": [
+        "name"
+      ]
+    },
+    {
+      "pseudonym": "Felek",
+      "name": "Feliks Pendelski",
+      "born": 1921,
+      "section": "Ubezpieczenie / Getto",
+      "category": "participant",
+      "roleInAction": "Member of the Getto section; arrived from work at the last moment and took back his post from Kapsiut.",
+      "fate": "Killed on 6 June 1943 near Wola Pękoszewska, defending the dying Andrzej Zawadowski during the withdrawal after the Czarnocin action.",
+      "diedOn": "1943-06-06",
+      "sources": [
+        1,
+        3,
+        32
+      ]
+    },
+    {
+      "pseudonym": "Ziutek",
+      "name": "Józef Pleszczyński",
+      "born": null,
+      "section": "Ubezpieczenie / Getto",
+      "category": "participant",
+      "roleInAction": "Member of the Getto section.",
+      "fate": "Mortally wounded on 26 September 1943 in the Wilanów action; died during the evacuation.",
+      "diedOn": "1943-09-26",
+      "sources": [
+        1,
+        3,
+        35
+      ]
+    },
+    {
+      "pseudonym": "Pająk",
+      "name": "Jerzy Tabor",
+      "born": null,
+      "section": "Ubezpieczenie / Getto",
+      "category": "participant",
+      "roleInAction": "Member of the Getto section.",
+      "fate": "Did not survive the war (he is not among the eleven participants who did); when and how he died is not verified.",
+      "diedOn": null,
+      "sources": [
+        1,
+        3
+      ],
+      "uncertain": [
+        "fate"
+      ]
+    },
+    {
+      "pseudonym": "Kapsiut",
+      "name": "Kazimierz Łodziński",
+      "born": 1922,
+      "section": "Ubezpieczenie / Getto (stand-in)",
+      "category": "participant",
+      "roleInAction": "Named to replace Felek. He handed over his pistol when Felek arrived as the first shots rang out, then covered towards Plac Krasińskich. Broniewski does not count him, which is why the total is 28 rather than 29.",
+      "fate": "Zośka battalion; after the war a professor of paediatric surgery. The last living participant; died in Warsaw on 8 July 2011.",
+      "diedOn": "2011-07-08",
+      "sources": [
+        1,
+        3,
+        31
+      ],
+      "uncertain": [
+        "section"
+      ]
+    },
+    {
+      "pseudonym": "Jeremi",
+      "name": "Jerzy Zborowski",
+      "born": 1922,
+      "section": "Ubezpieczenie / car (driver)",
+      "category": "participant",
+      "roleInAction": "Had bought the old DKW escape car and drove it. He reversed from the Długa–Bielańska crossroads to the burning truck and took Rudy, Buzdygan and Zośka to the medical post at Ursynowska 46.",
+      "fate": "Commanded the Parasol battalion in the Warsaw Uprising; Virtuti Militari. Captured wounded on 23 September 1944, last seen at the Gestapo headquarters on Szucha; missing.",
+      "diedOn": null,
+      "sources": [
+        1,
+        3,
+        33
+      ],
+      "diedApprox": "after 22 September 1944"
+    },
+    {
+      "pseudonym": "Jurek TK",
+      "name": "Jerzy Pepłowski",
+      "born": 1924,
+      "section": "Ubezpieczenie / car (cover)",
+      "category": "participant",
+      "roleInAction": "Guarded the escape car. Drove the wounded freed prisoner Maria Schiffers away in a commandeered Opel, which was fired on at Leszno.",
+      "fate": "Killed on 16 September 1944 in the Warsaw Uprising, at Czerniaków.",
+      "diedOn": "1944-09-16",
+      "sources": [
+        1,
+        3,
+        34
+      ]
+    },
+    {
+      "pseudonym": "Henryk",
+      "name": "Henryk Krajewski",
+      "born": null,
+      "section": "Support: escape car",
+      "category": "support",
+      "roleInAction": "A professional driver who worked for a German firm, added to the DKW crew. Not counted among the 28/29.",
+      "fate": "Not researched.",
+      "diedOn": null,
+      "sources": [
+        3
+      ]
+    },
+    {
+      "pseudonym": "Pytek",
+      "name": "Jan Makowelski",
+      "born": null,
+      "section": "Support",
+      "category": "support",
+      "roleInAction": "Collected everyone's identity papers before the action; held a Getto post until Tytus arrived, then watched from the windows of the RGO office on Bielańska.",
+      "fate": "Not researched.",
+      "diedOn": null,
+      "sources": [
+        3
+      ]
+    },
+    {
+      "pseudonym": "Nowak",
+      "name": "Florian Marciniak",
+      "born": 1915,
+      "section": "Support: Grey Ranks leadership",
+      "category": "support",
+      "roleInAction": "Head of the Grey Ranks. Obtained the military approval and phoned the go-ahead; was outside the Bank Polski during the action.",
+      "fate": "Arrested on 6 May 1943; died in Gross-Rosen concentration camp on 20 February 1944.",
+      "diedOn": "1944-02-20",
+      "sources": [
+        1,
+        3,
+        36
+      ]
+    },
+    {
+      "pseudonym": "Lipiński",
+      "name": "Jan Wojciech Kiwerski",
+      "born": 1910,
+      "section": "Support: Kedyw command",
+      "category": "support",
+      "roleInAction": "Commander of Kedyw's disposal units. Arrived late from a train and approved the attack with one word: \"Trzaskać!\"",
+      "fate": "Killed in Volhynia on 18 April 1944.",
+      "diedOn": "1944-04-18",
+      "sources": [
+        1,
+        3,
+        38
+      ]
+    },
+    {
+      "pseudonym": "Lola",
+      "name": "Helena Danielewicz",
+      "born": null,
+      "section": "Support: intelligence",
+      "category": "support",
+      "roleInAction": "Worked for the Prisoners' Aid Society, which had access to Pawiak. At 13:45 she reported that Rudy had been taken to Szucha that morning.",
+      "fate": "Not researched.",
+      "diedOn": null,
+      "sources": [
+        1,
+        3
+      ]
+    },
+    {
+      "pseudonym": "Wesoły",
+      "name": "Zygmunt Kaczyński",
+      "born": 1919,
+      "section": "Support: intelligence",
+      "category": "support",
+      "roleInAction": "A sales rep for E. Wedel who was often inside the Gestapo headquarters. He saw Rudy carried to the truck and phoned from inside the building: \"Wysyłam towar, bezwzględnie musi być odebrany!\"",
+      "fate": "Fought in the Warsaw Uprising. Died in Warsaw on 26 November 1984.",
+      "diedOn": "1984-11-26",
+      "sources": [
+        1,
+        3,
+        37
+      ]
+    },
+    {
+      "pseudonym": "Andrzej",
+      "name": "Andrzej Trojanowski",
+      "born": null,
+      "section": "Support: medical post",
+      "category": "support",
+      "roleInAction": "Surgeon at the medical post at Ursynowska 46, with Zofia Trojanowska \"Tamara\" and Maria Broniewska \"Elżbieta\". Later operated on Alek.",
+      "fate": "Not researched.",
+      "diedOn": null,
+      "sources": [
+        1,
+        3
+      ]
+    },
+    {
+      "pseudonym": "Rudy",
+      "name": "Jan Bytnar",
+      "born": 1921,
+      "section": "Freed prisoner",
+      "category": "prisoner",
+      "roleInAction": "Arrested on 23 March 1943 and tortured at Pawiak and Szucha. Freed on 26 March, unable to walk; he crawled out of the truck over the benches and was carried to the escape car.",
+      "fate": "Died on 30 March 1943 at about 16:30 in the Wola Hospital, of the injuries from his interrogation. Buried at Powązki Military Cemetery under the name Jan Domański; Cross of Valour (posthumous).",
+      "diedOn": "1943-03-30",
+      "sources": [
+        1,
+        3,
+        10
+      ]
+    },
+    {
+      "pseudonym": "Heniek",
+      "name": "Henryk Ostrowski",
+      "born": 1919,
+      "section": "Freed prisoner",
+      "category": "prisoner",
+      "roleInAction": "Commander of the Storm Groups' Praga company, arrested before Rudy. Freed; he recognised Zośka and Kołczan and asked for a gun.",
+      "fate": "Survived; died in Brisbane on 28 June 1995.",
+      "diedOn": "1995-06-28",
+      "sources": [
+        1,
+        3,
+        39
+      ]
+    },
+    {
+      "pseudonym": null,
+      "name": "Władysław Wyssogota-Zakrzewski",
+      "born": null,
+      "section": "Freed prisoner",
+      "category": "prisoner",
+      "roleInAction": "An army major. Tried to organise the prisoners to push the guards out, and was wounded in the arm.",
+      "fate": "Not researched.",
+      "diedOn": null,
+      "sources": [
+        1
+      ]
+    },
+    {
+      "pseudonym": null,
+      "name": "Maria Schiffers (Szyfers)",
+      "born": null,
+      "section": "Freed prisoner",
+      "category": "prisoner",
+      "roleInAction": "Wounded in the leg; driven off in a commandeered Opel; recaptured after the car was fired on at Leszno.",
+      "fate": "Shot in the late spring of 1943.",
+      "diedOn": null,
+      "sources": [
+        1,
+        3
+      ]
+    },
+    {
+      "pseudonym": null,
+      "name": "Halina Siemieńska",
+      "born": null,
+      "section": "Prisoner",
+      "category": "prisoner",
+      "roleInAction": "Zośka's aunt, riding in the van; killed by a stray bullet during the fight.",
+      "fate": "Killed on 26 March 1943.",
+      "diedOn": "1943-03-26",
+      "sources": [
+        1,
+        8
+      ]
+    },
+    {
+      "pseudonym": null,
+      "name": "Emil Hamm",
+      "born": null,
+      "section": "Truck escort (SS-Rottenführer)",
+      "category": "german",
+      "roleInAction": "One of the four Gestapo escorts.",
+      "fate": "Killed in the action.",
+      "diedOn": "1943-03-26",
+      "sources": [
+        1
+      ]
+    },
+    {
+      "pseudonym": null,
+      "name": "Schwarzmann",
+      "born": null,
+      "section": "Truck escort (SS-Rottenführer)",
+      "category": "german",
+      "roleInAction": "One of the four Gestapo escorts.",
+      "fate": "Killed in the action.",
+      "diedOn": "1943-03-26",
+      "sources": [
+        1
+      ]
+    },
+    {
+      "pseudonym": null,
+      "name": "Alfred Habicht",
+      "born": null,
+      "section": "Truck driver (SS-Unterscharführer)",
+      "category": "german",
+      "roleInAction": "Driver of the prison truck.",
+      "fate": "Wounded.",
+      "diedOn": null,
+      "sources": [
+        1
+      ]
+    },
+    {
+      "pseudonym": null,
+      "name": "Edmund (Ernest) Sommer",
+      "born": null,
+      "section": "Volksdeutscher bar owner, probably Sonderdienst",
+      "category": "german",
+      "roleInAction": "Seized Hubert Lenk in the gateway of Długa 27.",
+      "fate": "Executed by Kedyw soldiers at Józefów station on 18 July 1943.",
+      "diedOn": "1943-07-18",
+      "sources": [
+        1,
+        4
+      ]
+    },
+    {
+      "pseudonym": null,
+      "name": "Herbert Schulz",
+      "born": null,
+      "section": "Gestapo interrogator (SS-Oberscharführer)",
+      "category": "german",
+      "roleInAction": "Interrogated and tortured Rudy.",
+      "fate": "Shot by the Grey Ranks on 6 May 1943.",
+      "diedOn": "1943-05-06",
+      "sources": [
+        1
+      ]
+    },
+    {
+      "pseudonym": null,
+      "name": "Ewald Lange",
+      "born": null,
+      "section": "Gestapo interrogator (SS-Rottenführer)",
+      "category": "german",
+      "roleInAction": "Interrogated and tortured Rudy.",
+      "fate": "Shot by the Home Army on 22 May 1943.",
+      "diedOn": "1943-05-22",
+      "sources": [
+        1
+      ]
+    }
+  ],
+  "sections": [
+    {
+      "id": "atak",
+      "name": "Atak",
+      "group": "Atak",
+      "leader": "Zośka",
+      "position": "On the east pavement of Nalewki (the Pasaż Simonsa side), facing the Arsenal: four sections in successive lines over a dozen or so metres, the Butelki section nearest Długa.",
+      "task": "Stop the truck, kill the escort and free the prisoners. Each section was the next barrier if the one before it failed.",
+      "members": [
+        "Zośka"
+      ],
+      "sources": [
+        1,
+        3
+      ]
+    },
+    {
+      "id": "butelki",
+      "name": "Butelki",
+      "group": "Atak",
+      "leader": "Anoda",
+      "position": "The corner of Długa and Nalewki, opposite the Arsenal, nearest the crossroads.",
+      "task": "Throw petrol bottles at the bonnet and cab as the truck braked for the turn from Długa into Nalewki.",
+      "weapons": "Petrol bottles; pistols.",
+      "members": [
+        "Anoda",
+        "Bolec",
+        "Heniek",
+        "Stasiek"
+      ],
+      "sources": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "sten-1",
+      "name": "Sten I",
+      "group": "Atak",
+      "leader": "Maciek",
+      "position": "Right behind Butelki, on the same side of Nalewki.",
+      "task": "If the bottles failed, fire the Sten at the cab almost at right angles to the truck's path. The two others gave pistol cover.",
+      "weapons": "One Sten; pistols.",
+      "members": [
+        "Maciek",
+        "Kołczan",
+        "Sem"
+      ],
+      "sources": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "sten-2",
+      "name": "Sten II",
+      "group": "Atak",
+      "leader": "Słoń",
+      "position": "A few steps further up Nalewki, same side.",
+      "task": "Stop the truck at any cost: run into Nalewki and fire at 45 degrees, accepting the risk to prisoners.",
+      "weapons": "One Sten; pistols.",
+      "members": [
+        "Słoń",
+        "Buzdygan",
+        "Cielak"
+      ],
+      "sources": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "granaty",
+      "name": "Granaty",
+      "group": "Atak",
+      "leader": "Alek",
+      "position": "The northernmost post on Nalewki.",
+      "task": "The last barrier: smash the engine with four grenades. Also cover the site from the north, up Nalewki.",
+      "weapons": "Four grenades; pistols.",
+      "members": [
+        "Alek",
+        "Hubert",
+        "Mirski"
+      ],
+      "sources": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "ubezpieczenie",
+      "name": "Ubezpieczenie",
+      "group": "Ubezpieczenie",
+      "leader": "Giewont",
+      "position": "Across all approaches to the crossroads.",
+      "task": "Keep enemy forces off the site: shoot uniformed Germans, and Polish policemen who ignored a warning.",
+      "members": [
+        "Giewont"
+      ],
+      "sources": [
+        1,
+        3
+      ]
+    },
+    {
+      "id": "sygnalizacja",
+      "name": "Sygnalizacja",
+      "group": "Ubezpieczenie",
+      "leader": "Kuba",
+      "position": "On Bielańska towards Plac Teatralny. Kadłubek was at the kerb outside the Bank Polski (east side, about 250–280 m from Długa); Kuba was on the other side of Bielańska at the mouth of Tłomackie; Jur held a telephone in a restaurant at the Długa–Bielańska corner.",
+      "task": "Relay the news that the van had left, signal its approach (a deep bow with a hat, then a wave of a cap), then cover the site from the Plac Teatralny side.",
+      "members": [
+        "Kuba",
+        "Kadłubek",
+        "Jur"
+      ],
+      "sources": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "stare-miasto",
+      "name": "Stare Miasto",
+      "group": "Ubezpieczenie",
+      "leader": "Katoda",
+      "position": "Długa east of the crossroads, towards Miodowa, Plac Krasińskich and the Old Town.",
+      "task": "Seal Długa from the east (Old Town) side.",
+      "members": [
+        "Katoda",
+        "Kopeć",
+        "Rawicz"
+      ],
+      "sources": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "getto",
+      "name": "Getto",
+      "group": "Ubezpieczenie",
+      "leader": "Tytus",
+      "position": "Długa west of the Arsenal, facing Przejazd and the ghetto walls.",
+      "task": "Seal Długa from the west (ghetto) side. The largest cover section.",
+      "members": [
+        "Tytus",
+        "Felek",
+        "Ziutek",
+        "Pająk",
+        "Kapsiut"
+      ],
+      "notes": "Kapsiut was a stand-in for Felek and handed over his pistol when Felek arrived. Broniewski's roster, and the English Wikipedia table, list only four here.",
+      "sources": [
+        1,
+        2,
+        3
+      ]
+    },
+    {
+      "id": "car",
+      "name": "Escape car (DKW)",
+      "group": "Ubezpieczenie",
+      "leader": "Jeremi",
+      "position": "At the Długa–Bielańska crossroads, from where it reversed to the burning truck.",
+      "task": "Carry Rudy and the wounded to the medical post at Ursynowska 46.",
+      "members": [
+        "Jeremi",
+        "Jurek TK"
+      ],
+      "notes": "A professional driver, Henryk Krajewski, was also in the car and is outside the 28/29 count.",
+      "sources": [
+        1,
+        2,
+        3
+      ]
+    }
+  ],
+  "timeline": [
+    {
+      "when": "1943-03-19",
+      "what": "In the night of 18/19 March the Gestapo arrest Henryk Ostrowski \"Heniek\"; his notes contain Rudy's address. (17/18 and 18 March are also given.)",
+      "sources": [
+        1,
+        3,
+        39
+      ]
+    },
+    {
+      "when": "1943-03-23T04:30",
+      "what": "Rudy and his father are arrested at their flat, al. Niepodległości 159, and taken to Pawiak, where the beating starts at once.",
+      "sources": [
+        1,
+        3,
+        10
+      ]
+    },
+    {
+      "when": "1943-03-23T10:00",
+      "what": "The search of the flat ends. The cellar yields stamps for painting the Fighting Poland anchor, underground papers and fuse cord.",
+      "sources": [
+        1,
+        3
+      ],
+      "approx": true
+    },
+    {
+      "when": "1943-03-23T12:00",
+      "what": "Rudy is taken to Gestapo headquarters at al. Szucha 25 and interrogated by Herbert Schulz and Ewald Lange.",
+      "sources": [
+        1,
+        10
+      ],
+      "approx": true
+    },
+    {
+      "when": "1943-03-23T17:00",
+      "what": "First attempt (\"Meksyk I\"): the unit is in position at the Arsenal but has no approval and is sent home. Minutes later news comes that Rudy is in the van, and it passes the crossroads.",
+      "sources": [
+        1,
+        3
+      ],
+      "approx": true
+    },
+    {
+      "when": "1943-03-25",
+      "what": "Rudy is interrogated again and taken to the Pawiak prison hospital with grave injuries.",
+      "sources": [
+        1,
+        3,
+        10
+      ]
+    },
+    {
+      "when": "1943-03-26T08:00",
+      "what": "Rudy is carried on a stretcher to the morning transport from Pawiak to Szucha.",
+      "sources": [
+        1,
+        3
+      ],
+      "approx": true
+    },
+    {
+      "when": "1943-03-26T13:45",
+      "what": "Helena Danielewicz \"Lola\" reports that Rudy was taken to Szucha that morning. The unit gathers on Plac Żelaznej Bramy.",
+      "sources": [
+        1,
+        3
+      ]
+    },
+    {
+      "when": "1943-03-26T15:00",
+      "what": "Final briefing, in Buzdygan's flat on ul. Wspólna.",
+      "sources": [
+        3
+      ]
+    },
+    {
+      "when": "1943-03-26T16:00",
+      "what": "Weapons issued. Marciniak, Orsza and Giewont wait on Plac Trzech Krzyży for the Kedyw commander, Jan Kiwerski \"Lipiński\".",
+      "sources": [
+        1,
+        3
+      ]
+    },
+    {
+      "when": "1943-03-26T16:45",
+      "what": "Orsza and Giewont stop waiting and leave for a shop on Świętokrzyska to wait for a phone call.",
+      "sources": [
+        1,
+        3
+      ]
+    },
+    {
+      "when": "1943-03-26T16:50",
+      "what": "Kiwerski arrives from a late train and approves the attack: \"Trzaskać!\" Marciniak phones the go-ahead.",
+      "sources": [
+        1,
+        3
+      ],
+      "approx": true
+    },
+    {
+      "when": "1943-03-26T16:55",
+      "what": "At Szucha, Zygmunt Kaczyński \"Wesoły\" sees Rudy carried to the truck and phones from inside the building: \"I am sending the goods; they must be collected without fail!\"",
+      "sources": [
+        1,
+        3,
+        37
+      ],
+      "approx": true
+    },
+    {
+      "when": "1943-03-26T17:00",
+      "what": "Orsza and Giewont reach the command post.",
+      "sources": [
+        3
+      ],
+      "approx": true
+    },
+    {
+      "when": "1943-03-26T17:20",
+      "what": "The signals section is told that the van has left Szucha with Rudy.",
+      "sources": [
+        1,
+        3
+      ]
+    },
+    {
+      "when": "1943-03-26T17:30",
+      "what": "The van comes up Bielańska from Plac Teatralny. Kadłubek bows, Kuba waves his cap and Orsza blows his whistle. Zośka shoots a Polish policeman at the corner; the driver swerves left, straight on along Długa. Petrol bottles set the cab on fire.",
+      "sources": [
+        1,
+        3
+      ]
+    },
+    {
+      "when": "1943-03-26T17:35",
+      "what": "The burning truck rolls on along Długa and stops beside or beyond the Arsenal. The scouts fight the two rear guards from under the Arsenal arcades, and Buzdygan is badly wounded. Zośka leads the rush, Kołczan opens the tailgate, and 21 prisoners are freed. Rudy and Buzdygan leave in the DKW.",
+      "sources": [
+        1,
+        3
+      ],
+      "approx": true
+    },
+    {
+      "when": "1943-03-26T17:45",
+      "what": "Orsza's whistle ends the action. The scouts withdraw on foot east along Długa.",
+      "sources": [
+        1,
+        3
+      ]
+    },
+    {
+      "when": "1943-03-26T17:50",
+      "what": "Germans in the Arbeitsamt (Długa 38/40) fire on the last group. Alek is shot in the stomach and throws grenades, and Hubert is seized at Długa 27.",
+      "sources": [
+        1,
+        3,
+        4
+      ],
+      "approx": true
+    },
+    {
+      "when": "1943-03-26T18:05",
+      "what": "German gendarmerie and police with dogs arrive, about 20 minutes after the end.",
+      "sources": [
+        1
+      ],
+      "approx": true
+    },
+    {
+      "when": "1943-03-27",
+      "what": "Reprisal: 140 prisoners of Pawiak, Poles and Jews, are shot in the prison courtyard.",
+      "sources": [
+        1,
+        6,
+        7,
+        9
+      ]
+    },
+    {
+      "when": "1943-03-30T16:30",
+      "what": "Rudy dies in the Wola Hospital, Płocka 26. Alek dies the same day in the Dzieciątka Jezus hospital.",
+      "sources": [
+        1,
+        10,
+        11
+      ],
+      "approx": true
+    },
+    {
+      "when": "1943-04-02",
+      "what": "Buzdygan dies of his wounds. Rudy is buried at Powązki Military Cemetery under the name Jan Domański.",
+      "sources": [
+        1,
+        10,
+        14
+      ]
+    },
+    {
+      "when": "1943-05-03",
+      "what": "Alek is awarded the Silver Cross of Virtuti Militari posthumously, and six scouts the Cross of Valour.",
+      "sources": [
+        1,
+        11
+      ]
+    },
+    {
+      "when": "1943-05-06",
+      "what": "Rudy's interrogator Herbert Schulz is shot on Polna Street.",
+      "sources": [
+        1
+      ]
+    },
+    {
+      "when": "1943-05-07",
+      "what": "Hubert Lenk is shot at Dzielna 21 (per the Pawiak Museum card index; older accounts say he died under interrogation in late March).",
+      "sources": [
+        4,
+        5,
+        15
+      ]
+    },
+    {
+      "when": "1943-05-22",
+      "what": "The second interrogator, Ewald Lange, is shot.",
+      "sources": [
+        1
+      ]
+    },
+    {
+      "when": "1943-07-18",
+      "what": "Edmund Sommer, who caught Hubert, is executed by Kedyw at Józefów station.",
+      "sources": [
+        1,
+        4
+      ]
+    },
+    {
+      "when": "1943-08-20",
+      "what": "Zośka is killed at Sieczychy (Operation Taśma).",
+      "sources": [
+        12
+      ]
+    },
+    {
+      "when": "1944-08",
+      "what": "Warsaw Uprising. Kołczan, Kuba, Giewont, Jurek TK, Sem, Słoń and Jeremi are killed or go missing. Orsza, head of the Grey Ranks since May 1943, fights and survives.",
+      "sources": [
+        13,
+        16,
+        20,
+        21,
+        22,
+        25,
+        33,
+        34
+      ],
+      "approx": true
+    },
+    {
+      "when": "1949-01-07",
+      "what": "Anoda dies during interrogation by the communist security service.",
+      "sources": [
+        17
+      ]
+    },
+    {
+      "when": "1957",
+      "what": "Broniewski publishes Pod Arsenałem, a full account of the action.",
+      "sources": [
+        1
+      ]
+    },
+    {
+      "when": "1968-03",
+      "what": "The present plaque is placed on the Arsenal. It gives the uncorrected figure of 25 prisoners.",
+      "sources": [
+        1
+      ]
+    },
+    {
+      "when": "1993-03-26",
+      "what": "The memorial stone in front of the Arsenal is unveiled for the 50th anniversary.",
+      "sources": [
+        1
+      ]
+    },
+    {
+      "when": "2000-12-30",
+      "what": "Orsza dies in Wesoła, aged 85.",
+      "sources": [
+        13
+      ]
+    },
+    {
+      "when": "2011-07-08",
+      "what": "Kazimierz Łodziński \"Kapsiut\", the last living participant, dies.",
+      "sources": [
+        1,
+        31
+      ]
+    }
+  ],
+  "numbers": {
+    "scouts": 28,
+    "scoutsAlt": 29,
+    "prisonersFreed": 21,
+    "prisonersFreedContemporaryClaim": 25,
+    "prisonersKilled": 1,
+    "prisonersWounded": 3,
+    "germanKilled": 4,
+    "germanWounded": 9,
+    "germanLossesAlt": {
+      "killed": 5,
+      "wounded": 4,
+      "source": 5
+    },
+    "scoutsMortallyWounded": 2,
+    "scoutsCapturedAndKilled": 1,
+    "reprisalShot": 140,
+    "participantsWhoSurvivedWar": 11,
+    "stens": 2,
+    "grenades": 4,
+    "truckEscort": 4,
+    "prisonersPerTransport": 20,
+    "_notes": {
+      "scouts": "28 is Broniewski's count (he commanded) [1][2][7]; 29 is Borkiewicz-Celińska's [3][1], adding Kazimierz Łodziński. The medical post and the second driver are not counted.",
+      "prisonersFreed": "21 is the corrected figure [1][6][7][8]. 25 was given in the Grey Ranks' report of 29 March 1943, the Biuletyn Informacyjny and the 1968 plaque [1][5]. It is not clear whether the prisoner killed, Halina Siemieńska, is inside the 21.",
+      "germanWounded": "The nine wounded include the truck driver and two Polish policemen [1].",
+      "prisonersPerTransport": "\"About 20\" [1]."
+    }
+  },
+  "geography": {
+    "frame": "Metres. x = east, y = north. Origin = where Bielańska's centreline meets Długa's centreline. Measured on today's OpenStreetMap geometry of the streets whose layout survives from before the war [50]. Buildings other than the Arsenal are gone, and anything marked estimate is a reading of the sources, not a survey.",
+    "streets": {
+      "dluga": {
+        "bearingDeg": {
+          "eastArm": 60,
+          "westArm": 240
+        },
+        "note": "Runs WSW–ENE. East leads to Plac Krasińskich and the Old Town; west runs along the Arsenal towards Przejazd, Tłomackie and the ghetto walls. In 1943 the roadway sloped down to the west [3].",
+        "centreline": [
+          [
+            237,
+            326
+          ],
+          [
+            192,
+            258
+          ],
+          [
+            170,
+            219
+          ],
+          [
+            154,
+            176
+          ],
+          [
+            144,
+            152
+          ],
+          [
+            127,
+            122
+          ],
+          [
+            99,
+            80
+          ],
+          [
+            86,
+            68
+          ],
+          [
+            57,
+            42
+          ],
+          [
+            37,
+            27
+          ],
+          [
+            16,
+            12
+          ],
+          [
+            0,
+            0
+          ],
+          [
+            -16,
+            -9
+          ],
+          [
+            -34,
+            -18
+          ],
+          [
+            -48,
+            -25
+          ],
+          [
+            -74,
+            -37
+          ],
+          [
+            -91,
+            -45
+          ]
+        ]
+      },
+      "bielanska": {
+        "bearingDeg": 330,
+        "note": "Comes in from the SSE. The last ~65 m is a straight cobbled stub; further south the street bends east-south-east towards Plac Teatralny, about 430 m in all [42].",
+        "centreline": [
+          [
+            31,
+            -58
+          ],
+          [
+            25,
+            -48
+          ],
+          [
+            6.5,
+            -12.3
+          ],
+          [
+            0,
+            0
+          ]
+        ]
+      },
+      "nalewki": {
+        "bearingDeg": 332,
+        "note": "Leaves Długa to the NNW, parallel to Bielańska, along the Arsenal's east wing. Narrow on this stretch. Old tram rails survive in its cobbles.",
+        "centreline": [
+          [
+            -34,
+            -18
+          ],
+          [
+            -38,
+            -12
+          ],
+          [
+            -50,
+            8
+          ],
+          [
+            -59,
+            24
+          ],
+          [
+            -82,
+            70
+          ],
+          [
+            -121,
+            146
+          ],
+          [
+            -155,
+            205
+          ]
+        ]
+      },
+      "offsetBielanskaToNalewkiM": 38.5,
+      "offsetNote": "Centreline to centreline along Długa (40 m from the Długa infobox [43]). The \"about 10 m\" in the literature [1] is far shorter; use the measured value."
+    },
+    "arsenal": {
+      "address": "Długa 52",
+      "use1943": "Municipal Archive of Warsaw (Archiwum Miejskie), converted from a prison in 1935–38; damaged in September 1939 [40][1].",
+      "footprintM": {
+        "alongDluga": 64,
+        "alongNalewki": 82
+      },
+      "corners": {
+        "SE": [
+          -52,
+          -7
+        ],
+        "NE": [
+          -84,
+          68
+        ],
+        "NW": [
+          -144,
+          43
+        ],
+        "SW": [
+          -110,
+          -33
+        ]
+      },
+      "features": [
+        "Arcaded pedestrian walkway, with a pavement, along the whole east wing on Nalewki (added 1935–38, not rebuilt after the war) [40][1]",
+        "Sgraffito of Władysław IV and Józef Piłsudski on the Nalewki wall [40]",
+        "Main arched gate on Długa, roughly mid-way along the front (estimate), with crossed timber beams in the passage in 1939 [52]",
+        "Set back from Długa behind a strip of lawn with trees, as the 1938 and 1939 photos show [53][52]. In today's geometry the Długa centreline runs about 20 m from the front",
+        "Inner courtyard [40]"
+      ]
+    },
+    "landmarks": [
+      {
+        "name": "Crossroads / command post / escape car",
+        "xy": [
+          0,
+          0
+        ],
+        "note": "The Długa–Bielańska junction [1][3]"
+      },
+      {
+        "name": "Nalewki meets Długa",
+        "xy": [
+          -34,
+          -18
+        ]
+      },
+      {
+        "name": "Pasaż Simonsa, burnt corner block (\"ruins\")",
+        "xy": [
+          -15,
+          15
+        ],
+        "estimate": true,
+        "note": "North of Długa, east of Nalewki. Bombed in 1939 and partly pulled down; a fragment stood along Nalewki [41][3]"
+      },
+      {
+        "name": "Butelki section",
+        "xy": [
+          -28,
+          -8
+        ],
+        "estimate": true
+      },
+      {
+        "name": "Sten I section",
+        "xy": [
+          -31,
+          -2
+        ],
+        "estimate": true
+      },
+      {
+        "name": "Sten II section",
+        "xy": [
+          -35,
+          4
+        ],
+        "estimate": true
+      },
+      {
+        "name": "Granaty section",
+        "xy": [
+          -39,
+          11
+        ],
+        "estimate": true
+      },
+      {
+        "name": "Truck's planned turn into Nalewki",
+        "xy": [
+          -34,
+          -18
+        ]
+      },
+      {
+        "name": "Where the truck stopped",
+        "xy": [
+          -90,
+          -44
+        ],
+        "estimate": true,
+        "note": "On Długa beside the Arsenal front, 30–60 m west of the SE corner (\"beyond the Arsenal\" or \"opposite the entrance\") [1]"
+      },
+      {
+        "name": "Memorial stone (1993)",
+        "xy": [
+          -53,
+          -12
+        ],
+        "note": "In front of the Arsenal's SE corner [50][1]"
+      },
+      {
+        "name": "Getto section",
+        "xy": [
+          -120,
+          -55
+        ],
+        "estimate": true,
+        "note": "Długa west of the Arsenal, towards Przejazd [1][3]"
+      },
+      {
+        "name": "Stare Miasto section",
+        "xy": [
+          45,
+          33
+        ],
+        "estimate": true,
+        "note": "Długa east of the crossroads [1][3]"
+      },
+      {
+        "name": "Długa 45, corner of Bielańska (south side)",
+        "xy": [
+          -12,
+          -22
+        ],
+        "estimate": true,
+        "note": "Tenements Długa 45–53 face the Arsenal [51]"
+      },
+      {
+        "name": "Bank Polski, Bielańska 10 (Kadłubek's post)",
+        "xy": [
+          245,
+          -117
+        ],
+        "note": "About 250–280 m from the crossroads [47][50]"
+      },
+      {
+        "name": "Arbeitsamt, Pałac pod Czterema Wiatrami, Długa 38/40",
+        "xy": [
+          105,
+          149
+        ],
+        "note": "About 150–180 m NE; the source of the fire that wounded Alek [48][1]"
+      },
+      {
+        "name": "Długa 27 (Hubert seized)",
+        "xy": [
+          163,
+          164
+        ],
+        "note": "About 210–230 m NE [15][50]"
+      },
+      {
+        "name": "Długa meets Miodowa and Plac Krasińskich",
+        "xy": [
+          237,
+          326
+        ],
+        "note": "About 400–410 m along Długa [43][50]"
+      },
+      {
+        "name": "Ghetto gate / barrier on Nalewki (Świętojerska)",
+        "xy": [
+          -213,
+          301
+        ],
+        "note": "About 330–370 m up Nalewki; marked by a 2008 ghetto-boundary memorial [44][50]"
+      }
+    ],
+    "light": {
+      "sunAltitudeDegAt1730": 3.4,
+      "sunAzimuthDegAt1730": 269,
+      "sunset": "17:58",
+      "civilDuskEnds": "18:33",
+      "timezone": "CET (UTC+1)",
+      "note": "Computed with a standard solar formula, not taken from a source. Eyewitness: \"it is starting to get grey\" [3][56]."
+    },
+    "tram": "Rails ran on Bielańska and Nalewki (from 1881), and a stretch survives on Stare Nalewki. Whether trams used the junction in March 1943 is not verified [49][45][54]."
+  },
+  "truck": {
+    "vehicle": "Renault truck with a tarpaulin cover, registration 72076",
+    "seating": "Prisoners on benches across the load bed, backs to the direction of travel; about 20 per transport",
+    "escort": "Four Gestapo men with handguns: two in the cab beside the driver, two in the back at the ends of the bench nearest the tailgate",
+    "driver": "SS-Unterscharführer Alfred Habicht (wounded)",
+    "schedule": "Pawiak to Szucha about 08:00, back about 17:00",
+    "route": [
+      "al. Szucha",
+      "pl. Na Rozdrożu",
+      "Al. Ujazdowskie",
+      "pl. Trzech Krzyży",
+      "Nowy Świat",
+      "Krakowskie Przedmieście",
+      "Królewska (or Ossolińskich)",
+      "pl. Piłsudskiego",
+      "Wierzbowa",
+      "pl. Teatralny",
+      "Bielańska",
+      "Długa",
+      "Nalewki",
+      "ghetto gate",
+      "Nalewki",
+      "Nowolipki",
+      "Karmelicka (or Zamenhofa)",
+      "Dzielna",
+      "Pawiak"
+    ],
+    "howStopped": "Bottles of petrol at the cab. The first missed, the second slid off, and the third (Bolec) broke the windscreen and set the cab alight. The driver slumped over the wheel and the two cab guards jumped out burning. The truck rolled on west along Długa instead of turning into Nalewki.",
+    "howOpened": "After a firefight with the two rear guards from the Arsenal arcades, Zośka led a rush. Kołczan opened the tailgate, and the prisoners got out; Rudy was carried to the DKW.",
+    "afterwards": "The Germans changed the vehicle type, strengthened the escort and varied the routes.",
+    "sources": [
+      1,
+      3
+    ]
+  }
+}

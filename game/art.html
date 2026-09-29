@@ -1,0 +1,21 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Minor Sabotage art lab</title>
+    <link rel="icon" href="data:," />
+    <style>
+      body { margin: 0; background: #2b2721; color: #e8e4d8; font: 13px/1.4 ui-monospace, Menlo, monospace; }
+      h2 { font-size: 14px; margin: 18px 12px 6px; color: #e8be46; }
+      .row { display: flex; flex-wrap: wrap; gap: 10px; align-items: flex-end; padding: 0 12px; }
+      figure { margin: 0; display: grid; gap: 3px; }
+      figcaption { font-size: 11px; color: #a9a397; max-width: 420px; }
+      canvas { image-rendering: pixelated; background: var(--bg, #6a6862); }
+    </style>
+  </head>
+  <body>
+    <div id="lab"></div>
+    <script type="module" src="./src/artlab/main.ts"></script>
+  </body>
+</html>

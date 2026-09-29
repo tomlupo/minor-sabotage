@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Minor Sabotage sound lab</title>
+    <link rel="icon" href="data:," />
+    <style>
+      body { margin: 0; background: #2b2721; color: #e8e4d8; font: 13px/1.4 ui-monospace, Menlo, monospace; }
+      h2 { font-size: 14px; margin: 16px 12px 6px; color: #e8be46; }
+      .row { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; padding: 0 12px; }
+      button {
+        font: inherit; color: #e8e4d8; background: #3d372e; border: 1px solid #5a5244;
+        border-radius: 4px; padding: 7px 10px; touch-action: manipulation;
+      }
+      button:active { background: #57503f; }
+      button.on { background: #6b5a2a; border-color: #e8be46; }
+      label { display: inline-flex; gap: 6px; align-items: center; color: #a9a397; }
+      input[type="range"] { width: 130px; }
+      #status { padding: 10px 12px 0; color: #a9a397; }
+      table { border-collapse: collapse; margin: 6px 12px 12px; font-size: 12px; }
+      th, td { padding: 2px 8px; text-align: right; border-bottom: 1px solid #3d372e; white-space: nowrap; }
+      th:first-child, td:first-child, th:nth-child(2), td:nth-child(2) { text-align: left; }
+      td.bad, .bad { color: #ff7b6b; }
+      .ok { color: #9fd37f; }
+      pre { margin: 6px 12px 24px; white-space: pre-wrap; }
+    </style>
+  </head>
+  <body>
+    <div id="lab"></div>
+    <script type="module" src="./src/audiolab/main.ts"></script>
+  </body>
+</html>
