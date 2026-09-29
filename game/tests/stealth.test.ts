@@ -594,6 +594,29 @@ describe("a man handed a job goes to it himself, and gets there", () => {
     expect(sim.state.vars.post_bank).toBe(true);
   }, 60_000);
 
+  it("a ring tapped, the squad nudged aside, then walked back: he goes on, the squad no longer taking him", () => {
+    // review round 17: the squad's mark on his job was never cleared, and a later walk away called
+    // him back after the squad had been sent elsewhere
+    const { sim, phase, sq, id } = setup(signalTask);
+    blind(sim);
+    const kadlubek = id((t) => t === "kadlubek");
+    const bank = phase.interactables(sim).find((i) => i.id === "bank")!;
+    bank.act(sim);
+    wait(sim, 1.5);
+    const L = sim.leaderOf(sq)!;
+    const ahead = Math.atan2(bank.y - L.y, bank.x - L.x);
+    // a nudge too short to judge: the squad goes there, not with him
+    const nudge = spotFrom(sim, L.x, L.y, 4.5, ahead + Math.PI / 2);
+    cmdMove(sim, nudge.x, nudge.y);
+    wait(sim, 1.5);
+    const l = sim.unit(L.id)!;
+    const back = spotFrom(sim, l.x, l.y, 8, ahead + Math.PI);
+    cmdMove(sim, back.x, back.y);
+    expect(sim.unit(kadlubek)!.task?.kind, "his job kept").toBe("work");
+    for (let n = 0; n < 120 && sim.state.vars.post_bank !== true; n++) wait(sim, 0.5);
+    expect(sim.state.vars.post_bank).toBe(true);
+  }, 60_000);
+
   it("a man sent alone keeps his job when the squad walks away from it", () => {
     // cmdPick: he "works alone until his tag is tapped again" (review round 16: a walk of the squad
     // dropped his job too)
@@ -668,9 +691,9 @@ describe("a man handed a job goes to it himself, and gets there", () => {
 
   for (const seed of [5, 10, 13, 28, 29]) {
     it(`Stare Miasto: the rotor-arm ring tapped, then a knife on the Schupo coming by: the man with the arm gets past the squad to the truck (seed ${seed})`, () => {
-      // review round 16: he stood 2 to 4 m short of the bonnet among the men settling round the
-      // leader in the passage, and neither a second tap on the ring nor picking him moved him. His
-      // own men without a job make way for him now (move.ts separate)
+      // review round 16: let go by the column among the men settling round the leader in the passage,
+      // he stood 2 to 4 m short of the bonnet, and neither a second tap on the ring nor picking him
+      // moved him (the column carries nobody now)
       const { sim, phase, sq } = setup(oldtownTask, seed);
       for (let k = 0; k < 400 && sim.state.vars.phase !== "unloading"; k++) wait(sim, 0.5);
       blind(sim);

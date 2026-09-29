@@ -13,8 +13,7 @@ export type Glyph = "none" | "alert" | "suspicious" | "wounded" | "knife";
 export type UnitTask =
   | { kind: "knife"; target: number; t: number; phase: "approach" | "strike" }
   | { kind: "throw"; what: "grenade" | "bottle"; x: number; y: number; t: number; phase: "approach" | "wind"; veh?: number }
-  // escort: the squad was sent along with him (cmdWork), and a walk of it away from the job calls him back
-  | { kind: "work"; what: string; ref: string; x: number; y: number; t: number; dur: number; phase: "approach" | "work"; escort?: boolean }
+  | { kind: "work"; what: string; ref: string; x: number; y: number; t: number; dur: number; phase: "approach" | "work" }
   | { kind: "help"; target: number; t: number; phase: "approach" | "work" };
 
 export type AiMode = "post" | "patrol" | "suspicious" | "search" | "alert" | "flee" | "crew" | "idle";

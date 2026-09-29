@@ -311,7 +311,11 @@ export function finale(md: MapData, c: Campaign): Phase {
         guard(sim, BIEL.w + 1, 150, -Math.PI / 2, { district: D_SOUTH, tag: "south" });
         guard(sim, BIEL.e - 1, 156, -Math.PI / 2, { district: D_SOUTH, tag: "south", look: "de_mp40" });
       }
-      objective(sim, "stop", "Stop the van at the bend", true);
+      // the bend, ringed, with an arrow when it is off the screen (Tom, on the preview: "dont reealy
+      // know where is it, the other places where easier to spot"; this one had no mark at all). On
+      // its north pavement: from where the camera looks, the south side's roofs hide the street's middle
+      const bend = zone(md, "bend");
+      objective(sim, "stop", "Stop the van at the bend", true, bend.x + bend.w / 2, DLUGA.n + 1.5);
       objective(sim, "tailgate", "Open the tailgate", true);
       objective(sim, "rudy", "Get Rudy into the DKW", true);
       objective(sim, "escape", "The DKW gets away along Długa", true);

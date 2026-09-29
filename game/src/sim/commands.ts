@@ -5,7 +5,7 @@ import type { Sim } from "./sim";
 import type { Squad, Unit } from "./types";
 import { UF_POSTED } from "./types";
 import { goTo } from "./move";
-import { WORK_DETACH } from "./tasks";
+import { farFromJob } from "./tasks";
 import { THROW } from "./tuning";
 
 /** The man picked on the portrait strip, while he can still act for the squad you lead. */
@@ -57,16 +57,18 @@ export function cmdMove(sim: Sim, x: number, y: number): boolean {
   const L = actorOf(sim);
   if (!L) return false;
   if (L.task && L.task.kind !== "help") L.task = null;
-  // a walk of the squad away from a job it was taking a man to calls him back, and he drops it (review
-  // round 15: the squad turned back and he walked on alone, into the cones). Walking towards the job,
-  // sent alone, or within reach of it, he carries on (round 16: a drag, a walk after another from
-  // under the finger, dropped the job at its first touch; a walk, the job of a man sent alone)
-  if (!pickedOf(sim)) {
+  // a walk of the squad that does not take it toward a job it is bound for with a man calls him back,
+  // and he drops it (review round 15: the squad turned back and he walked on alone, into the cones;
+  // round 17: turned aside too). A man the squad is not bound for his job with carries on: sent alone,
+  // or the squad sent elsewhere since (round 17); so does one within reach of his job; and a walk
+  // ending near the leader, as a drag's first touches do, is not judged (round 16: a drag dropped
+  // the job at its first touch)
+  if (!pickedOf(sim) && Math.hypot(x - L.x, y - L.y) > 5) {
     for (const u of sim.membersOf(sq)) {
       const t = u.task;
-      if (u === L || t?.kind !== "work" || !t.escort || t.phase !== "approach") continue;
-      const away = Math.hypot(x - t.x, y - t.y) > Math.hypot(L.x - t.x, L.y - t.y) + 2;
-      if (away && Math.hypot(u.x - t.x, u.y - t.y) > WORK_DETACH) u.task = null;
+      if (t?.kind !== "work" || !farFromJob(u)) continue;
+      const bound = Math.hypot(L.goalX - t.x, L.goalY - t.y) <= 4.5;
+      if (bound && Math.hypot(x - t.x, y - t.y) > Math.hypot(L.x - t.x, L.y - t.y) - 3) u.task = null;
     }
   }
   // a new walk cancels the squad's lock-on only if it was on something now out of sight
@@ -182,9 +184,7 @@ export function cmdWork(sim: Sim, x: number, y: number, what: string, ref: strin
   // off his own errand)
   const L = sim.leaderOf(sq);
   const columnFree = !!L && sim.state.picked !== L.id && !L.task && !(L.flags & UF_POSTED);
-  const escorted = columnFree && L !== best && best.id !== sim.state.picked;
-  if (best.task?.kind === "work") best.task.escort = escorted;
-  if (L && escorted) {
+  if (L && columnFree && L !== best && best.id !== sim.state.picked) {
     const d = Math.hypot(x - L.x, y - L.y);
     if (d > 4) goTo(sim, L, x - ((x - L.x) / d) * 3, y - ((y - L.y) / d) * 3);
   }

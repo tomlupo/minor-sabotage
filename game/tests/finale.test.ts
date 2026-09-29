@@ -3,7 +3,7 @@
 // won end to end, and that a van left alone gets away.
 import { describe, expect, it } from "vitest";
 import { buildArsenalMap } from "../src/content/arsenal/map";
-import { gridFromMap } from "../src/content/mapdata";
+import { gridFromMap, inZone, zone } from "../src/content/mapdata";
 import { Sim } from "../src/sim/sim";
 import { newCampaign } from "../src/missions/campaign";
 import { finale, PRISONERS } from "../src/missions/finale";
@@ -139,6 +139,13 @@ describe("finale", () => {
       step(sim, 3);
       expect(sim.state.vars.r_south === true, `${tasks}: by 41.5 s`).toBe(blown);
     }
+  });
+
+  it("the bend where the van is to be stopped is ringed", () => {
+    // Tom, on the preview: "dont reealy know where is it" (the finale's first objective had no mark)
+    const { sim, md } = setup("signal,line,post,truck");
+    const o = sim.state.objectives.find((q) => q.id === "stop")!;
+    expect(o.x !== undefined && o.y !== undefined && inZone(zone(md, "bend"), o.x, o.y), "a place at the bend").toBe(true);
   });
 
   it("without the signal the van comes on its own", () => {

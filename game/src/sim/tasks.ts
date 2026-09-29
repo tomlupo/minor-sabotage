@@ -10,11 +10,20 @@ import { KNIFE, THROW, WOUND } from "./tuning";
  *  away from the job leaves him to it. */
 export const WORK_DETACH = 7;
 
+/** On his way to his job, not yet at work on it. */
+export function toJob(u: Unit): boolean {
+  return u.task?.kind === "work" && u.task.phase === "approach";
+}
+
+/** On his way to a job still far off. */
+export function farFromJob(u: Unit): boolean {
+  const t = u.task;
+  return t?.kind === "work" && t.phase === "approach" && Math.hypot(t.x - u.x, t.y - u.y) > WORK_DETACH;
+}
+
 /** A man at his task does not fight; one still walking to a job far off does. */
 export function atTask(u: Unit): boolean {
-  const t = u.task;
-  if (!t) return false;
-  return !(t.kind === "work" && t.phase === "approach" && Math.hypot(t.x - u.x, t.y - u.y) > WORK_DETACH);
+  return !!u.task && !farFromJob(u);
 }
 
 export function stepTasks(sim: Sim, dt: number): void {
