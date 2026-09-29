@@ -6,7 +6,6 @@ import type { Squad, Unit } from "./types";
 import { UF_POSTED } from "./types";
 import type { Pt } from "./path";
 import { SPEED, SQUAD, UNIT_RADIUS } from "./tuning";
-import { carriedToJob } from "./tasks";
 import { F_VEH, F_WALK } from "./grid";
 
 const TRAIL_MAX = 80;
@@ -222,6 +221,18 @@ export function stepMovement(sim: Sim, dt: number): void {
 }
 
 /** Soft personal space so a squad never stacks into one sprite. */
+/** On his way to his job: his own men without one make way for him, all but the leader, whom the
+ *  squad forms up round (shoved, he would drag it after him). */
+function toJob(u: Unit): boolean {
+  return u.task?.kind === "work" && u.task.phase === "approach";
+}
+
+function makesWay(sim: Sim, u: Unit): boolean {
+  if (u.task || u.state !== "ok") return false;
+  const sq = sim.squad(u.squad);
+  return !!sq && sim.leaderOf(sq) !== u;
+}
+
 function separate(sim: Sim): void {
   const G = sim.grid;
   const us = sim.state.units;
@@ -240,8 +251,15 @@ function separate(sim: Sim): void {
       const nx = d > 1e-4 ? dx / d : 1, ny = d > 1e-4 ? dy / d : 0;
       // the one standing still gives way less; nobody is pushed into a fire's harm (a man
       // walking out of one would be pushed back in as fast as he walked)
-      const wa = a.state !== "ok" ? 0 : a.moving ? 0.5 : 0.35;
-      const wb = b.state !== "ok" ? 0 : b.moving ? 0.5 : 0.35;
+      let wa = a.state !== "ok" ? 0 : a.moving ? 0.5 : 0.35;
+      let wb = b.state !== "ok" ? 0 : b.moving ? 0.5 : 0.35;
+      // a man on his way to his job does not stand aside for his own men without one: they make
+      // way, and stand aside a moment before the column takes them back (review round 16: bound
+      // for the truck's bonnet, he stood for good among the men settling round the leader)
+      if (a.side === b.side && a.squad === b.squad && a.squad >= 0) {
+        if (toJob(a) && makesWay(sim, b)) { wa = 0; b.yieldUntil = sim.state.time + 1; }
+        else if (toJob(b) && makesWay(sim, a)) { wb = 0; a.yieldUntil = sim.state.time + 1; }
+      }
       const tot = wa + wb || 1;
       const ax = a.x - nx * push * (wa / tot) * 2, ay = a.y - ny * push * (wa / tot) * 2;
       const bx = b.x + nx * push * (wb / tot) * 2, by = b.y + ny * push * (wb / tot) * 2;
@@ -301,10 +319,11 @@ export function restSlots(sim: Sim, x: number, y: number, dir: number, n: number
   return out;
 }
 
-function busy(sim: Sim, u: Unit): boolean {
-  // a man with a task goes about it, unless the column is carrying him to his job; a man at his
+function busy(u: Unit): boolean {
+  // a man with a task goes about it, a man at his job walking to it himself (review round 16: the
+  // column carried him there, and each way it could stop or turn left him standing); a man at his
   // post holds it, and does not walk back into the column until he is sent
-  return (!!u.task && !carriedToJob(sim, u)) || (u.flags & UF_POSTED) !== 0;
+  return !!u.task || (u.flags & UF_POSTED) !== 0;
 }
 
 export function stepSquads(sim: Sim, dt: number): void {
@@ -333,7 +352,7 @@ export function stepSquads(sim: Sim, dt: number): void {
     const slots = moving ? null : restSlots(sim, sq.restX, sq.restY, sq.restDir, followers.length);
     followers.forEach((u, k) => {
       // the man picked on the strip goes where he is sent, not back into the column
-      if (busy(sim, u) || u.yieldUntil > s.time || u.id === s.picked) return;
+      if (busy(u) || u.yieldUntil > s.time || u.id === s.picked) return;
       const target = moving ? trailPoint(sq, L, SQUAD.spacing * (k + 1)) : slots![k];
       const d = Math.hypot(target.x - u.x, target.y - u.y);
       if (d < (moving ? 0.35 : 0.25)) { if (!moving) u.path = []; return; }

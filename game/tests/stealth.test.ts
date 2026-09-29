@@ -420,9 +420,11 @@ describe("stealth and fire", () => {
   }, 60_000);
 });
 
-describe("a man handed a job gets there, whether the column goes with him or not", () => {
-  // review round 14: with the leader picked, a ring tapped for another man left him standing,
-  // waiting for a column that never came; and a ring tapped for one man sent the leader off his own
+describe("a man handed a job goes to it himself, and gets there", () => {
+  // the column carried a man to his job, and each way it could stop or turn left him standing or
+  // lost the job: its leader picked (review round 14), halted or sent elsewhere (15), a walk of the
+  // squad dropping the job of a man sent alone, or a drag, one walk after another (16). He walks to
+  // it himself now, the squad going along, and his tag tapped twice calls him back
   it("the leader picked and sent to a post, a ring tapped for another man: each gets to his own", () => {
     const { sim, phase, sq } = setup(signalTask);
     blind(sim);
@@ -479,45 +481,6 @@ describe("a man handed a job gets there, whether the column goes with him or not
     expect(Math.hypot(g.x - post.x, g.y - post.y)).toBeLessThan(1);
   }, 60_000);
 
-  it("the leader picked and on his way to a job of his own, a job beside it tapped for another man: he sets off at once, alone", () => {
-    // the column stays where it rested while its leader is picked, though its leader walks to a job
-    // by the other man's
-    const { sim, sq } = setup(signalTask);
-    blind(sim);
-    const L = sim.leaderOf(sq)!;
-    cmdPick(sim, L.id);
-    const a = spotFrom(sim, L.x, L.y, 20);
-    expect(cmdWork(sim, a.x, a.y, "errand", "errand", 30)).toBe(L);
-    wait(sim, 0.5);
-    const b = spotFrom(sim, a.x, a.y, 4);
-    const man = cmdWork(sim, b.x, b.y, "test", "test", 1)!;
-    expect(man.id).not.toBe(L.id);
-    const d0 = Math.hypot(man.x - b.x, man.y - b.y);
-    wait(sim, 3);
-    const m = sim.unit(man.id)!;
-    expect(d0 - Math.hypot(m.x - b.x, m.y - b.y), `${man.tag} on his way at once`).toBeGreaterThan(4);
-    for (let n = 0; n < 60 && sim.unit(man.id)!.task; n++) wait(sim, 0.5);
-    expect(sim.unit(man.id)!.task, `${man.tag} did it`).toBeNull();
-  });
-
-  it("a job tapped, then another the other way: the first man makes for his own, not along with the column", () => {
-    // the column goes with the second man now, and carries only a man whose job it walks to
-    const { sim, sq } = setup(signalTask);
-    blind(sim);
-    const L = sim.leaderOf(sq)!;
-    const a = spotFrom(sim, L.x, L.y, 20);
-    const x = cmdWork(sim, a.x, a.y, "test_a", "test_a", 1, (u) => (u === L ? -100 : 0))!;
-    wait(sim, 0.5);
-    const b = spotFrom(sim, L.x, L.y, 20, Math.atan2(a.y - L.y, a.x - L.x) + Math.PI);
-    const y = cmdWork(sim, b.x, b.y, "test_b", "test_b", 1, (u) => (u === L ? -100 : 0))!;
-    expect([x.id, y.id]).not.toContain(L.id);
-    expect(y.id).not.toBe(x.id);
-    const d0 = Math.hypot(sim.unit(x.id)!.x - a.x, sim.unit(x.id)!.y - a.y);
-    wait(sim, 3);
-    const m = sim.unit(x.id)!;
-    expect(d0 - Math.hypot(m.x - a.x, m.y - a.y), `${x.tag} making for his own job`).toBeGreaterThan(4);
-  });
-
   it("another man's job tapped again once the picked leader is done with his own: the man goes on, the leader stays", () => {
     // cmdWork's "tapped again: the squad sets off again", but not a squad whose leader is picked
     const { sim, sq } = setup(signalTask);
@@ -537,39 +500,142 @@ describe("a man handed a job gets there, whether the column goes with him or not
     expect(Math.hypot(sim.unit(L.id)!.goalX - goal.x, sim.unit(L.id)!.goalY - goal.y), "the leader sent nowhere").toBeLessThan(0.01);
   });
 
-  it("a ring tapped, then the street: the man on his way to that job far off comes along with the squad", () => {
+  it("a job tapped, then another the other way: the first man makes for his own at once, not along with the column", () => {
+    const { sim, sq } = setup(signalTask);
+    blind(sim);
+    const L = sim.leaderOf(sq)!;
+    const a = spotFrom(sim, L.x, L.y, 20);
+    const x = cmdWork(sim, a.x, a.y, "test_a", "test_a", 1, (u) => (u === L ? -100 : 0))!;
+    wait(sim, 0.5);
+    const b = spotFrom(sim, L.x, L.y, 20, Math.atan2(a.y - L.y, a.x - L.x) + Math.PI);
+    const y = cmdWork(sim, b.x, b.y, "test_b", "test_b", 1, (u) => (u === L ? -100 : 0))!;
+    expect([x.id, y.id]).not.toContain(L.id);
+    expect(y.id).not.toBe(x.id);
+    const d0 = Math.hypot(sim.unit(x.id)!.x - a.x, sim.unit(x.id)!.y - a.y);
+    wait(sim, 3);
+    const m = sim.unit(x.id)!;
+    expect(d0 - Math.hypot(m.x - a.x, m.y - a.y), `${x.tag} making for his own job`).toBeGreaterThan(4);
+  });
+
+  it("a ring tapped, then a drag toward it or the street beside it: the man goes on with his job", () => {
+    // review round 16: a drag, a walk after another from under the finger, dropped the job at its
+    // first touch
+    const { sim, phase, sq, id } = setup(signalTask);
+    blind(sim);
+    const kadlubek = id((t) => t === "kadlubek");
+    const bank = phase.interactables(sim).find((i) => i.id === "bank")!;
+    bank.act(sim);
+    wait(sim, 1);
+    const L = sim.leaderOf(sq)!;
+    // a drag from the leader toward the bank
+    for (let k = 0; k <= 10; k++) {
+      const l = sim.unit(L.id)!;
+      cmdMove(sim, l.x + (bank.x - l.x) * 0.05 * k, l.y + (bank.y - l.y) * 0.05 * k);
+      wait(sim, 0.1);
+    }
+    // and the street beside the bank
+    const by = spotFrom(sim, bank.x, bank.y, 9);
+    cmdMove(sim, by.x, by.y);
+    expect(sim.unit(kadlubek)!.task?.kind, "his job kept").toBe("work");
+    for (let n = 0; n < 120 && sim.state.vars.post_bank !== true; n++) wait(sim, 0.5);
+    expect(sim.state.vars.post_bank).toBe(true);
+  }, 60_000);
+
+  it("a ring tapped, then the street away from it: the man the squad was taking comes back with it", () => {
     // review round 15: the squad turned back and he walked on alone, into the cones
     const { sim, phase, sq, id } = setup(signalTask);
     blind(sim);
-    const L = sim.leaderOf(sq)!;
-    const home = { x: L.x, y: L.y };
     const kadlubek = id((t) => t === "kadlubek");
-    phase.interactables(sim).find((i) => i.id === "bank")!.act(sim);
-    expect(sim.unit(kadlubek)!.task?.kind).toBe("work");
+    const bank = phase.interactables(sim).find((i) => i.id === "bank")!;
+    bank.act(sim);
     wait(sim, 2);
-    cmdMove(sim, home.x, home.y);
-    expect(sim.unit(kadlubek)!.task, "his far-off job dropped").toBeNull();
-    wait(sim, 20);
+    const L = sim.leaderOf(sq)!;
+    const back = spotFrom(sim, L.x, L.y, 8, Math.atan2(L.y - bank.y, L.x - bank.x));
+    cmdMove(sim, back.x, back.y);
+    expect(sim.unit(kadlubek)!.task, "his job dropped").toBeNull();
+    wait(sim, 15);
     expect(sim.state.vars.post_bank).not.toBe(true);
     const k = sim.unit(kadlubek)!, l = sim.unit(L.id)!;
     expect(Math.hypot(k.x - l.x, k.y - l.y), "with the squad").toBeLessThan(6);
   });
 
-  it("a ring tapped, then the squad halted on its way: the man goes on to his job alone", () => {
-    // review round 15: the column halted short of the job (a knife order halts all but men with a
-    // task, cmdTapEnemy) and held him at his place in it until the next order
-    const { sim, phase, sq } = setup(signalTask);
+  it("a man picked and walking elsewhere, handed a job, turns for it at once", () => {
+    // he finished the walk first: a man handed a job was bound for wherever he last was
+    const { sim, sq } = setup(signalTask);
     blind(sim);
-    phase.interactables(sim).find((i) => i.id === "bank")!.act(sim);
+    const L = sim.leaderOf(sq)!;
+    const man = sim.membersOf(sq).find((u) => u !== L)!;
+    cmdPick(sim, man.id);
+    const off = spotFrom(sim, man.x, man.y, 20);
+    cmdMove(sim, off.x, off.y);
+    wait(sim, 1);
+    const m0 = sim.unit(man.id)!;
+    const job = spotFrom(sim, m0.x, m0.y, 12, Math.atan2(m0.y - off.y, m0.x - off.x));
+    expect(cmdWork(sim, job.x, job.y, "test", "test", 1)).toBe(m0);
+    const d0 = Math.hypot(m0.x - job.x, m0.y - job.y);
     wait(sim, 2);
-    for (const u of sim.membersOf(sq)) if (!u.task) u.path = [];
+    const m = sim.unit(man.id)!;
+    expect(d0 - Math.hypot(m.x - job.x, m.y - job.y), "turned for the job").toBeGreaterThan(3);
+  });
+
+  it("a man within reach of his job finishes it, though the squad walks away", () => {
+    const { sim, phase, sq, id } = setup(signalTask);
+    blind(sim);
+    const kadlubek = id((t) => t === "kadlubek");
+    const bank = phase.interactables(sim).find((i) => i.id === "bank")!;
+    bank.act(sim);
+    const near = () => Math.hypot(sim.unit(kadlubek)!.x - bank.x, sim.unit(kadlubek)!.y - bank.y) < 6;
+    for (let n = 0; n < 240 && !near(); n++) wait(sim, 0.25);
+    expect(near()).toBe(true);
+    const L = sim.leaderOf(sq)!;
+    const back = spotFrom(sim, L.x, L.y, 8, Math.atan2(L.y - bank.y, L.x - bank.x));
+    cmdMove(sim, back.x, back.y);
+    for (let n = 0; n < 40 && sim.state.vars.post_bank !== true; n++) wait(sim, 0.5);
+    expect(sim.state.vars.post_bank).toBe(true);
+  }, 60_000);
+
+  it("a man sent alone keeps his job when the squad walks away from it", () => {
+    // cmdPick: he "works alone until his tag is tapped again" (review round 16: a walk of the squad
+    // dropped his job too)
+    const { sim, phase, sq, id } = setup(signalTask);
+    blind(sim);
+    const kadlubek = id((t) => t === "kadlubek");
+    const bank = phase.interactables(sim).find((i) => i.id === "bank")!;
+    cmdPick(sim, kadlubek);
+    bank.act(sim);
+    wait(sim, 1);
+    // another man's tag tapped twice: nobody picked, so the street walks the squad
+    const jur = id((t) => t === "jur");
+    cmdPick(sim, jur);
+    cmdPick(sim, jur);
+    const L = sim.leaderOf(sq)!;
+    const back = spotFrom(sim, L.x, L.y, 8, Math.atan2(L.y - bank.y, L.x - bank.x));
+    cmdMove(sim, back.x, back.y);
+    expect(sim.unit(kadlubek)!.task?.kind, "his job kept").toBe("work");
     for (let n = 0; n < 120 && sim.state.vars.post_bank !== true; n++) wait(sim, 0.5);
     expect(sim.state.vars.post_bank).toBe(true);
   }, 60_000);
 
-  it("the column leaves a man alone once it is not carrying him: he is routed to his job once, not every tick", () => {
-    // left in the column's hands, the column and the job each sent him their own way every tick, a
-    // route search a tick for each such man (round 15)
+  it("a ring tapped, then his tag tapped twice: he drops the job and comes back to the squad", () => {
+    // cmdPick, and the hint: "Tap a man's tag to send him alone. Tap it again to call him back."
+    const { sim, phase, sq, id } = setup(signalTask);
+    blind(sim);
+    const kadlubek = id((t) => t === "kadlubek");
+    phase.interactables(sim).find((i) => i.id === "bank")!.act(sim);
+    wait(sim, 3);
+    cmdPick(sim, kadlubek);
+    cmdPick(sim, kadlubek);
+    expect(sim.unit(kadlubek)!.task, "called back").toBeNull();
+    wait(sim, 15);
+    expect(sim.state.vars.post_bank).not.toBe(true);
+    const k = sim.unit(kadlubek)!, l = sim.leaderOf(sq)!;
+    expect(Math.hypot(k.x - l.x, k.y - l.y), "back with the squad").toBeLessThan(6);
+  }, 60_000);
+
+  it("a ring tapped, then the squad halted on its way: the man goes on to his job, routed once, not every tick", () => {
+    // review round 15: the column halted short of the job (a knife order halts all but men with a
+    // task, cmdTapEnemy) and held him at his place in it; the column and the job each sent him their
+    // own way every tick, a route search a tick
     const { sim, phase, sq } = setup(signalTask);
     blind(sim);
     phase.interactables(sim).find((i) => i.id === "bank")!.act(sim);
@@ -600,24 +666,26 @@ describe("a man handed a job gets there, whether the column goes with him or not
     expect(sim.unit(man.id)!.task, `${man.tag} cut it`).toBeNull();
   }, 60_000);
 
-  it("a man picked on the strip walks to his job himself at once, though the column is on its way to one beside it", () => {
-    // the column does not carry a picked man: he waited for it to arrive
-    const { sim, sq } = setup(signalTask);
-    blind(sim);
-    const L = sim.leaderOf(sq)!;
-    const a = spotFrom(sim, L.x, L.y, 20);
-    const x = cmdWork(sim, a.x, a.y, "test_a", "test_a", 1, (u) => (u === L ? -100 : 0))!;
-    expect(x.id).not.toBe(L.id);
-    wait(sim, 0.5);
-    const man = sim.membersOf(sq).find((u) => u !== L && u !== x && !u.task)!;
-    cmdPick(sim, man.id);
-    const b = spotFrom(sim, a.x, a.y, 2);
-    expect(cmdWork(sim, b.x, b.y, "test_b", "test_b", 1)).toBe(sim.unit(man.id));
-    const d0 = Math.hypot(man.x - b.x, man.y - b.y);
-    wait(sim, 3);
-    const m = sim.unit(man.id)!;
-    expect(d0 - Math.hypot(m.x - b.x, m.y - b.y), `${man.tag} on his way at once`).toBeGreaterThan(4);
-    for (let n = 0; n < 60 && sim.unit(man.id)!.task; n++) wait(sim, 0.5);
-    expect(sim.unit(man.id)!.task).toBeNull();
-  });
+  for (const seed of [5, 10, 13, 28, 29]) {
+    it(`Stare Miasto: the rotor-arm ring tapped, then a knife on the Schupo coming by: the man with the arm gets past the squad to the truck (seed ${seed})`, () => {
+      // review round 16: he stood 2 to 4 m short of the bonnet among the men settling round the
+      // leader in the passage, and neither a second tap on the ring nor picking him moved him. His
+      // own men without a job make way for him now (move.ts separate)
+      const { sim, phase, sq } = setup(oldtownTask, seed);
+      for (let k = 0; k < 400 && sim.state.vars.phase !== "unloading"; k++) wait(sim, 0.5);
+      blind(sim);
+      phase.interactables(sim).find((i) => i.id === "disable_truck")!.act(sim);
+      // the first German within 13 m of a man without a job is tapped: the nearest such man knifes him
+      let tap = "";
+      for (let k = 0; k < 90 * 30 && !tap; k++) {
+        wait(sim, 1 / 30);
+        blind(sim);
+        const g = sim.state.units.find((q) => q.side === "de" && q.state === "ok" && !q.hidden && sim.membersOf(sq).some((u) => u.state === "ok" && !u.task && Math.hypot(u.x - q.x, u.y - q.y) <= 13));
+        if (g) { g.ai!.blind = false; tap = cmdTapEnemy(sim, g.id); }
+      }
+      expect(tap, "a knife given").toBe("knife");
+      for (let k = 0; k < 60 && sim.state.vars.truckDisabled !== true; k++) { blind(sim); wait(sim, 0.5); }
+      expect(sim.state.vars.truckDisabled, "the rotor arm pulled").toBe(true);
+    }, 60_000);
+  }
 });

@@ -5,7 +5,7 @@ import type { Sim } from "./sim";
 import type { Squad, Unit } from "./types";
 import { UF_POSTED } from "./types";
 import { goTo } from "./move";
-import { farFromJob } from "./tasks";
+import { WORK_DETACH } from "./tasks";
 import { THROW } from "./tuning";
 
 /** The man picked on the portrait strip, while he can still act for the squad you lead. */
@@ -23,9 +23,12 @@ export function cmdPick(sim: Sim, id: number): boolean {
   const s = sim.state;
   if (s.picked === id) {
     s.picked = -1;
-    // tapped again he rejoins the column, from his post too
+    // tapped again he rejoins the column, from his post or his job ("Tap it again to call him back")
     const was = sim.unit(id);
-    if (was) was.flags &= ~UF_POSTED;
+    if (was) {
+      was.flags &= ~UF_POSTED;
+      if (was.task?.kind === "work") was.task = null;
+    }
     return false;
   }
   const u = sim.unit(id);
@@ -54,9 +57,18 @@ export function cmdMove(sim: Sim, x: number, y: number): boolean {
   const L = actorOf(sim);
   if (!L) return false;
   if (L.task && L.task.kind !== "help") L.task = null;
-  // the squad walks as one: a man on his way to a job far off drops it and comes along, and one
-  // within reach of his job finishes it (review round 15: he walked on alone, into the cones)
-  if (!pickedOf(sim)) for (const u of sim.membersOf(sq)) if (farFromJob(u)) u.task = null;
+  // a walk of the squad away from a job it was taking a man to calls him back, and he drops it (review
+  // round 15: the squad turned back and he walked on alone, into the cones). Walking towards the job,
+  // sent alone, or within reach of it, he carries on (round 16: a drag, a walk after another from
+  // under the finger, dropped the job at its first touch; a walk, the job of a man sent alone)
+  if (!pickedOf(sim)) {
+    for (const u of sim.membersOf(sq)) {
+      const t = u.task;
+      if (u === L || t?.kind !== "work" || !t.escort || t.phase !== "approach") continue;
+      const away = Math.hypot(x - t.x, y - t.y) > Math.hypot(L.x - t.x, L.y - t.y) + 2;
+      if (away && Math.hypot(u.x - t.x, u.y - t.y) > WORK_DETACH) u.task = null;
+    }
+  }
   // a new walk cancels the squad's lock-on only if it was on something now out of sight
   return goTo(sim, L, x, y);
 }
@@ -164,13 +176,15 @@ export function cmdWork(sim: Sim, x: number, y: number, what: string, ref: strin
     // given a job, he has left his post
     best.flags &= ~UF_POSTED;
   }
-  // the squad goes with him (it moves as one) and he detaches for the last few metres; a man
-  // picked on the strip goes alone, and the squad stays. So it does while its leader is picked, at
-  // a job of his own or at his post, and the man walks there alone (review round 14: a ring tapped
-  // for one man sent the picked leader 20 m off his own errand)
+  // the squad goes along (it moves as one), and he walks to the job himself; a man picked on the
+  // strip goes alone, and the squad stays. So it does while its leader is picked, at a job of his
+  // own or at his post (review round 14: a ring tapped for one man sent the picked leader 20 m
+  // off his own errand)
   const L = sim.leaderOf(sq);
   const columnFree = !!L && sim.state.picked !== L.id && !L.task && !(L.flags & UF_POSTED);
-  if (columnFree && L !== best && best.id !== sim.state.picked) {
+  const escorted = columnFree && L !== best && best.id !== sim.state.picked;
+  if (best.task?.kind === "work") best.task.escort = escorted;
+  if (L && escorted) {
     const d = Math.hypot(x - L.x, y - L.y);
     if (d > 4) goTo(sim, L, x - ((x - L.x) / d) * 3, y - ((y - L.y) / d) * 3);
   }

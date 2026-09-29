@@ -6,34 +6,15 @@ import type { Unit } from "./types";
 import { goTo, setAnim } from "./move";
 import { KNIFE, THROW, WOUND } from "./tuning";
 
-/** A man with a job walks in the column until he is this close to it. */
+/** Within this of his job a man walking to it is at it: he stops fighting, and a walk of the squad
+ *  away from the job leaves him to it. */
 export const WORK_DETACH = 7;
-
-/** On his way to a job still far off: he still fights, and the column may carry him there. */
-export function farFromJob(u: Unit): boolean {
-  const t = u.task;
-  return t?.kind === "work" && t.phase === "approach" && Math.hypot(t.x - u.x, t.y - u.y) > WORK_DETACH;
-}
-
-/**
- * Whether the column is carrying a man to his job: he walks in it while it walks there, and goes
- * the last few metres alone. The leader and the man picked on the strip walk to a job themselves,
- * and so does anyone whose column is not walking there: its leader picked (the column keeps its
- * rest point), halted, arrived, or bound elsewhere. (Whether the column is SENT is cmdWork's
- * question.) Review round 14: he stood waiting for a column that never came; round 15: a column
- * halted short of the job, as for a knife, still held him.
- */
-export function carriedToJob(sim: Sim, u: Unit): boolean {
-  if (!farFromJob(u) || u.id === sim.state.picked) return false;
-  const t = u.task as Extract<Unit["task"], { kind: "work" }>;
-  const sq = sim.squad(u.squad);
-  const L = sq && sim.leaderOf(sq);
-  return !!L && L !== u && sim.state.picked !== L.id && L.path.length > 0 && Math.hypot(L.goalX - t.x, L.goalY - t.y) <= WORK_DETACH;
-}
 
 /** A man at his task does not fight; one still walking to a job far off does. */
 export function atTask(u: Unit): boolean {
-  return !!u.task && !farFromJob(u);
+  const t = u.task;
+  if (!t) return false;
+  return !(t.kind === "work" && t.phase === "approach" && Math.hypot(t.x - u.x, t.y - u.y) > WORK_DETACH);
 }
 
 export function stepTasks(sim: Sim, dt: number): void {
@@ -145,8 +126,7 @@ function work(sim: Sim, u: Unit): void {
   const d = Math.hypot(t.x - u.x, t.y - u.y);
   // petrol burning on the spot: he waits at its edge, facing the job, until it goes out
   const f = sim.fireAt(t.x, t.y, 0.4);
-  const carried = carriedToJob(sim, u);
-  if (f && !carried) {
+  if (f) {
     if (t.phase === "work") { t.phase = "approach"; setAnim(u, "idle"); }
     const a = Math.atan2(u.y - f.y, u.x - f.x);
     const wx = f.x + Math.cos(a) * (f.r * 0.8 + 1), wy = f.y + Math.sin(a) * (f.r * 0.8 + 1);
@@ -168,10 +148,9 @@ function work(sim: Sim, u: Unit): void {
       sim.emit({ t: "work", unit: u.id, what: t.what, done: false });
       return;
     }
-    // he walks in the column while it carries him, then goes to it, from wherever it last sent him
-    // (review round 15: bound for his place in a halted column, a neighbour's elbow kept him from
-    // it, and so from his job, for good)
-    if (carried) return;
+    // he walks to it himself, at once from wherever he was bound when he was handed it (a man picked
+    // and walking elsewhere finished his walk first; review round 15: bound for his place in a halted
+    // column, a man was kept from it by a neighbour, and so from his job, for good)
     if (!u.path.length || Math.hypot(u.goalX - t.x, u.goalY - t.y) > 0.5) goTo(sim, u, t.x, t.y, 6000);
     return;
   }

@@ -42,11 +42,11 @@ export function finale(md: MapData, c: Campaign): Phase {
   const Z = zone(md, "finale");
   const R = c.results;
   const signal = R.signal?.flags.signal === true;
-  // the signal section was seen or heard: the Schupo from Plac Teatralny come early
+  // the signal section was seen, or loud: the Schupo from Plac Teatralny come early
   const signalBlown = blownTask(R.signal);
   const lineCut = R.ghetto?.flags.lineCut === true;
   const postSilenced = R.ghetto?.flags.postSilenced === true;
-  // the Old Town section was seen or heard: the Arbeitsamt is ready for the shooting
+  // the Old Town section was seen, or loud: the Arbeitsamt is ready for the shooting
   const eastBlown = blownTask(R.oldtown);
   const truckDisabled = R.oldtown?.flags.truckDisabled === true;
   const exits = ["exit_east", "exit_tlomackie", "exit_south", "exit_west"].map((n) => zone(md, n));
