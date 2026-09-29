@@ -34,7 +34,8 @@ export class CardScene extends Phaser.Scene {
     const bg = this.add.rectangle(0, 0, COVER, COVER, hex(PAL.hud.paper[0])).setOrigin(0);
     const title = txt(this, W / 2, H / 2 - 16, this.phase.title, { font: PXB, color: PAL.hud.paper_ink, align: 0.5 });
     const line = txt(this, W / 2, H / 2 + 8, `${this.phase.place}. ${this.phase.time}`, { font: PX, color: PAL.city_1943.brick[0], align: 0.5 });
-    this.layer = this.add.container(0, 0, [bg, title, line]);
+    const mode = txt(this, W / 2, H / 2 + 22, this.phase.mode === "stealth" ? "A stealth task: stay unseen." : this.phase.kind === "finale" ? "The action." : "A fire task.", { font: PX, color: PAL.hud.paper_ink, align: 0.5 });
+    this.layer = this.add.container(0, 0, [bg, title, line, mode]);
   }
 
   override update(_t: number, delta: number) {

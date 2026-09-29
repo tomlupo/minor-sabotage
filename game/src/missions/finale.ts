@@ -4,8 +4,8 @@
 // rolled to a stop beside the Arsenal; the two guards at the tailgate fought for minutes;
 // Kołczan opened the tailgate; Rudy crawled out last and the DKW reversed from the corner
 // to take him (research §1, §3, §4). The tasks decide what comes after the first shot:
-// the ghetto-wall police (Getto), the Arbeitsamt and a truck across Plac Krasińskich
-// (Stare Miasto), and whether you get the signal at all (Sygnalizacja).
+// the ghetto-wall police (Getto), how soon the Arbeitsamt fires and whether a truck stands
+// across Plac Krasińskich (Stare Miasto), and whether you get the signal at all (Sygnalizacja).
 import type { Sim } from "../sim/sim";
 import type { SimEvent, Unit, Vehicle } from "../sim/types";
 import { UF_ESCAPED, UF_EVACUATED } from "../sim/types";
@@ -45,7 +45,8 @@ export function finale(md: MapData, c: Campaign): Phase {
   const bielAlert = R.signal?.flags.bielanskaAlert === true;
   const lineCut = R.ghetto?.flags.lineCut === true;
   const postSilenced = R.ghetto?.flags.postSilenced === true;
-  const gateSilenced = R.oldtown?.flags.gateSilenced === true;
+  // the Old Town section was seen: the Arbeitsamt is ready for the shooting
+  const eastBlown = R.oldtown !== undefined && !R.oldtown.silent;
   const truckDisabled = R.oldtown?.flags.truckDisabled === true;
   const exits = ["exit_east", "exit_tlomackie", "exit_south", "exit_west"].map((n) => zone(md, n));
 
@@ -247,7 +248,7 @@ export function finale(md: MapData, c: Campaign): Phase {
     const s = sim.state;
     const once = (key: string, at: number, fn: () => void) => { if (a >= at && s.vars[key] !== true) { s.vars[key] = true; fn(); } };
     once("r_west", lineCut ? 60 : 18, () => { if (!postSilenced) { sim.raiseAlarm(D_WEST, 12, DLUGA.n + 3); sim.message(lineCut ? "The wall police heard the shots at last." : "The police at the ghetto wall are coming!", "bad"); } });
-    once("r_east", 22, () => { if (!gateSilenced || !truckDisabled) { sim.raiseAlarm(D_EAST, 200, 78); sim.message(gateSilenced ? "The truck's crew at Plac Krasińskich is up." : "Germans at the Arbeitsamt are shooting!", "bad"); } });
+    once("r_east", eastBlown ? 8 : 22, () => { sim.raiseAlarm(D_EAST, 200, 78); sim.message("Germans at the Arbeitsamt are shooting!", "bad"); });
     once("r_north", 35, () => { spawnGroup(sim, path(md, "reinf_north"), ["de_officer", "de_rifle", "de_rifle"], D_NORTH, "north"); sim.message("Up Nalewki: an SS officer and two men.", "bad"); });
     once("r_south", bielAlert ? 40 : 100, () => { sim.raiseAlarm(D_SOUTH, BIEL.w + 6, 110); spawnGroup(sim, path(md, "reinf_south"), ["de_mp40", "de_mp40", "de_rifle"], D_SOUTH, "south"); sim.message("Schupo from Plac Teatralny!", "bad"); });
     once("r_warn", LATE - 60, () => sim.message("Gendarmerie with dogs are on their way. Get out!", "bad"));
@@ -260,6 +261,7 @@ export function finale(md: MapData, c: Campaign): Phase {
   const phase: Phase = {
     id: "finale",
     kind: "finale",
+    mode: "fire",
     title: "Akcja pod Arsenałem",
     place: "The Arsenal, Długa at Bielańska and Nalewki",
     time: "26 March 1943, 17:30",
@@ -295,11 +297,10 @@ export function finale(md: MapData, c: Campaign): Phase {
         guard(sim, PRZEJAZD.e - 2, wy, Math.PI / 2, { district: D_WEST, tag: "wall" });
         sim.addSpawner({ x: (PRZEJAZD.w + PRZEJAZD.e) / 2, y: GHETTO_WALL_Y + 1.5, ox: 12, oy: DLUGA.n + 3, district: D_WEST, interval: lineCut ? 16 : 8, left: -1, maxAlive: 3, tag: "wall_post", look: "de_rifle" });
       }
-      if (!gateSilenced) {
-        guard(sim, 208, DLUGA.n + 1.4, Math.PI / 2 + 0.3, { district: D_EAST, tag: "gate" });
-        guard(sim, 215, DLUGA.n + 1.4, Math.PI / 2 - 0.3, { district: D_EAST, tag: "gate" });
-        sim.addSpawner({ x: 211.5, y: DLUGA.n - 1, ox: 211.5, oy: DLUGA.n + 4, district: D_EAST, interval: 6, left: -1, maxAlive: 3, tag: "arbeitsamt", look: "de_rifle" });
-      }
+      // the Arbeitsamt's sentries and post: they fired on the last group (research §1)
+      guard(sim, 208, DLUGA.n + 1.4, Math.PI / 2 + 0.3, { district: D_EAST, tag: "gate" });
+      guard(sim, 215, DLUGA.n + 1.4, Math.PI / 2 - 0.3, { district: D_EAST, tag: "gate" });
+      sim.addSpawner({ x: 211.5, y: DLUGA.n - 1, ox: 211.5, oy: DLUGA.n + 4, district: D_EAST, interval: 6, left: -1, maxAlive: 3, tag: "arbeitsamt", look: "de_rifle" });
       if (!truckDisabled) {
         sim.spawnVehicle("german_truck", W - 12, 80.5, Math.PI, [], "block");
         guard(sim, W - 16, 84, Math.PI, { district: D_EAST, tag: "block" });

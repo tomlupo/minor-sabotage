@@ -20,7 +20,7 @@ setScreen(v0);
 
 // Debug entry points (the headless playtest harness uses them):
 //   ?phase=signal|ghetto|oldtown|finale   straight into a phase
-//   ?tasks=signal,line,post,gate,truck    pretend the tasks went so (with ?phase=finale)
+//   ?tasks=signal,line,post,truck,loud    pretend the tasks went so (with ?phase=finale; loud: blown)
 //   ?screen=briefing|decision|note        straight to a screen
 class Boot extends Phaser.Scene {
   constructor() { super("boot"); }

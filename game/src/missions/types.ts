@@ -1,7 +1,7 @@
 // A phase of the operation (one task or the finale), as the rules and the screen see it.
 import type { Mission, Sim } from "../sim/sim";
 import type { MapData } from "../content/mapdata";
-import type { Campaign, FinaleResult, TaskResult } from "./campaign";
+import type { Campaign, FinaleResult, PlayMode, TaskResult } from "./campaign";
 
 /** A spot the player can tap to get a job done (a telephone, a post, the tailgate). */
 export interface Interactable {
@@ -17,6 +17,8 @@ export interface Interactable {
 
 export interface Phase extends Mission {
   kind: "task" | "finale";
+  /** Stealth (stay unseen; an alarm blows it, and it is finished by fire) or fire. */
+  mode: PlayMode;
   title: string;
   place: string;
   time: string;

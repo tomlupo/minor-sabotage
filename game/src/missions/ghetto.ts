@@ -1,14 +1,14 @@
 // Task: Getto. The largest cover section held Długa west of the Arsenal, facing Przejazd
 // and the ghetto walls, where German police watched from a distance (research §2, §3).
-// Here: cut the telephone line of the police post at the wall so it cannot call for help
-// when the shooting starts, then take cover at the Arsenal's corner. Silencing the post
-// itself keeps the finale's west side empty.
+// Here, a fire task: cut the telephone line of the police post at the wall so it cannot call
+// for help when the shooting starts, then take cover at the Arsenal's corner. Silencing the
+// post itself keeps the finale's west side empty.
 import type { Sim } from "../sim/sim";
 import type { MapData } from "../content/mapdata";
 import { zone, path } from "../content/mapdata";
 import { cmdWork } from "../sim/commands";
 import { DLUGA, PRZEJAZD, GHETTO_WALL_Y, ARSENAL } from "../content/arsenal/map";
-import type { Campaign, TaskResult } from "./campaign";
+import { TASK_MODE, type Campaign, type TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
 import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, silencePost, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
 
@@ -23,6 +23,7 @@ export function ghettoTask(md: MapData, c: Campaign): Phase {
   const phase: Phase = {
     id: "ghetto",
     kind: "task",
+    mode: TASK_MODE.ghetto,
     title: "Getto",
     place: "Długa at Przejazd",
     time: "26 March 1943, 17:10",
@@ -51,7 +52,6 @@ export function ghettoTask(md: MapData, c: Campaign): Phase {
       objective(sim, "cut", "Cut the post's telephone line", true);
       objective(sim, "cover", "Take cover at the Arsenal's corner", true, COVER.x + COVER.w / 2, COVER.y + COVER.h / 2);
       objective(sim, "post", "Silence the post at the wall", false);
-      objective(sim, "quiet", "Keep it quiet: no alarm", false);
       sim.message("Długa, 17:10. The police at the wall have a telephone.");
     },
 
@@ -60,14 +60,12 @@ export function ghettoTask(md: MapData, c: Campaign): Phase {
     tick(sim: Sim) {
       const s = sim.state;
       if (s.outcome || taskTimeUp(sim)) return;
-      if (sim.anyAlarm()) setObjective(sim, "quiet", "failed");
       silencePost(sim, "wall_post", postTags, "post");
       if (s.vars.lineCut === true) {
         const L = sim.leaderOf(sim.state.squads[squad]);
         if (L && L.x >= COVER.x && L.y >= COVER.y && L.x < COVER.x + COVER.w && L.y < COVER.y + COVER.h) setObjective(sim, "cover", "done");
       }
       if (objectiveDone(sim, "cut") && objectiveDone(sim, "cover")) {
-        if (!sim.anyAlarm()) setObjective(sim, "quiet", "done");
         s.outcome = "success";
         sim.emit({ t: "phase", outcome: "success" });
         sim.message("Długa west is covered.", "good");

@@ -57,19 +57,15 @@ describe("tasks", () => {
     expect((phase.finish(sim, c) as TaskResult).flags.lineCut).toBe(true);
   });
 
-  it("Stare Miasto: disable the truck and silence the gate", () => {
+  it("Stare Miasto: disable the truck while it unloads, and the task ends once the patrol has gone by", () => {
     const { sim, phase, c } = setup(oldtownTask);
     expect(fly(sim, 40, () => sim.state.vars.phase === "unloading")).toBe(true);
     expect(job(sim, phase, "disable_truck", () => sim.state.vars.truckDisabled === true, 80)).toBe(true);
-    // the gate: walk towards it; the pilot knifes the sentries who have not seen us
-    for (let k = 0; k < 40 && !sim.state.outcome; k++) {
-      cmdMove(sim, 211.5, 76);
-      fly(sim, 2, () => !!sim.state.outcome, { goal: () => ({ x: 211.5, y: 72 }) });
-    }
-    expect(["success", "partial"]).toContain(sim.state.outcome);
+    fly(sim, 150, () => !!sim.state.outcome);
+    expect(sim.state.vars.patrolPassed).toBe(true);
+    expect(sim.state.outcome).toBe("success");
     const r = phase.finish(sim, c) as TaskResult;
     expect(r.flags.truckDisabled).toBe(true);
-    expect(r.flags.gateSilenced).toBe(true);
   });
 });
 

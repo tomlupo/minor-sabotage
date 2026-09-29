@@ -3,6 +3,7 @@
 // the nearest trooper like Fodder's hostages.
 import type { Sim } from "./sim";
 import type { Squad, Unit } from "./types";
+import { UF_POSTED } from "./types";
 import type { Pt } from "./path";
 import { SPEED, SQUAD, UNIT_RADIUS } from "./tuning";
 import { outOfColumn } from "./tasks";
@@ -20,6 +21,8 @@ export function setAnim(u: Unit, a: Unit["anim"], lock = 0): void {
 
 /** Send a unit along a route to (x, y). Returns false if no route. */
 export function goTo(sim: Sim, u: Unit, x: number, y: number, maxNodes = 12000): boolean {
+  // sent anywhere, he has left his post
+  u.flags &= ~UF_POSTED;
   u.goalX = x;
   u.goalY = y;
   if (Math.hypot(x - u.x, y - u.y) < 0.2) { u.path = []; return true; }
@@ -299,7 +302,8 @@ export function restSlots(sim: Sim, x: number, y: number, dir: number, n: number
 }
 
 function busy(u: Unit): boolean {
-  return outOfColumn(u);
+  // a man at his post holds it, and does not walk back into the column until he is sent
+  return outOfColumn(u) || (u.flags & UF_POSTED) !== 0;
 }
 
 export function stepSquads(sim: Sim, dt: number): void {

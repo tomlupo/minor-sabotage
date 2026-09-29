@@ -111,6 +111,9 @@ export const UF_SILENT_DEATH = 1; // killed by a knife: no noise
 export const UF_ESCAPED = 2;
 export const UF_CAPTURED = 4;
 export const UF_EVACUATED = 8;
+/** At his post in plain clothes: a man standing at a kerb, not a partisan to the Germans (the signal
+ *  section on 26 March 1943). Cleared when he is sent anywhere. */
+export const UF_POSTED = 16;
 
 export type SquadOrder = "follow" | "hold" | "cover" | "signal";
 

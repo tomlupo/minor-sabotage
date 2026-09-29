@@ -3,8 +3,9 @@
 // three-man Schutzpolizei patrol with submachine guns went slowly past; during the
 // withdrawal Germans in the Arbeitsamt (Pałac pod Czterema Wiatrami) fired on the last
 // group, and a Wehrmacht truck blocked Alek's car at Plac Krasińskich (research §1-§3).
-// Here: silence the Arbeitsamt's gate and disable the truck before it leaves, so the way
-// east is open for the escape and the withdrawal.
+// Here, a stealth task (decision of 2026-09-29): let the Schupo patrol go by and pull the
+// truck's rotor arm while it unloads, unseen. The Arbeitsamt's gunfight is the finale's, where
+// it happened; its sentries stand at the gate here, and its post sends men if the alarm goes up.
 import type { Sim } from "../sim/sim";
 import type { Unit, Vehicle } from "../sim/types";
 import type { MapData } from "../content/mapdata";
@@ -12,12 +13,14 @@ import { zone, path } from "../content/mapdata";
 import { cmdWork } from "../sim/commands";
 import { goTo } from "../sim/move";
 import { DLUGA, W } from "../content/arsenal/map";
-import type { Campaign, TaskResult } from "./campaign";
+import { TASK_MODE, type Campaign, type TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
-import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, silencePost, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
+import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
 
 const GATE_X = 211.5;
-const UNLOAD_S = 75;
+/** Seconds the crew unloads: long enough that, once the Schupo patrol has gone by, the rotor arm
+ *  can still be pulled unseen before they climb back in (the stealth decision of 2026-09-29). */
+export const UNLOAD_S = 120;
 
 export function oldtownTask(md: MapData, c: Campaign): Phase {
   const Z = zone(md, "task_oldtown");
@@ -27,6 +30,7 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
   const phase: Phase = {
     id: "oldtown",
     kind: "task",
+    mode: TASK_MODE.oldtown,
     title: "Stare Miasto",
     place: "Długa towards the Old Town",
     time: "26 March 1943, 17:15",
@@ -46,10 +50,9 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
       civilians(sim, 6,
         [{ x: 150, y: DLUGA.n + 1.5 }, { x: 236, y: DLUGA.n + 1.5 }, { x: 160, y: DLUGA.s - 1.5 }, { x: 230, y: DLUGA.s - 1.5 }],
         [{ x: W - 1, y: DLUGA.n + 1.5 }, { x: 177.5, y: DLUGA.s + 6 }]);
-      objective(sim, "gate", "Silence the Arbeitsamt's gate", true, GATE_X, DLUGA.n + 2);
       objective(sim, "truck", "Disable the Wehrmacht truck before it leaves", true);
-      objective(sim, "patrol", "Let the police patrol go by", false);
-      objective(sim, "quiet", "Keep it quiet: no alarm", false);
+      objective(sim, "patrol", "Let the Schupo patrol go by", true);
+      objective(sim, "quiet", "Stay unseen", true);
       sim.state.vars.phase = "waiting";
       sim.message("Długa, 17:15. A truck is coming to unload barrels.");
     },
@@ -83,7 +86,10 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
           u.y = u.py = rear.y;
           u.ai!.blind = false;
           u.ai!.mode = "patrol";
-          u.ai!.route = [{ x: rear.x, y: rear.y }, { x: 183, y: DLUGA.s - 2.6 }];
+          // from the tailgate, round the back, to the north pavement: the truck stands between them
+          // and its bonnet, so the rotor arm can be reached unseen (the stealth decision of 2026-09-29;
+          // they carried along its south side, looking at the bonnet all the while)
+          u.ai!.route = [{ x: rear.x + 0.8, y: truck.y }, { x: rear.x + 0.8, y: DLUGA.n + 2 }];
           u.ai!.routeI = tag === "w_a" ? 1 : 0;
           truck.crew = truck.crew.filter((id) => id !== u.id);
         }
@@ -123,10 +129,12 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
       // the police patrol: three men with submachine guns, slowly along Długa
       if (!s.vars.patrolSpawned && t > 32) {
         s.vars.patrolSpawned = true;
-        const route = path(md, "motorcycles");
+        // on foot, they come in at the map's edge: the route starts off the map, as a vehicle's does,
+        // and a man off the grid finds no way (they stood beyond the edge, and never came by)
+        const route = path(md, "motorcycles").map((p) => ({ x: Math.min(p.x, W - 1.5), y: Math.min(p.y, md.h - 1.5) }));
         for (let k = 0; k < 3; k++) {
           const u = patrol(sim, route, { look: "de_mp40", tag: `schupo${k}`, start: 0 });
-          u.x = u.px = route[0].x + k * 1.6;
+          u.x = u.px = route[0].x - k * 1.6;
           u.y = u.py = route[0].y + (k % 2) * 0.9;
           u.speed = 1.6;
         }
@@ -139,9 +147,8 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
           setObjective(sim, "patrol", us.every((u) => u.state !== "dead") && !sim.anyAlarm() ? "done" : "failed");
         }
       }
-      // the gate: both sentries down, or the door blown
-      silencePost(sim, "arbeitsamt", ["gate_a", "gate_b"], "gate");
-      if (objectiveDone(sim, "gate") && (objectiveDone(sim, "truck") || s.vars.truckGone === true)) {
+      // over once the truck is settled and the patrol has gone by
+      if ((objectiveDone(sim, "truck") || s.vars.truckGone === true) && s.vars.patrolPassed === true) {
         if (!sim.anyAlarm()) setObjective(sim, "quiet", "done");
         s.outcome = objectiveDone(sim, "truck") ? "success" : "partial";
         sim.emit({ t: "phase", outcome: s.outcome });
@@ -181,12 +188,11 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
 
     finish(sim: Sim, cc: Campaign): TaskResult {
       recordSoldiers(sim, cc);
-      const gate = objectiveDone(sim, "gate");
       const truck = objectiveDone(sim, "truck");
       return {
-        outcome: gate && truck ? "success" : gate || truck ? "partial" : "fail",
+        outcome: truck ? "success" : sim.state.vars.patrolPassed === true ? "partial" : "fail",
         silent: !sim.anyAlarm(),
-        flags: { gateSilenced: gate, truckDisabled: truck },
+        flags: { truckDisabled: truck },
         seconds: sim.state.time,
       };
     },

@@ -3,7 +3,7 @@
 import Phaser from "phaser";
 import type { Flow } from "../../game/flow";
 import { mapData } from "../../game/flow";
-import { TASKS, tasksLeft, fit, type TaskId } from "../../missions/campaign";
+import { TASKS, TASK_MODE, tasksLeft, fit, type TaskId } from "../../missions/campaign";
 import { SQUADS } from "../../content/arsenal/roster";
 import { PAL, SQUAD_COLOURS, hex, mix } from "../../art/palette";
 import { toCanvas } from "../../art/pixel";
@@ -16,7 +16,7 @@ import { sound } from "../../render/sound";
 const INFO: Record<TaskId, { letter: string; title: string; place: string; job: string; helps?: string; at: [number, number] }> = {
   signal: { letter: "A", title: "Sygnalizacja", place: "Bielańska", job: "Set three posts to signal the van: the telephone, Tłomackie, the Bank Polski.", helps: "Scouts know the street.", at: [131, 138] },
   ghetto: { letter: "B", title: "Getto", place: "Długa at Przejazd", job: "Cut the telephone of the police post at the ghetto wall; cover Długa west.", at: [28, 58] },
-  oldtown: { letter: "C", title: "Stare Miasto", place: "Długa, to the Old Town", job: "Silence the Arbeitsamt's gate; disable the Wehrmacht truck before it leaves.", at: [196, 80] },
+  oldtown: { letter: "C", title: "Stare Miasto", place: "Długa, to the Old Town", job: "Let the Schupo patrol go by; disable the Wehrmacht truck before it leaves.", at: [196, 80] },
 };
 
 /** A task that went partly: ochre ink, between the green of done and the red of failed
@@ -98,12 +98,15 @@ export class BriefingScene extends Phaser.Scene {
       const card = this.add.rectangle(cx, y, cw, cardH, hex(PAL.hud.paper[1])).setOrigin(0).setStrokeStyle(selected ? 2 : 1, hex(selected ? PAL.shared.select_gold : PAL.hud.paper_ink));
       card.setInteractive({ useHandCursor: true }).on("pointerup", () => { if (!res) { this.sel = t; sound.ui("ui_tap"); this.draw(); } });
       this.add.rectangle(cx + 1, y + 1, 5, cardH - 2, hex(SQUAD_COLOURS[SQUADS[sqi].colour])).setOrigin(0);
-      txt(this, cx + 10, y + 3, `${info.letter}. ${info.title}`, { color: PAL.hud.paper_ink });
+      const head = txt(this, cx + 10, y + 3, `${info.letter}. ${info.title}`, { color: PAL.hud.paper_ink });
+      // what kind of task: stealth (stay unseen) or fire, as on the day
+      txt(this, head.x + head.width + 6, y + 5, TASK_MODE[t] === "stealth" ? "stealth" : "fire", { font: PXS, face: "sans", color: PAL.city_1943.brick[0] });
       txt(this, cx + cw - 4, y + 3, SQUADS[sqi].name, { color: PAL.hud.paper_ink, align: 1, font: PXS });
       if (res) {
         const word = res.outcome === "success" ? "DONE" : res.outcome === "partial" ? "PART DONE" : "FAILED";
         const col = res.outcome === "success" ? PAL.hud.hp_ok : res.outcome === "partial" ? PARTIAL : PAL.hud.hp_low;
-        txt(this, cx + 10, y + 14, `${word}${res.silent ? ", quietly" : ", the alarm went up"}`, { font: PXS, color: col });
+        const how = TASK_MODE[t] === "fire" ? "" : res.silent ? ", unseen" : ", blown";
+        txt(this, cx + 10, y + 14, `${word}${how}`, { font: PXS, color: col });
         txt(this, cx + 10, y + 24, this.effect(t), { font: PX, color: PAL.hud.paper_ink, wrap: cw - 16 });
       } else {
         txt(this, cx + 10, y + 14, info.job, { font: PX, color: PAL.hud.paper_ink, wrap: cw - 16 });
@@ -145,7 +148,8 @@ export class BriefingScene extends Phaser.Scene {
     const r = this.flow.campaign.results[t]!;
     if (t === "signal") return r.flags.signal ? "The finale has the go-code: you choose when." : "No signal: the van will come unannounced.";
     if (t === "ghetto") return r.flags.postSilenced ? "The wall post is silenced: the west stays empty." : r.flags.lineCut ? "The line is cut: the wall police will be slow." : "The wall police will come quickly.";
-    return r.flags.gateSilenced && r.flags.truckDisabled ? "The way east is open for the escape." : r.flags.truckDisabled ? "The Arbeitsamt is still manned." : "A truck will block Plac Krasińskich.";
+    const truck = r.flags.truckDisabled ? "No truck will block Plac Krasińskich." : "A truck will block Plac Krasińskich.";
+    return r.silent ? truck : `${truck} The Arbeitsamt is warned.`;
   }
 
   private assign(i: number) {

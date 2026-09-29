@@ -4,6 +4,7 @@
 // quick knife or shot can still keep it quiet.
 import type { Sim } from "./sim";
 import type { Unit } from "./types";
+import { UF_POSTED } from "./types";
 import { angDiff } from "./combat";
 import { goTo } from "./move";
 import { germanWeapon } from "./setup";
@@ -14,7 +15,8 @@ const GERMAN_HUH = ["Was?", "Wer da?", "Hm?"];
 
 export function stepAI(sim: Sim, dt: number): void {
   const s = sim.state;
-  const pls = s.units.filter((u) => u.side === "pl" && u.state !== "dead" && !u.hidden);
+  // a man at his post in plain clothes is one more man at a kerb
+  const pls = s.units.filter((u) => u.side === "pl" && u.state !== "dead" && !u.hidden && !(u.flags & UF_POSTED));
   for (const u of s.units) {
     if (!u.ai || u.state !== "ok" || u.hidden) continue;
     if (u.side === "civ") { civilian(sim, u); continue; }

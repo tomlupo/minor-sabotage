@@ -7,6 +7,12 @@ import { WOUND } from "../sim/tuning";
 export type TaskId = "signal" | "ghetto" | "oldtown";
 export const TASKS: TaskId[] = ["signal", "ghetto", "oldtown"];
 
+/** Stealth or fire, by what the section did on 26 March 1943 (decision of 2026-09-29): the signal
+ *  section only watched and gestured, the Getto section held Długa west by force, and the Old Town
+ *  section let a Schupo patrol and a truck go by before the action. The finale is fire. */
+export type PlayMode = "stealth" | "fire";
+export const TASK_MODE: Record<TaskId, PlayMode> = { signal: "stealth", ghetto: "fire", oldtown: "stealth" };
+
 /** "down" only while a phase runs: he lies wounded and has not been got up yet. */
 export type SoldierState = "ok" | "wounded" | "down" | "dead" | "captured" | "evacuated";
 

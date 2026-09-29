@@ -22,12 +22,12 @@ const PHASES: Record<string, (md: MapData, c: Campaign) => Phase> = {
   finale,
 };
 
-/** Debug: pretend the tasks went a certain way (?tasks=signal,line,post,gate,truck). */
+/** Debug: pretend the tasks went a certain way (?tasks=signal,line,post,truck; add loud for blown stealth tasks). */
 export function fakeResults(c: Campaign, spec: string) {
   const has = (k: string) => spec.split(",").includes(k);
   c.results.signal = { outcome: has("signal") ? "success" : "fail", silent: true, flags: { signal: has("signal"), bielanskaAlert: has("loud") }, seconds: 0 };
   c.results.ghetto = { outcome: has("line") ? "success" : "fail", silent: true, flags: { lineCut: has("line"), postSilenced: has("post") }, seconds: 0 };
-  c.results.oldtown = { outcome: has("gate") && has("truck") ? "success" : "partial", silent: true, flags: { gateSilenced: has("gate"), truckDisabled: has("truck") }, seconds: 0 };
+  c.results.oldtown = { outcome: has("truck") ? "success" : "partial", silent: !has("loud"), flags: { truckDisabled: has("truck") }, seconds: 0 };
 }
 
 let MD: MapData | null = null;

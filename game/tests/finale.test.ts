@@ -16,7 +16,7 @@ function setup(tasks: string) {
   const has = (k: string) => tasks.split(",").includes(k);
   c.results.signal = { outcome: "success", silent: true, flags: { signal: has("signal"), bielanskaAlert: false }, seconds: 0 };
   c.results.ghetto = { outcome: "success", silent: true, flags: { lineCut: has("line"), postSilenced: has("post") }, seconds: 0 };
-  c.results.oldtown = { outcome: "success", silent: true, flags: { gateSilenced: has("gate"), truckDisabled: has("truck") }, seconds: 0 };
+  c.results.oldtown = { outcome: "success", silent: !has("oldloud"), flags: { truckDisabled: has("truck") }, seconds: 0 };
   const sim = new Sim(gridFromMap(md), 99);
   sim.streetNames = md.streets.map((s) => s.name);
   const phase: Phase = finale(md, c);
@@ -53,7 +53,7 @@ function step(sim: Sim, seconds: number, until?: () => boolean): boolean {
 
 describe("finale", () => {
   it("can be won: bottles at the bend, the tailgate, the DKW backing up for Rudy", () => {
-    const { sim, phase, c } = setup("signal,line,post,gate,truck");
+    const { sim, phase, c } = setup("signal,line,post,truck");
     expect(sim.state.signalReady).toBe(true);
     cmdSignal(sim);
     const van = () => sim.state.vehicles.find((v) => v.tag === "van");
@@ -114,7 +114,7 @@ describe("finale", () => {
   });
 
   it("without the signal the van comes on its own", () => {
-    const { sim } = setup("line,gate,truck");
+    const { sim } = setup("line,truck");
     expect(sim.state.signalReady).toBe(false);
     step(sim, 25);
     expect(sim.state.vehicles.some((v) => v.tag === "van")).toBe(true);

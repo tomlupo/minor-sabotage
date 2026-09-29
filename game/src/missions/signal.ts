@@ -9,8 +9,9 @@ import type { MapData } from "../content/mapdata";
 import { zone } from "../content/mapdata";
 import { cmdWork } from "../sim/commands";
 import { BIEL, DLUGA, TLOM } from "../content/arsenal/map";
-import type { Campaign, TaskResult } from "./campaign";
+import { TASK_MODE, type Campaign, type TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
+import { UF_POSTED } from "../sim/types";
 import { civilians, fieldFromCampaign, guard, objective, patrol, recordSoldiers, setObjective, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
 import { path } from "../content/mapdata";
 
@@ -26,6 +27,7 @@ export function signalTask(md: MapData, c: Campaign): Phase {
   const phase: Phase = {
     id: "signal",
     kind: "task",
+    mode: TASK_MODE.signal,
     title: "Sygnalizacja",
     place: "Bielańska",
     time: "26 March 1943, 17:05",
@@ -54,7 +56,7 @@ export function signalTask(md: MapData, c: Campaign): Phase {
         [{ x: BIEL.w + 1, y: 168 }, { x: BIEL.e - 1, y: 168 }, { x: 70, y: TLOM.n + 1 }]);
       // no place of their own: each post's job rings it (one ring, one arrow)
       for (const p of POSTS) objective(sim, p.id, p.obj, true);
-      objective(sim, "quiet", "Keep it quiet: no alarm", false);
+      objective(sim, "quiet", "Stay unseen", true);
       sim.message("Bielańska, 17:05. The van leaves Szucha soon.");
     },
 
@@ -80,7 +82,11 @@ export function signalTask(md: MapData, c: Campaign): Phase {
         sim.state.vars[e.what] = true;
         setObjective(sim, e.what.slice(5), "done");
         const u = sim.unit(e.unit);
-        if (u) sim.say(u, e.what === "post_phone" ? "Halo? Tu Jur." : "Na miejscu.", 3);
+        if (u) {
+          // at his post he passes for a man at a kerb, as they did on the day
+          u.flags |= UF_POSTED;
+          sim.say(u, e.what === "post_phone" ? "Halo? Tu Jur." : "Na miejscu.", 3);
+        }
       }
     },
 
