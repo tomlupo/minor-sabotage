@@ -416,6 +416,32 @@ describe("fire on the street", () => {
     expect(Math.hypot(u.x - 96.8, u.y - 76.4)).toBeGreaterThan(HARM(2));
   });
 
+  it("sent off a stopped van he stands on, walks off it and does not walk back in", () => {
+    // Tom, 2026-09-28: "i got stuck next to van could not move". A man a van stopped on (its cells
+    // cover where he stands) took a 5 cm step, landed in its cells again, was refused, every tick
+    const md = buildArsenalMap();
+    const sim = new Sim(gridFromMap(md), 7);
+    const v = sim.spawnVehicle("prison_truck", 101.5, 78.9, 3.54);
+    v.state = "wreck";
+    sim.step();
+    const G = sim.grid;
+    for (const [x, y] of [[98.1, 77.1], [100.2, 78.6], [103.4, 79.5]]) {
+      expect(G.walkable(x, y), `${x}, ${y} is on the van`).toBe(false);
+      const u = sim.spawnUnit({ side: "pl", look: "pl", x, y, weapon: "sten" });
+      u.path = sim.route({ x, y }, { x: x - 6, y: y - 2.5 }) ?? [];
+      let off = false, back = 0;
+      for (let i = 0; i < 30 * 3; i++) {
+        sim.step();
+        if (G.walkable(u.x, u.y)) off = true;
+        else if (off) back++;
+      }
+      expect(off, `from ${x}, ${y}`).toBe(true);
+      expect(back, `from ${x}, ${y}`).toBe(0);
+      expect(Math.hypot(u.x - x, u.y - y)).toBeGreaterThan(1);
+      sim.state.units = sim.state.units.filter((q) => q !== u);
+    }
+  });
+
   it("caught by a bottle in a building's corner, walks clear and stays clear", () => {
     // review round 8: two ways out, each weighed afresh every tick from where he stood, took
     // turns, and held him in the harm until it burnt out. The second fire leaves the way south

@@ -6,6 +6,7 @@ import type { Squad, Unit } from "./types";
 import type { Pt } from "./path";
 import { SPEED, SQUAD, UNIT_RADIUS } from "./tuning";
 import { outOfColumn } from "./tasks";
+import { F_VEH, F_WALK } from "./grid";
 
 const TRAIL_MAX = 80;
 
@@ -182,9 +183,13 @@ export function stepMovement(sim: Sim, dt: number): void {
       // the way a slide along one axis (a slide counts only when it moves him: walking square
       // into a closed cell, a zero step "succeeded" and he stood still for ever)
       let tx = nx, ty = ny;
-      if (!arrive && !G.walkable(nx, ny)) {
-        if (Math.abs(nx - u.x) > 1e-4 && G.walkable(nx, u.y)) ty = u.y;
-        else if (Math.abs(ny - u.y) > 1e-4 && G.walkable(u.x, ny)) tx = u.x;
+      // a man a vehicle stopped on (its cells cover where he stands) steps off it across its cells,
+      // onto open ground; walls still stop him (Tom, 2026-09-28: "i got stuck next to van")
+      const onVehicle = (G.flagAt(u.x, u.y) & F_VEH) !== 0;
+      const open = (x: number, y: number) => G.walkable(x, y) || (onVehicle && (G.flagAt(x, y) & F_WALK) !== 0);
+      if (!arrive && !open(nx, ny)) {
+        if (Math.abs(nx - u.x) > 1e-4 && open(nx, u.y)) ty = u.y;
+        else if (Math.abs(ny - u.y) > 1e-4 && open(u.x, ny)) tx = u.x;
         else tx = NaN;
       }
       if (Number.isNaN(tx)) {
