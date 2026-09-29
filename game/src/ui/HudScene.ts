@@ -470,11 +470,8 @@ export class HudScene extends Phaser.Scene {
     const vw = cam.width / cam.zoom, vh = cam.height / cam.zoom;
     const left = cam.scrollX + (cam.width - vw) / 2, top = cam.scrollY + (cam.height - vh) / 2;
     const marks = this.g.marksOf().map((m) => ({ key: m.key, x: sx(m.x) - left, y: sy(m.y) - top }));
-    // a pixel's nudge the way it points, twice a second
-    const nudge = Math.floor(this.time.now / 300) % 2;
-    for (const a of placeArrows(marks, screen.w, screen.h, this.safe, blocked)) {
-      const m = arrowMask(a.angle);
-      const x = a.x + Math.round(Math.cos(a.angle) * nudge), y = a.y + Math.round(Math.sin(a.angle) * nudge);
+    for (const { x, y, angle } of placeArrows(marks, screen.w, screen.h, this.safe, blocked)) {
+      const m = arrowMask(angle);
       this.gfx.fillStyle(hex(PAL.shared.outline), 1);
       for (const [dx, dy] of m.edge) this.gfx.fillRect(x + dx, y + dy, 1, 1);
       this.gfx.fillStyle(hex(PAL.shared.chalk), 1);

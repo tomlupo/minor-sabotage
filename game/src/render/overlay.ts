@@ -164,26 +164,19 @@ class Raster {
     }
   }
 
-  /** The ring with a one-pixel dark edge round each dash, so it reads on pale ground too. */
-  ringEdged(r: Ring, x: number, y: number, c: number, edge: number, onPx = 2, period = 4, phase = 0) {
+  /** A ring centred on world px (x, y), dashed `on` px in every `period`, marching by `phase`;
+   *  with an `edge` colour each dash gets a one-pixel edge round it, so it reads on pale ground. */
+  ring(r: Ring, x: number, y: number, c: number, onPx = 2, period = 4, phase = 0, edge?: number) {
     const left = x - (r.w - 1) / 2, top = y - (r.h - 1) / 2;
     if (!this.sees(left - 1, top - 1, left + r.w, top + r.h)) return;
     const n = r.pts.length / 2;
     const lit = (i: number) => ((i + phase) % period + period) % period < onPx;
-    for (let i = 0; i < n; i++) {
+    for (let i = 0; edge !== undefined && i < n; i++) {
       if (!lit(i)) continue;
       const px = left + r.pts[i * 2], py = top + r.pts[i * 2 + 1];
       this.put(px - 1, py, edge); this.put(px + 1, py, edge); this.put(px, py - 1, edge); this.put(px, py + 1, edge);
     }
-    this.ring(r, x, y, c, onPx, period, phase);
-  }
-
-  /** A ring centred on world px (x, y), dashed `on` px in every `period`, marching by `phase`. */
-  ring(r: Ring, x: number, y: number, c: number, onPx = 2, period = 4, phase = 0) {
-    const left = x - (r.w - 1) / 2, top = y - (r.h - 1) / 2;
-    if (!this.sees(left, top, left + r.w - 1, top + r.h - 1)) return;
-    const n = r.pts.length / 2;
-    for (let i = 0; i < n; i++) if (((i + phase) % period + period) % period < onPx) this.put(left + r.pts[i * 2], top + r.pts[i * 2 + 1], c);
+    for (let i = 0; i < n; i++) if (lit(i)) this.put(left + r.pts[i * 2], top + r.pts[i * 2 + 1], c);
   }
 }
 
@@ -320,7 +313,7 @@ export class Overlay {
     const chalk = word(PAL.shared.chalk);
     for (const mk of this.marks) {
       const rw = Math.round(mk.r * 12), rh = Math.round(mk.r * 9);
-      R.ringEdged(this.ringFor(rw * 2 + 1, rh * 2 + 1), X(mk.x), Y(mk.y), chalk, dark, 2, 4, mk.on ? march : 0);
+      R.ring(this.ringFor(rw * 2 + 1, rh * 2 + 1), X(mk.x), Y(mk.y), chalk, 2, 4, mk.on ? march : 0, dark);
     }
 
     // where you tapped: the ring grows and breaks up (red on an enemy)

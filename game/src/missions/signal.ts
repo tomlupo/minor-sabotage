@@ -52,7 +52,8 @@ export function signalTask(md: MapData, c: Campaign): Phase {
       civilians(sim, 7,
         [{ x: BIEL.w + 1, y: 100 }, { x: BIEL.w + 1, y: 150 }, { x: BIEL.e - 1, y: 104 }, { x: BIEL.e - 1, y: 132 }, { x: 90, y: TLOM.n + 1 }],
         [{ x: BIEL.w + 1, y: 168 }, { x: BIEL.e - 1, y: 168 }, { x: 70, y: TLOM.n + 1 }]);
-      for (const p of POSTS) objective(sim, p.id, p.obj, true, p.x, p.y);
+      // no place of their own: each post's job rings it (one ring, one arrow)
+      for (const p of POSTS) objective(sim, p.id, p.obj, true);
       objective(sim, "quiet", "Keep it quiet: no alarm", false);
       sim.message("Bielańska, 17:05. The van leaves Szucha soon.");
     },

@@ -184,12 +184,13 @@ export class GameScene extends Phaser.Scene {
     const cam = this.cameras.main;
     if (on) {
       const Z = this.run.md.zones.find((z) => z.name === this.run.phase.zone)!;
-      const zx = screen.w / sx(Z.w), zy = screen.h / (sy(Z.h) + 60);
-      // at most a whole fraction (1/2, 1/3, 1/4) of the street's zoom, and even on the screen: a
-      // whole number of physical pixels to an art pixel, or one physical pixel to a whole number
-      // of art pixels (review round 11: 4/3 drew art pixels 1 and 2 pixels wide by turns)
-      const fit = screen.s / Math.min(4, Math.ceil(1 / Math.min(1, zx, zy)));
-      cam.setZoom(fit >= 1 ? Math.floor(fit) : 1 / Math.ceil(1 / fit));
+      // the whole zone on the screen, never nearer than the street: on a screen where one physical
+      // pixel shows, a whole number of them to an art pixel or one to a whole number of art pixels
+      // (round 11: 4/3 drew art pixels 1 and 2 pixels wide by turns; round 12: flooring a zoom
+      // already cut to a fraction of the street's opened a maximised window's zone at half size)
+      const fit = Math.min(screen.s, cam.width / sx(Z.w), cam.height / (sy(Z.h) + 60));
+      const dense = screen.s / screen.zoom >= 2;
+      cam.setZoom(dense ? fit : fit >= 1 ? Math.floor(fit) : 1 / Math.ceil(1 / fit));
       cam.centerOn(sx(Z.x + Z.w / 2), sy(Z.y + Z.h / 2));
     } else {
       cam.setZoom(screen.s);

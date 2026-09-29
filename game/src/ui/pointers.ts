@@ -6,8 +6,9 @@
 // hides under a button or the objectives. Pure: the HUD draws what this returns (style
 // guide §8).
 
+import type { SafeInsets } from "../render/view";
+
 export interface Box { x: number; y: number; w: number; h: number }
-export interface Insets { top: number; right: number; bottom: number; left: number }
 /** A mark in the HUD's art px. Marks with one key do one job, and one arrow serves them all. */
 export interface Mark { key: string; x: number; y: number }
 export interface Arrow { key: string; x: number; y: number; angle: number }
@@ -22,7 +23,7 @@ const SEEN = 12;
 const within = (x: number, y: number, b: Box, pad: number) => x >= b.x - pad && x < b.x + b.w + pad && y >= b.y - pad && y < b.y + b.h + pad;
 
 /** Where each unseen mark's arrow goes: one per key, pointing from the screen's middle at the nearest of its marks. */
-export function placeArrows(marks: Mark[], w: number, h: number, safe: Insets, blocked: Box[]): Arrow[] {
+export function placeArrows(marks: Mark[], w: number, h: number, safe: SafeInsets, blocked: Box[]): Arrow[] {
   const x0 = safe.left, y0 = safe.top, x1 = w - safe.right, y1 = h - safe.bottom;
   const cx = (x0 + x1) / 2, cy = (y0 + y1) / 2;
   const seen = (m: Mark) => m.x >= x0 + SEEN && m.x < x1 - SEEN && m.y >= y0 + SEEN && m.y < y1 - SEEN && !blocked.some((b) => within(m.x, m.y, b, 0));
