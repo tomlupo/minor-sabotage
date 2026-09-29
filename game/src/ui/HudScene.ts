@@ -39,7 +39,8 @@ interface Gesture {
   t0: number;
   moved: boolean;
   btn: Btn | null;
-  held: boolean;
+  /** It has led the squad: a drag, judged when it is let go. */
+  dragged: boolean;
   lastDrag: number;
 }
 
@@ -265,7 +266,7 @@ export class HudScene extends Phaser.Scene {
       return;
     }
     const btn = this.btnAt(a.x, a.y);
-    const g: Gesture = { id: p.id, x0: a.x, y0: a.y, t0: this.time.now, moved: false, btn, held: false, lastDrag: 0 };
+    const g: Gesture = { id: p.id, x0: a.x, y0: a.y, t0: this.time.now, moved: false, btn, dragged: false, lastDrag: 0 };
     this.gestures.set(p.id, g);
     if (btn?.onDown) btn.onDown(p);
     if (!btn && this.fireHeld) this.g.fireAt(p.x, p.y);
@@ -280,7 +281,8 @@ export class HudScene extends Phaser.Scene {
     if (this.fireHeld) { this.g.fireAt(p.x, p.y); return; }
     if (g.moved && this.time.now - g.lastDrag > 120 && !this.pendingOrder && !this.grenadeArmed) {
       g.lastDrag = this.time.now;
-      this.g.dragWorld(p.x, p.y);
+      this.g.dragWorld(p.x, p.y, !g.dragged);
+      g.dragged = true;
     }
   }
 
@@ -294,7 +296,10 @@ export class HudScene extends Phaser.Scene {
       else g.btn.onUp?.(p, held);
       return;
     }
-    if (g.held || this.fireHeld) return;
+    // a drag let go: the walk it led is judged now, once, whatever else the finger does (review
+    // round 19: let go with FIRE held, a grenade armed or an order waiting, it was never judged)
+    if (g.dragged) this.g.dragEnded();
+    if (this.fireHeld) return;
     const sim = this.g.run.sim;
     if (this.pendingOrder) {
       const w = this.g.toWorld(p.x, p.y);
@@ -315,8 +320,7 @@ export class HudScene extends Phaser.Scene {
       if (!this.g.holdWorld(p.x, p.y)) this.say("Nobody close enough to throw", "bad");
       return;
     }
-    // a drag let go: the walk it led is judged now, once
-    if (g.moved) { this.g.dragEnded(); return; }
+    if (g.moved) return;
     if (held > 480) { this.g.holdWorld(p.x, p.y); return; }
     this.g.tapWorld(p.x, p.y);
   }

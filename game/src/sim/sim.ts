@@ -53,6 +53,9 @@ export class Sim {
   noises: { x: number; y: number; r: number; gun: boolean }[] = [];
   /** Street names by id, for messages ("Alek is down on Długa"). */
   streetNames: string[] = [];
+  /** The drag under way (commands.ts cmdDrag): where the leader stood when it began, and the men its
+   *  walk may call back, read then. Not serialised. */
+  drag: { x: number; y: number; men: number[] } | null = null;
   private acc = 0;
 
   constructor(grid: Grid, seed = 1943) {
