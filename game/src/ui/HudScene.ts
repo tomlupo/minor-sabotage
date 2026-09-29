@@ -14,7 +14,7 @@ import { hudArt, type HudArt, type HudImage } from "./hudart";
 import { txt, capsOf, capShift, fitLine, PX, PXS, PXB } from "./text";
 import { nextHint, markSeen, type Hint } from "./hints";
 import { placeArrows, arrowMask, type Box } from "./pointers";
-import { Gestures } from "./gestures";
+import { Gestures, leads, type Waiting } from "./gestures";
 import { sx, sy } from "../render/iso";
 import type { RGB } from "../art/palette";
 
@@ -244,8 +244,14 @@ export class HudScene extends Phaser.Scene {
     return null;
   }
 
+  /** What the HUD has waiting for a finger (gestures.ts). */
+  private waiting(): Waiting {
+    return { fire: this.fireHeld, order: !!this.pendingOrder, grenade: this.grenadeArmed };
+  }
+
   private down(p: Phaser.Input.Pointer) {
     sound.unlock();
+    if (!leads(p.button)) return;
     // the HUD is laid out in art px; the street (this.g) takes the canvas point as it came
     const a = artPoint(p);
     const hb = this.hintBox;
@@ -256,32 +262,27 @@ export class HudScene extends Phaser.Scene {
       return;
     }
     const btn = this.btnAt(a.x, a.y);
-    // the mouse's second button joins the gesture under way (gestures.ts)
-    if (!this.gestures.open({ id: p.id, x0: a.x, y0: a.y, t0: this.time.now, moved: false, btn, dragged: false, lastDrag: 0 })) return;
-    if (btn?.onDown) btn.onDown(p);
-    if (!btn && this.fireHeld) this.g.fireAt(p.x, p.y);
+    const { press, stale } = this.gestures.press({ id: p.id, x0: a.x, y0: a.y, t0: this.time.now, moved: false, btn, dragged: false, lastDrag: 0 }, this.waiting());
+    // a gesture whose lift the page never heard: its drag is let go
+    if (stale?.dragged) cmdDragEnd(this.g.run.sim);
+    if (press === "button") btn?.onDown?.(p);
+    else if (press === "fire") this.g.fireAt(p.x, p.y);
   }
 
   private move(p: Phaser.Input.Pointer) {
-    const g = this.gestures.get(p.id);
-    if (!g || !p.isDown) return;
+    if (!p.isDown) return;
     const a = artPoint(p);
-    if (Math.hypot(a.x - g.x0, a.y - g.y0) > 8) g.moved = true;
-    if (g.btn) return;
-    if (this.fireHeld) { this.g.fireAt(p.x, p.y); return; }
-    if (g.moved && this.time.now - g.lastDrag > 120 && !this.pendingOrder && !this.grenadeArmed) {
-      g.lastDrag = this.time.now;
-      this.g.dragWorld(p.x, p.y);
-      g.dragged = true;
-    }
+    const m = this.gestures.move(p.id, a.x, a.y, this.time.now, this.waiting());
+    if (m === "fire") this.g.fireAt(p.x, p.y);
+    else if (m === "drag") this.g.dragWorld(p.x, p.y);
   }
 
   private up(p: Phaser.Input.Pointer) {
-    // what the lift does is gestures.ts's to say ("held" and "none": nothing); here it is done
-    const l = this.gestures.lift(p.id, this.time.now, p.buttons, { fire: this.fireHeld, order: !!this.pendingOrder, grenade: this.grenadeArmed });
+    if (!leads(p.button)) return;
+    // what the lift does is gestures.ts's to say ("none": nothing); here it is done
+    const l = this.gestures.lift(p.id, this.time.now, this.waiting());
     if (!l) return;
-    const { g, lift } = l;
-    const held = this.time.now - g.t0;
+    const { g, lift, held } = l;
     const sim = this.g.run.sim;
     switch (lift) {
       case "button":
