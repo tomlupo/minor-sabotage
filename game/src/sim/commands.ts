@@ -3,6 +3,7 @@
 // an unaware sentry close enough is knifed.
 import type { Sim } from "./sim";
 import type { Squad, Unit } from "./types";
+import { UF_POSTED } from "./types";
 import { goTo } from "./move";
 import { THROW } from "./tuning";
 
@@ -19,7 +20,13 @@ export function pickedOf(sim: Sim): Unit | undefined {
  */
 export function cmdPick(sim: Sim, id: number): boolean {
   const s = sim.state;
-  if (s.picked === id) { s.picked = -1; return false; }
+  if (s.picked === id) {
+    s.picked = -1;
+    // tapped again he rejoins the column, from his post too
+    const was = sim.unit(id);
+    if (was) was.flags &= ~UF_POSTED;
+    return false;
+  }
   const u = sim.unit(id);
   if (!u || u.state !== "ok" || u.hidden || u.squad !== s.controlled) return false;
   s.picked = id;
@@ -142,12 +149,16 @@ export function cmdWork(sim: Sim, x: number, y: number, what: string, ref: strin
     let bd = Infinity;
     const p = freePicked(sim);
     for (const u of p ? [p] : sim.membersOf(sq)) {
-      if (u.state !== "ok" || u.task) continue;
+      // a man at his post keeps it unless he is picked for the job (review round 13: handed another
+      // post, he waited for a column he no longer walks in)
+      if (u.state !== "ok" || u.task || (!p && u.flags & UF_POSTED)) continue;
       const d = Math.hypot(u.x - x, u.y - y) - (prefer ? prefer(u) : 0);
       if (d < bd) { bd = d; best = u; }
     }
     if (!best) return null;
     best.task = { kind: "work", what, ref, x, y, t: 0, dur, phase: "approach" };
+    // given a job, he has left his post
+    best.flags &= ~UF_POSTED;
   }
   // the squad goes with him (it moves as one) and he detaches for the last few metres; a man
   // picked on the strip goes alone, and the squad stays

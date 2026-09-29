@@ -16,7 +16,7 @@ function setup(tasks: string) {
   const has = (k: string) => tasks.split(",").includes(k);
   c.results.signal = { outcome: "success", silent: true, flags: { signal: has("signal"), bielanskaAlert: false }, seconds: 0 };
   c.results.ghetto = { outcome: "success", silent: true, flags: { lineCut: has("line"), postSilenced: has("post") }, seconds: 0 };
-  c.results.oldtown = { outcome: "success", silent: !has("oldloud"), flags: { truckDisabled: has("truck") }, seconds: 0 };
+  c.results.oldtown = { outcome: "success", silent: !has("oldloud"), flags: { truckDisabled: has("truck") }, seconds: 120 };
   const sim = new Sim(gridFromMap(md), 99);
   sim.streetNames = md.streets.map((s) => s.name);
   const phase: Phase = finale(md, c);
@@ -111,6 +111,20 @@ describe("finale", () => {
     step(sim, 120);
     expect(sim.state.outcome).toBe("fail");
     expect(sim.state.vars.failReason).toMatch(/van got away/);
+  });
+
+  it("the Arbeitsamt's sentries always stand at its gate, and open fire sooner when Stare Miasto was blown", () => {
+    // the stealth decision of 2026-09-29: the gunfight at the Arbeitsamt is the finale's (research §1)
+    for (const [tasks, at] of [["signal,line,post,truck", 22], ["signal,line,post,truck,oldloud", 8]] as const) {
+      const { sim } = setup(tasks);
+      expect(sim.state.units.filter((u) => u.tag === "gate" && u.state === "ok")).toHaveLength(2);
+      // the first shot of the action
+      sim.state.vars.actionT = sim.state.time;
+      step(sim, at - 1.5);
+      expect(sim.state.vars.r_east, `${tasks}: not yet ${at - 1.5} s after the first shot`).not.toBe(true);
+      step(sim, 3);
+      expect(sim.state.vars.r_east, `${tasks}: by ${at + 1.5} s`).toBe(true);
+    }
   });
 
   it("without the signal the van comes on its own", () => {

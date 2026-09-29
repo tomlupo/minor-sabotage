@@ -3,6 +3,7 @@
 // wait reads as a page turning rather than a frozen button; then it fades off the street.
 import Phaser from "phaser";
 import type { Phase } from "../../missions/types";
+import { TASK_MODE, type TaskId } from "../../missions/campaign";
 import { PAL, hex } from "../../art/palette";
 import { txt, setFace, PX, PXB } from "../text";
 import { COVER, screen, fitCamera } from "../../render/screen";
@@ -34,7 +35,8 @@ export class CardScene extends Phaser.Scene {
     const bg = this.add.rectangle(0, 0, COVER, COVER, hex(PAL.hud.paper[0])).setOrigin(0);
     const title = txt(this, W / 2, H / 2 - 16, this.phase.title, { font: PXB, color: PAL.hud.paper_ink, align: 0.5 });
     const line = txt(this, W / 2, H / 2 + 8, `${this.phase.place}. ${this.phase.time}`, { font: PX, color: PAL.city_1943.brick[0], align: 0.5 });
-    const mode = txt(this, W / 2, H / 2 + 22, this.phase.mode === "stealth" ? "A stealth task: stay unseen." : this.phase.kind === "finale" ? "The action." : "A fire task.", { font: PX, color: PAL.hud.paper_ink, align: 0.5 });
+    const line2 = this.phase.kind === "finale" ? "The action." : TASK_MODE[this.phase.id as TaskId] === "stealth" ? "A stealth task: stay unseen." : "A fire task.";
+    const mode = txt(this, W / 2, H / 2 + 22, line2, { font: PX, color: PAL.hud.paper_ink, align: 0.5 });
     this.layer = this.add.container(0, 0, [bg, title, line, mode]);
   }
 

@@ -13,7 +13,7 @@ import { zone, path } from "../content/mapdata";
 import { cmdWork } from "../sim/commands";
 import { goTo } from "../sim/move";
 import { DLUGA, W } from "../content/arsenal/map";
-import { TASK_MODE, type Campaign, type TaskResult } from "./campaign";
+import type { Campaign, TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
 import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
 
@@ -30,7 +30,6 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
   const phase: Phase = {
     id: "oldtown",
     kind: "task",
-    mode: TASK_MODE.oldtown,
     title: "Stare Miasto",
     place: "Długa towards the Old Town",
     time: "26 March 1943, 17:15",
@@ -136,7 +135,6 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
           const u = patrol(sim, route, { look: "de_mp40", tag: `schupo${k}`, start: 0 });
           u.x = u.px = route[0].x - k * 1.6;
           u.y = u.py = route[0].y + (k % 2) * 0.9;
-          u.speed = 1.6;
         }
       }
       if (s.vars.patrolSpawned && !s.vars.patrolPassed) {
@@ -147,8 +145,10 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
           setObjective(sim, "patrol", us.every((u) => u.state !== "dead") && !sim.anyAlarm() ? "done" : "failed");
         }
       }
-      // over once the truck is settled and the patrol has gone by
-      if ((objectiveDone(sim, "truck") || s.vars.truckGone === true) && s.vars.patrolPassed === true) {
+      // over once the truck is settled and the patrol has gone by; blown, the Schupo fight rather
+      // than go by, and the task ends with the truck (review round 13: it ran to the clock)
+      if ((objectiveDone(sim, "truck") || s.vars.truckGone === true) && (s.vars.patrolPassed === true || sim.anyAlarm())) {
+        if (s.vars.patrolPassed !== true) setObjective(sim, "patrol", "failed");
         if (!sim.anyAlarm()) setObjective(sim, "quiet", "done");
         s.outcome = objectiveDone(sim, "truck") ? "success" : "partial";
         sim.emit({ t: "phase", outcome: s.outcome });

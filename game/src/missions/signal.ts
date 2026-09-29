@@ -9,9 +9,10 @@ import type { MapData } from "../content/mapdata";
 import { zone } from "../content/mapdata";
 import { cmdWork } from "../sim/commands";
 import { BIEL, DLUGA, TLOM } from "../content/arsenal/map";
-import { TASK_MODE, type Campaign, type TaskResult } from "./campaign";
+import type { Campaign, TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
 import { UF_POSTED } from "../sim/types";
+import { SPEED } from "../sim/tuning";
 import { civilians, fieldFromCampaign, guard, objective, patrol, recordSoldiers, setObjective, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
 import { path } from "../content/mapdata";
 
@@ -27,7 +28,6 @@ export function signalTask(md: MapData, c: Campaign): Phase {
   const phase: Phase = {
     id: "signal",
     kind: "task",
-    mode: TASK_MODE.signal,
     title: "Sygnalizacja",
     place: "Bielańska",
     time: "26 March 1943, 17:05",
@@ -41,16 +41,32 @@ export function signalTask(md: MapData, c: Campaign): Phase {
       sim.state.missionId = "signal";
       // in from Tłomackie
       fieldFromCampaign(sim, c, squad, TLOM.x0 + 34, (TLOM.n + TLOM.s) / 2, 0, true);
-      // the Bank Polski: two sentries and a guard room
-      guard(sim, BIEL.e - 0.8, 151, Math.PI * 0.95, { tag: "bank_a" });
+      // the Bank Polski: two sentries and a guard room, looking down Bielańska towards Plac
+      // Teatralny. The first looked west across the street, and his slow look round swept the way
+      // to Kadłubek's post by the bank (review round 13)
+      guard(sim, BIEL.e - 0.8, 151, Math.PI * 0.8, { tag: "bank_a" });
       guard(sim, BIEL.e - 0.8, 158, Math.PI * 0.8, { tag: "bank_b" });
       sim.addSpawner({ x: BIEL.e + 0.6, y: 154.5, ox: BIEL.e - 2, oy: 154.5, district: 1, interval: 9, left: -1, maxAlive: 2, tag: "bank_door", look: "de_rifle" });
-      // a patrol pair walking the pavements
+      // a patrol pair walking the pavements together, the second two paces behind. Half a round
+      // apart, one of them was always on the north half of Bielańska, and a player watching the
+      // cones never saw the way to the telephone clear (review round 13)
       const route = path(md, "patrol_signal");
-      patrol(sim, route, { start: 0, tag: "patrol_a" });
-      patrol(sim, route, { start: 2, tag: "patrol_b" });
-      // a Schupo at the corner of Tłomackie, looking along Bielańska
-      guard(sim, BIEL.w - 5, TLOM.n + 2.2, -0.15, { look: "de_mp40", tag: "schupo" });
+      const a = patrol(sim, route, { start: 0, tag: "patrol_a" });
+      // the second walks his own round a pace inside the first: on the same corners they both
+      // wanted one spot, and stood there shoulder to shoulder for good
+      const mid = { x: (BIEL.w + BIEL.e) / 2, y: (route[0].y + route[1].y) / 2 };
+      const inner = route.map((p) => ({ x: p.x + Math.sign(mid.x - p.x) * 1.2, y: p.y + Math.sign(mid.y - p.y) * 1.2 }));
+      const b = patrol(sim, inner, { start: 0, tag: "patrol_b" });
+      b.y = b.py = inner[0].y - 2;
+      // and at his round's pace, so the pair stays a pair (the inner round is 10 m shorter)
+      const round = (r: { x: number; y: number }[]) => r.reduce((a, p, i) => a + Math.hypot(r[(i + 1) % r.length].x - p.x, r[(i + 1) % r.length].y - p.y), 0);
+      b.ai!.pace = SPEED.guardPatrol * (round(inner) / round(route));
+      // and stops as long as the first at each corner (each man's own stop drifted them apart)
+      a.ai!.pause = b.ai!.pause = 1.5;
+      // a Schupo at the Plac Teatralny end, looking up Bielańska (where the finale's Schupo come
+      // from). He stood at the mouth of Tłomackie, on the very way a tap on Kuba's ring walks him:
+      // a player waiting for clear cones was felt at arm's length every time (review round 13)
+      guard(sim, BIEL.w + 3, 166, -Math.PI / 2, { look: "de_mp40", tag: "schupo" });
       civilians(sim, 7,
         [{ x: BIEL.w + 1, y: 100 }, { x: BIEL.w + 1, y: 150 }, { x: BIEL.e - 1, y: 104 }, { x: BIEL.e - 1, y: 132 }, { x: 90, y: TLOM.n + 1 }],
         [{ x: BIEL.w + 1, y: 168 }, { x: BIEL.e - 1, y: 168 }, { x: 70, y: TLOM.n + 1 }]);

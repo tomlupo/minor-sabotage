@@ -190,7 +190,9 @@ export class GameScene extends Phaser.Scene {
       // already cut to a fraction of the street's opened a maximised window's zone at half size)
       const fit = Math.min(screen.s, cam.width / sx(Z.w), cam.height / (sy(Z.h) + 60));
       const dense = screen.s / screen.zoom >= 2;
-      cam.setZoom(dense ? fit : fit >= 1 ? Math.floor(fit) : 1 / Math.ceil(1 / fit));
+      // below a screen pixel to an art pixel there is no evenness to keep: the zone takes the fit
+      // (round 13: 1/2 opened a 1366 x 768 laptop's zone at a third of the screen)
+      cam.setZoom(dense || fit < 1 ? fit : Math.floor(fit));
       cam.centerOn(sx(Z.x + Z.w / 2), sy(Z.y + Z.h / 2));
     } else {
       cam.setZoom(screen.s);

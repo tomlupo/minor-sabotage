@@ -57,12 +57,14 @@ describe("tasks", () => {
     expect((phase.finish(sim, c) as TaskResult).flags.lineCut).toBe(true);
   });
 
-  it("Stare Miasto: disable the truck while it unloads, and the task ends once the patrol has gone by", () => {
+  it("Stare Miasto: disable the truck while it unloads, by fire if need be, and the task ends", () => {
+    // this pilot fights its way in: seen, the task ends once the truck is settled (the patrol let by
+    // unseen is tests/stealth.test.ts's)
     const { sim, phase, c } = setup(oldtownTask);
     expect(fly(sim, 40, () => sim.state.vars.phase === "unloading")).toBe(true);
     expect(job(sim, phase, "disable_truck", () => sim.state.vars.truckDisabled === true, 80)).toBe(true);
     fly(sim, 150, () => !!sim.state.outcome);
-    expect(sim.state.vars.patrolPassed).toBe(true);
+    expect(sim.state.vars.patrolPassed === true || sim.anyAlarm()).toBe(true);
     expect(sim.state.outcome).toBe("success");
     const r = phase.finish(sim, c) as TaskResult;
     expect(r.flags.truckDisabled).toBe(true);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Grid, F_SIGHT, F_WALK } from "../src/sim/grid";
+import { Grid, F_SIGHT, F_VEH, F_WALK } from "../src/sim/grid";
 import { Sim } from "../src/sim/sim";
 import { makeSquad, fieldSquad } from "../src/sim/setup";
 import { cmdMove, cmdTapEnemy, cmdThrow, cmdHelp, cmdSelectSquad, cmdOrder, cmdPick, cmdWork } from "../src/sim/commands";
@@ -440,6 +440,30 @@ describe("fire on the street", () => {
       expect(Math.hypot(u.x - x, u.y - y)).toBeGreaterThan(1);
       sim.state.units = sim.state.units.filter((q) => q !== u);
     }
+  });
+
+  it("sent straight across a stopped van from beside it, goes round and never steps on it", () => {
+    // the step across a vehicle's cells is only for a man it stopped on (review round 13: unpinned)
+    const md = buildArsenalMap();
+    const sim = new Sim(gridFromMap(md), 7);
+    const v = sim.spawnVehicle("prison_truck", 101.5, 78.9, 3.54);
+    v.state = "wreck";
+    sim.step();
+    const G = sim.grid;
+    // either side of the van, across its width
+    const nx = Math.sin(v.heading), ny = -Math.cos(v.heading);
+    const a = { x: v.x + nx * 3, y: v.y + ny * 3 }, b = { x: v.x - nx * 3, y: v.y - ny * 3 };
+    expect(G.walkable(a.x, a.y) && G.walkable(b.x, b.y)).toBe(true);
+    expect(G.walkable(v.x, v.y)).toBe(false);
+    const u = sim.spawnUnit({ side: "pl", look: "pl", x: a.x, y: a.y, weapon: "sten" });
+    // straight at the far side, as a walk line would take him
+    u.path = [{ x: b.x, y: b.y }];
+    let on = 0;
+    for (let i = 0; i < 30 * 4; i++) {
+      sim.step();
+      if ((G.flagAt(u.x, u.y) & F_VEH) !== 0) on++;
+    }
+    expect(on).toBe(0);
   });
 
   it("caught by a bottle in a building's corner, walks clear and stays clear", () => {

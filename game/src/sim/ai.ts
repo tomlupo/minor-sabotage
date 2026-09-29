@@ -123,7 +123,7 @@ function backToRoutine(sim: Sim, u: Unit): void {
   const ai = u.ai!;
   ai.meter = 0;
   setGlyph(sim, u, "none");
-  u.speed = SPEED.guardPatrol;
+  u.speed = ai.pace ?? SPEED.guardPatrol;
   if (ai.route && ai.route.length) {
     ai.mode = "patrol";
     const p = ai.route[ai.routeI % ai.route.length];
@@ -146,7 +146,7 @@ function post(sim: Sim, u: Unit, dt: number): void {
 
 function patrol(sim: Sim, u: Unit, dt: number): void {
   const ai = u.ai!;
-  u.speed = SPEED.guardPatrol;
+  u.speed = ai.pace ?? SPEED.guardPatrol;
   if (!ai.route || !ai.route.length) { ai.mode = "post"; return; }
   if (u.path.length) return;
   if (ai.wait > 0) {
@@ -158,7 +158,7 @@ function patrol(sim: Sim, u: Unit, dt: number): void {
   const here = ai.route[ai.routeI % ai.route.length];
   if (Math.hypot(here.x - u.x, here.y - u.y) < 0.6) {
     ai.routeI = (ai.routeI + 1) % ai.route.length;
-    ai.wait = 1.2 + (u.id % 3) * 0.6;
+    ai.wait = ai.pause ?? 1.2 + (u.id % 3) * 0.6;
     return;
   }
   goTo(sim, u, here.x, here.y, 6000);

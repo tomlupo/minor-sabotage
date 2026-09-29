@@ -8,7 +8,7 @@ import type { MapData } from "../content/mapdata";
 import { zone, path } from "../content/mapdata";
 import { cmdWork } from "../sim/commands";
 import { DLUGA, PRZEJAZD, GHETTO_WALL_Y, ARSENAL } from "../content/arsenal/map";
-import { TASK_MODE, type Campaign, type TaskResult } from "./campaign";
+import type { Campaign, TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
 import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, silencePost, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
 
@@ -23,7 +23,6 @@ export function ghettoTask(md: MapData, c: Campaign): Phase {
   const phase: Phase = {
     id: "ghetto",
     kind: "task",
-    mode: TASK_MODE.ghetto,
     title: "Getto",
     place: "Długa at Przejazd",
     time: "26 March 1943, 17:10",

@@ -2,6 +2,7 @@
 // The game teaches itself instead of opening with a manual.
 import type { Sim } from "../sim/sim";
 import type { Phase } from "../missions/types";
+import { TASK_MODE, type TaskId } from "../missions/campaign";
 
 export interface Hint {
   id: string;
@@ -37,6 +38,7 @@ export const HINTS: Hint[] = [
   { id: "walk", text: "Tap the street to walk there. Drag to lead the squad.", when: (s) => s.state.time > 0.5 },
   { id: "cone", text: "Yellow is what a guard sees. Stay out of it, or be quick.", when: (s) => s.state.time > 4 && guardOnScreenish(s) },
   { id: "knife", text: "Tap a guard from behind: the knife. From the front: the squad fires.", when: (s) => s.state.time > 9 && guardOnScreenish(s) },
+  { id: "stealth", text: "Stealth: hide a man at a corner out of the cones, wait for the patrol to pass, then tap the ring.", when: (s, p) => p.kind === "task" && TASK_MODE[p.id as TaskId] === "stealth" && s.state.time > 8 },
   { id: "job", text: "Tap the white ring: the right man does the job.", when: (s, p) => s.state.time > 14 && p.interactables(s).some((i) => i.ready(s)) },
   { id: "alarm", text: "Alarm! Guard posts send men until you blow them up: hold on one to throw.", when: (s) => s.anyAlarm() },
   { id: "pick", text: "Tap a man's tag to send him alone. Tap it again to call him back.", when: (s) => s.state.time > 24 },

@@ -74,7 +74,11 @@ export interface Leg { cells: number[]; arriveStep: number }
  * after it is there, and then standing `stay` seconds unseen at the goal. Null when none exists
  * within `seconds`.
  */
-export function planLeg(sim: Sim, from: { x: number; y: number }, goal: (cx: number, cy: number) => boolean, stay: number, seconds = 120): Leg | null {
+// A man is named by his id: planning restores a snapshot, which makes every Unit object new, and a
+// Unit held across it is a stale copy (review round 13: the way back was planned from where he had been)
+export function planLeg(sim: Sim, manId: number, goal: (cx: number, cy: number) => boolean, stay: number, seconds = 120): Leg | null {
+  const from = sim.unit(manId);
+  if (!from) return null;
   const G = sim.grid;
   const f = foresee(sim, seconds + stay + DT * 2);
   const steps = Math.ceil(seconds / DT), hold = Math.ceil(stay / DT);
@@ -132,9 +136,9 @@ export function planLeg(sim: Sim, from: { x: number; y: number }, goal: (cx: num
 }
 
 /** Walk `man` alone along a leg, a cell a step, with the game's orders. False if the alarm went up. */
-export function walkLeg(sim: Sim, man: Unit, leg: Leg): boolean {
+export function walkLeg(sim: Sim, manId: number, leg: Leg): boolean {
   const G = sim.grid;
-  if (sim.state.picked !== man.id) cmdPick(sim, man.id);
+  if (sim.state.picked !== manId) cmdPick(sim, manId);
   let last = -1;
   for (const cell of leg.cells) {
     if (cell !== last) {
@@ -146,6 +150,90 @@ export function walkLeg(sim: Sim, man: Unit, leg: Leg): boolean {
     if (sim.anyAlarm()) return false;
   }
   return !sim.anyAlarm();
+}
+
+/**
+ * A person at the screen, where the look-ahead player above proves a way exists. He sees what is
+ * drawn (the cones) and the patrols walking, nothing more: he sends his man to a corner of his
+ * choosing (`hide`) when the way there is clear, waits there until no cone reaches the rest of the
+ * way and no patrol is near it or heading for it, then taps the job's ring. Nothing is foreseen.
+ * True when the job is done with no alarm.
+ */
+export function tapWhenClear(sim: Sim, manId: number, job: () => { x: number; y: number; act: (s: Sim) => void } | undefined, done: () => boolean, o: { hide?: { x: number; y: number }; clear?: number; lookAhead?: number; patience?: number } = {}): boolean {
+  const G = sim.grid;
+  const clear = o.clear ?? 4, lookAhead = o.lookAhead ?? 8, patience = o.patience ?? 180;
+  /** The game's way from the man to (x, y), a point a metre. */
+  const wayTo = (x: number, y: number): { x: number; y: number }[] => {
+    const man = sim.unit(manId)!;
+    const route = sim.route({ x: man.x, y: man.y }, { x, y }) ?? [];
+    const pts: { x: number; y: number }[] = [];
+    let px = man.x, py = man.y;
+    for (const p of route) {
+      const n = Math.max(1, Math.ceil(Math.hypot(p.x - px, p.y - py)));
+      for (let k = 1; k <= n; k++) pts.push({ x: px + ((p.x - px) * k) / n, y: py + ((p.y - py) * k) / n });
+      px = p.x; py = p.y;
+    }
+    return pts;
+  };
+  const waitClear = (to: () => { x: number; y: number } | undefined): boolean => {
+    for (let t = 0; t < patience; t += 0.5) {
+      const p = to();
+      // the job went while he waited (the truck drove off)
+      if (!p) return false;
+      if (clearWay(wayTo(p.x, p.y))) return true;
+      if (!wait(sim, 0.5)) return false;
+    }
+    return false;
+  };
+  const clearWay = (pts: { x: number; y: number }[]): boolean => {
+    for (const u of sim.state.units) {
+      const ai = u.ai;
+      if (!ai || u.side !== "de" || u.state !== "ok" || u.hidden || ai.blind) continue;
+      for (const q of pts) {
+        const d = Math.hypot(q.x - u.x, q.y - u.y);
+        let off = Math.atan2(q.y - u.y, q.x - u.x) - u.dir;
+        off = Math.abs(Math.atan2(Math.sin(off), Math.cos(off)));
+        if (ai.mode === "patrol") {
+          // a walking guard: too close, or if he keeps walking the way he faces for `lookAhead` s,
+          // his cone reaches the way; a person sees where a man is heading, not where he will turn
+          if (d < clear) return false;
+          for (let t = 1; t <= lookAhead; t++) {
+            const gx = u.x + Math.cos(u.dir) * u.speed * t, gy = u.y + Math.sin(u.dir) * u.speed * t;
+            if (!G.walkable(gx, gy)) break;
+            const dd = Math.hypot(q.x - gx, q.y - gy);
+            let o2 = Math.atan2(q.y - gy, q.x - gx) - u.dir;
+            o2 = Math.abs(Math.atan2(Math.sin(o2), Math.cos(o2)));
+            if (dd <= ai.coneR && o2 <= ai.coneHalf && G.los(gx, gy, q.x, q.y)) return false;
+          }
+        }
+        // a sentry's cone swings round his post (ai.ts post()): a person sees the whole swing
+        let swing = off, reach = ai.coneHalf;
+        if (ai.mode === "post") {
+          swing = Math.atan2(q.y - u.y, q.x - u.x) - ai.homeDir;
+          swing = Math.abs(Math.atan2(Math.sin(swing), Math.cos(swing)));
+          reach = ai.coneHalf + 0.6;
+        }
+        if (d <= ai.coneR && swing <= reach && G.los(u.x, u.y, q.x, q.y)) return false;
+      }
+    }
+    return true;
+  };
+  if (!job()) return false;
+  if (sim.state.picked !== manId) cmdPick(sim, manId);
+  if (o.hide) {
+    const at = o.hide;
+    if (!waitClear(() => at)) return false;
+    cmdMove(sim, at.x, at.y);
+    for (let t = 0; t < 60; t += 0.5) {
+      const man = sim.unit(manId)!;
+      if (Math.hypot(man.x - at.x, man.y - at.y) < 0.8) break;
+      if (!wait(sim, 0.5)) return false;
+    }
+  }
+  if (!waitClear(() => job())) return false;
+  job()!.act(sim);
+  for (let t = 0; t < 60 && !done(); t += 0.5) if (!wait(sim, 0.5)) return false;
+  return done() && !sim.anyAlarm();
 }
 
 /** Stand still for `seconds` (the others hidden where they are); false if the alarm went up. */

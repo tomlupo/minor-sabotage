@@ -100,12 +100,13 @@ export class BriefingScene extends Phaser.Scene {
       this.add.rectangle(cx + 1, y + 1, 5, cardH - 2, hex(SQUAD_COLOURS[SQUADS[sqi].colour])).setOrigin(0);
       const head = txt(this, cx + 10, y + 3, `${info.letter}. ${info.title}`, { color: PAL.hud.paper_ink });
       // what kind of task: stealth (stay unseen) or fire, as on the day
-      txt(this, head.x + head.width + 6, y + 5, TASK_MODE[t] === "stealth" ? "stealth" : "fire", { font: PXS, face: "sans", color: PAL.city_1943.brick[0] });
+      txt(this, head.x + head.width + 6, y + 5, TASK_MODE[t], { font: PXS, face: "sans", color: PAL.city_1943.brick[0] });
       txt(this, cx + cw - 4, y + 3, SQUADS[sqi].name, { color: PAL.hud.paper_ink, align: 1, font: PXS });
       if (res) {
         const word = res.outcome === "success" ? "DONE" : res.outcome === "partial" ? "PART DONE" : "FAILED";
-        const col = res.outcome === "success" ? PAL.hud.hp_ok : res.outcome === "partial" ? PARTIAL : PAL.hud.hp_low;
-        const how = TASK_MODE[t] === "fire" ? "" : res.silent ? ", unseen" : ", blown";
+        const blown = TASK_MODE[t] === "stealth" && res.seconds > 0 && !res.silent;
+        const col = res.outcome === "success" && !blown ? PAL.hud.hp_ok : res.outcome === "fail" ? PAL.hud.hp_low : PARTIAL;
+        const how = TASK_MODE[t] === "fire" || res.seconds === 0 ? "" : blown ? ", blown" : ", unseen";
         txt(this, cx + 10, y + 14, `${word}${how}`, { font: PXS, color: col });
         txt(this, cx + 10, y + 24, this.effect(t), { font: PX, color: PAL.hud.paper_ink, wrap: cw - 16 });
       } else {
@@ -146,10 +147,14 @@ export class BriefingScene extends Phaser.Scene {
 
   private effect(t: TaskId): string {
     const r = this.flow.campaign.results[t]!;
-    if (t === "signal") return r.flags.signal ? "The finale has the go-code: you choose when." : "No signal: the van will come unannounced.";
+    const blown = r.seconds > 0 && !r.silent;
+    if (t === "signal") {
+      const go = r.flags.signal ? "The finale has the go-code: you choose when." : "No signal: the van will come unannounced.";
+      return blown ? `${go} The Schupo from Plac Teatralny will come early.` : go;
+    }
     if (t === "ghetto") return r.flags.postSilenced ? "The wall post is silenced: the west stays empty." : r.flags.lineCut ? "The line is cut: the wall police will be slow." : "The wall police will come quickly.";
     const truck = r.flags.truckDisabled ? "No truck will block Plac Krasińskich." : "A truck will block Plac Krasińskich.";
-    return r.silent ? truck : `${truck} The Arbeitsamt is warned.`;
+    return blown ? `${truck} The Arbeitsamt is warned.` : truck;
   }
 
   private assign(i: number) {

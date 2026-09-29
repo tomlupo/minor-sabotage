@@ -17,7 +17,7 @@ import { SPEED } from "../sim/tuning";
 import { makeSquad, germanWeapon } from "../sim/setup";
 import { SQUADS } from "../content/arsenal/roster";
 import { BIEL, DLUGA, NAL, W, PRZEJAZD, GHETTO_WALL_Y } from "../content/arsenal/map";
-import { fit, type Campaign, type FinaleResult } from "./campaign";
+import { fit, type Campaign, type FinaleResult, type TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
 import { civilians, fieldFromCampaign, guard, objective, recordSoldiers, setObjective } from "./helpers";
 
@@ -42,11 +42,13 @@ export function finale(md: MapData, c: Campaign): Phase {
   const Z = zone(md, "finale");
   const R = c.results;
   const signal = R.signal?.flags.signal === true;
-  const bielAlert = R.signal?.flags.bielanskaAlert === true;
+  // a stealth task blown: played, and the alarm went up (a task not played is not blown)
+  const blown = (r?: TaskResult) => !!r && r.seconds > 0 && !r.silent;
+  const bielAlert = blown(R.signal);
   const lineCut = R.ghetto?.flags.lineCut === true;
   const postSilenced = R.ghetto?.flags.postSilenced === true;
   // the Old Town section was seen: the Arbeitsamt is ready for the shooting
-  const eastBlown = R.oldtown !== undefined && !R.oldtown.silent;
+  const eastBlown = blown(R.oldtown);
   const truckDisabled = R.oldtown?.flags.truckDisabled === true;
   const exits = ["exit_east", "exit_tlomackie", "exit_south", "exit_west"].map((n) => zone(md, n));
 
@@ -261,7 +263,6 @@ export function finale(md: MapData, c: Campaign): Phase {
   const phase: Phase = {
     id: "finale",
     kind: "finale",
-    mode: "fire",
     title: "Akcja pod Arsenałem",
     place: "The Arsenal, Długa at Bielańska and Nalewki",
     time: "26 March 1943, 17:30",

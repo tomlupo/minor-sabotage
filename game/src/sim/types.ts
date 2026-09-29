@@ -42,6 +42,10 @@ export interface GuardAI {
   repath: number;
   /** Cannot see (crew inside a vehicle). */
   blind: boolean;
+  /** Walking pace on his round, m/s, when not the patrols’ own (a pair keeping step on rounds of two lengths). */
+  pace?: number;
+  /** Seconds he stops at each corner of his round, when not his own (a pair stops together). */
+  pause?: number;
   /** Fights where he stands and never advances (the guards at the tailgate). */
   stay?: boolean;
 }
