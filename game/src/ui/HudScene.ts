@@ -14,6 +14,7 @@ import { hudArt, type HudArt, type HudImage } from "./hudart";
 import { txt, capsOf, capShift, fitLine, PX, PXS, PXB } from "./text";
 import { nextHint, markSeen, type Hint } from "./hints";
 import { placeArrows, arrowMask, type Box } from "./pointers";
+import { Gestures } from "./gestures";
 import { sx, sy } from "../render/iso";
 import type { RGB } from "../art/palette";
 
@@ -33,17 +34,6 @@ type Btn = {
   onLong?: () => void;
 };
 
-interface Gesture {
-  id: number;
-  x0: number; y0: number;
-  t0: number;
-  moved: boolean;
-  btn: Btn | null;
-  /** It has led the squad: a drag, judged when it is let go. */
-  dragged: boolean;
-  lastDrag: number;
-}
-
 export class HudScene extends Phaser.Scene {
   g!: GameScene;
   private art!: HudArt;
@@ -51,7 +41,7 @@ export class HudScene extends Phaser.Scene {
   private texts = new Map<string, Phaser.GameObjects.Text>();
   private images = new Map<string, Phaser.GameObjects.Image>();
   private btns: Btn[] = [];
-  private gestures = new Map<number, Gesture>();
+  private gestures = new Gestures<Btn>();
   private fireHeld = false;
   private grenadeArmed = false;
   private toast: { text: string; t: number; tone: string }[] = [];
@@ -266,8 +256,8 @@ export class HudScene extends Phaser.Scene {
       return;
     }
     const btn = this.btnAt(a.x, a.y);
-    const g: Gesture = { id: p.id, x0: a.x, y0: a.y, t0: this.time.now, moved: false, btn, dragged: false, lastDrag: 0 };
-    this.gestures.set(p.id, g);
+    // the mouse's second button joins the gesture under way (gestures.ts)
+    if (!this.gestures.open({ id: p.id, x0: a.x, y0: a.y, t0: this.time.now, moved: false, btn, dragged: false, lastDrag: 0 })) return;
     if (btn?.onDown) btn.onDown(p);
     if (!btn && this.fireHeld) this.g.fireAt(p.x, p.y);
   }
@@ -287,43 +277,45 @@ export class HudScene extends Phaser.Scene {
   }
 
   private up(p: Phaser.Input.Pointer) {
-    const g = this.gestures.get(p.id);
-    this.gestures.delete(p.id);
-    if (!g) return;
+    // what the lift does is gestures.ts's to say ("held" and "none": nothing); here it is done
+    const l = this.gestures.lift(p.id, this.time.now, p.buttons, { fire: this.fireHeld, order: !!this.pendingOrder, grenade: this.grenadeArmed });
+    if (!l) return;
+    const { g, lift } = l;
     const held = this.time.now - g.t0;
-    if (g.btn) {
-      if (g.btn.onLong && held > 450 && !g.moved) g.btn.onLong();
-      else g.btn.onUp?.(p, held);
-      return;
-    }
     const sim = this.g.run.sim;
-    // a drag let go: the walk it led is judged now, and the finger answers nothing else (review round
-    // 19: let go with FIRE held, a grenade armed or an order waiting, it was never judged; round 20:
-    // it threw a grenade armed meanwhile where it lifted)
-    if (g.dragged) { cmdDragEnd(sim); return; }
-    if (this.fireHeld) return;
-    if (this.pendingOrder) {
-      const w = this.g.toWorld(p.x, p.y);
-      const po = this.pendingOrder;
-      this.pendingOrder = null;
-      const sq = sim.state.squads[po.squad];
-      const L = sq && sim.leaderOf(sq);
-      if (!L) return;
-      const ok = po.kind === "cover"
-        ? cmdOrder(sim, po.squad, "cover", { dir: Math.atan2(w.y - L.y, w.x - L.x), half: 0.55 })
-        : cmdOrder(sim, po.squad, "signal", { route: [w] });
-      this.say(ok ? `${sq.name}: ${po.kind === "cover" ? "covering" : "goes on the signal"}` : "One order per squad during the pause", ok ? "info" : "bad");
-      sound.ui(ok ? "ui_ok" : "ui_back");
-      return;
+    switch (lift) {
+      case "button":
+        if (g.btn!.onLong && held > 450 && !g.moved) g.btn!.onLong();
+        else g.btn!.onUp?.(p, held);
+        return;
+      case "drag":
+        cmdDragEnd(sim);
+        return;
+      case "order": {
+        const w = this.g.toWorld(p.x, p.y);
+        const po = this.pendingOrder!;
+        this.pendingOrder = null;
+        const sq = sim.state.squads[po.squad];
+        const L = sq && sim.leaderOf(sq);
+        if (!L) return;
+        const ok = po.kind === "cover"
+          ? cmdOrder(sim, po.squad, "cover", { dir: Math.atan2(w.y - L.y, w.x - L.x), half: 0.55 })
+          : cmdOrder(sim, po.squad, "signal", { route: [w] });
+        this.say(ok ? `${sq.name}: ${po.kind === "cover" ? "covering" : "goes on the signal"}` : "One order per squad during the pause", ok ? "info" : "bad");
+        sound.ui(ok ? "ui_ok" : "ui_back");
+        return;
+      }
+      case "grenade":
+        this.grenadeArmed = false;
+        if (!this.g.holdWorld(p.x, p.y)) this.say("Nobody close enough to throw", "bad");
+        return;
+      case "hold":
+        this.g.holdWorld(p.x, p.y);
+        return;
+      case "tap":
+        this.g.tapWorld(p.x, p.y);
+        return;
     }
-    if (this.grenadeArmed) {
-      this.grenadeArmed = false;
-      if (!this.g.holdWorld(p.x, p.y)) this.say("Nobody close enough to throw", "bad");
-      return;
-    }
-    if (g.moved) return;
-    if (held > 480) { this.g.holdWorld(p.x, p.y); return; }
-    this.g.tapWorld(p.x, p.y);
   }
 
   // ------------------------------------------------------------------ events and text
