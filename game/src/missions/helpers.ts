@@ -86,17 +86,17 @@ export function setObjective(sim: Sim, id: string, status: ObjectiveStatus): voi
 }
 
 /**
- * A stealth task is blown once a German has seen one of ours (he began to whistle, whether or not
- * he lived to finish) or the squad has been loud, a shot, a grenade or a bottle, as well as by the
- * alarm (the stealth decision of 2026-09-29; review round 14: shooting the pair that saw you kept
- * the task "unseen"). A knife is silent. Call it from the task's onEvent.
+ * A stealth task is blown once a German began to whistle, whether or not he lived to finish (he saw
+ * one of ours, or found a body), or the squad has been loud, a shot, a grenade or a bottle, as well
+ * as by the alarm (the stealth decision of 2026-09-29; review round 14: shooting the pair that saw
+ * you kept the task "unseen"). A knife is silent. Call it from the task's onEvent.
  */
 export function noteBlown(sim: Sim, e: SimEvent): void {
   const loud = (e.t === "shot" && e.side === "pl") || (e.t === "throw" && sim.unit(e.unit)?.side === "pl");
   if (e.t === "whistle" || loud) sim.state.vars.blown = true;
 }
 
-/** Whether a stealth task is blown: the alarm, a German who saw one of ours, or a loud act of ours. */
+/** Whether a stealth task is blown: the alarm, a German's whistle, or a loud act of ours. */
 export function isBlown(sim: Sim): boolean {
   return sim.anyAlarm() || sim.state.vars.blown === true;
 }

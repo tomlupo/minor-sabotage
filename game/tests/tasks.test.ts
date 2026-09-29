@@ -8,6 +8,7 @@ import { newCampaign, type TaskResult } from "../src/missions/campaign";
 import { signalTask } from "../src/missions/signal";
 import { ghettoTask } from "../src/missions/ghetto";
 import { oldtownTask } from "../src/missions/oldtown";
+import { finale } from "../src/missions/finale";
 import { cmdMove } from "../src/sim/commands";
 import type { Phase } from "../src/missions/types";
 import { fly } from "./helpers/autopilot";
@@ -105,5 +106,21 @@ describe("a task's record says what the task decided", () => {
   });
   it("Getto: the squad broken after the cut", () => {
     expect(broken(ghettoTask, (sim) => { sim.state.vars.lineCut = true; setObjective(sim, "cut", "done"); })).toEqual(["fail", "fail"]);
+  });
+});
+
+describe("the street", () => {
+  it("every phase's civilians start and walk on open ground", () => {
+    // one of Sygnalizacja's walk points stood in a snow heap: a man spawned in it never stepped out,
+    // and searched a route every tick of the task (round 15)
+    for (const make of [signalTask, ghettoTask, oldtownTask, finale]) {
+      for (let seed = 1; seed <= 10; seed++) {
+        const { sim } = setup(make, seed);
+        for (const u of sim.state.units.filter((q) => q.side === "civ")) {
+          expect(sim.grid.walkable(u.x, u.y), `${make.name} seed ${seed}: civilian ${u.id} at ${u.x.toFixed(1)},${u.y.toFixed(1)}`).toBe(true);
+          for (const p of u.ai!.route!) expect(sim.grid.walkable(p.x, p.y), `${make.name}: walk point ${p.x},${p.y}`).toBe(true);
+        }
+      }
+    }
   });
 });

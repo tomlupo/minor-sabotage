@@ -62,12 +62,19 @@ export function signalTask(md: MapData, c: Campaign): Phase {
       b.ai!.pace = SPEED.guardPatrol * (round(inner) / round(route));
       // and stops as long as the first at each corner (each man's own stop drifted them apart)
       a.ai!.pause = b.ai!.pause = 1.5;
+      // they stand at their first corner a while before they set off. The quiet ways were made for
+      // this round: setting off at once (review round 15) let a first play that taps the rings with
+      // no hiding through unseen from 9 s to 30 s, and left a fight begun at the bank unfinished 10
+      // times in 12 (12 in 12 finished with the stop)
+      a.ai!.wait = b.ai!.wait = 13;
       // a Schupo at the Plac Teatralny end, looking up Bielańska (where the finale's Schupo come
       // from). He stood at the mouth of Tłomackie, on the very way a tap on Kuba's ring walks him:
       // a player waiting for clear cones was felt at arm's length every time (review round 13)
       guard(sim, BIEL.w + 3, 166, -Math.PI / 2, { look: "de_mp40", tag: "schupo" });
+      // (the first stood in the snow heap by the pavement at y 100: a man spawned in it never stepped
+      // out, and searched a route every tick of the task)
       civilians(sim, 7,
-        [{ x: BIEL.w + 1, y: 100 }, { x: BIEL.w + 1, y: 150 }, { x: BIEL.e - 1, y: 104 }, { x: BIEL.e - 1, y: 132 }, { x: 90, y: TLOM.n + 1 }],
+        [{ x: BIEL.w + 1, y: 103 }, { x: BIEL.w + 1, y: 150 }, { x: BIEL.e - 1, y: 104 }, { x: BIEL.e - 1, y: 132 }, { x: 90, y: TLOM.n + 1 }],
         [{ x: BIEL.w + 1, y: 168 }, { x: BIEL.e - 1, y: 168 }, { x: 70, y: TLOM.n + 1 }]);
       // no place of their own: each post's job rings it (one ring, one arrow)
       for (const p of POSTS) objective(sim, p.id, p.obj, true);
@@ -123,9 +130,9 @@ export function signalTask(md: MapData, c: Campaign): Phase {
       recordSoldiers(sim, cc);
       const done = POSTS.filter((p) => sim.state.vars[`post_${p.id}`] === true).length;
       return {
-        // what the task decided when it ended (review round 14: Stare Miasto's two disagreed, and
-        // so did this, the squad broken after a post), and by the posts if it never did
-        outcome: sim.state.outcome ?? (done === POSTS.length ? "success" : done > 0 ? "partial" : "fail"),
+        // what the task decided when it ended: finish runs only once it has (flow.ts onEnd).
+        // Review round 14: counting for itself, the record said "partial" for a squad broken after a post
+        outcome: sim.state.outcome ?? "fail",
         silent: !isBlown(sim),
         flags: { signal: done === POSTS.length },
         seconds: sim.state.time,

@@ -9,28 +9,31 @@ import { KNIFE, THROW, WOUND } from "./tuning";
 /** A man with a job walks in the column until he is this close to it. */
 export const WORK_DETACH = 7;
 
+/** On his way to a job still far off: he still fights, and the column may carry him there. */
+export function farFromJob(u: Unit): boolean {
+  const t = u.task;
+  return t?.kind === "work" && t.phase === "approach" && Math.hypot(t.x - u.x, t.y - u.y) > WORK_DETACH;
+}
+
 /**
- * Whether the column is carrying a man to his job: he walks in it while it is on its way there,
- * and goes the last few metres alone. The leader and the man picked on the strip walk to a job
- * themselves, and so does anyone whose column is not going there, its leader picked (the column
- * keeps its rest point) or gone elsewhere (review round 14: he stood waiting for a column that
- * never came, and it held him at his place in it).
+ * Whether the column is carrying a man to his job: he walks in it while it walks there, and goes
+ * the last few metres alone. The leader and the man picked on the strip walk to a job themselves,
+ * and so does anyone whose column is not walking there: its leader picked (the column keeps its
+ * rest point), halted, arrived, or bound elsewhere. (Whether the column is SENT is cmdWork's
+ * question.) Review round 14: he stood waiting for a column that never came; round 15: a column
+ * halted short of the job, as for a knife, still held him.
  */
 export function carriedToJob(sim: Sim, u: Unit): boolean {
-  const t = u.task;
-  if (t?.kind !== "work" || t.phase !== "approach" || u.id === sim.state.picked) return false;
-  if (Math.hypot(t.x - u.x, t.y - u.y) <= WORK_DETACH) return false;
+  if (!farFromJob(u) || u.id === sim.state.picked) return false;
+  const t = u.task as Extract<Unit["task"], { kind: "work" }>;
   const sq = sim.squad(u.squad);
   const L = sq && sim.leaderOf(sq);
-  return !!L && L !== u && sim.state.picked !== L.id && Math.hypot(L.goalX - t.x, L.goalY - t.y) <= WORK_DETACH;
+  return !!L && L !== u && sim.state.picked !== L.id && L.path.length > 0 && Math.hypot(L.goalX - t.x, L.goalY - t.y) <= WORK_DETACH;
 }
 
 /** A man at his task does not fight; one still walking to a job far off does. */
 export function atTask(u: Unit): boolean {
-  const t = u.task;
-  if (!t) return false;
-  if (t.kind === "work" && t.phase === "approach" && Math.hypot(t.x - u.x, t.y - u.y) > WORK_DETACH) return false;
-  return true;
+  return !!u.task && !farFromJob(u);
 }
 
 export function stepTasks(sim: Sim, dt: number): void {
@@ -165,9 +168,11 @@ function work(sim: Sim, u: Unit): void {
       sim.emit({ t: "work", unit: u.id, what: t.what, done: false });
       return;
     }
-    // he walks in the column while it carries him, then goes to it
+    // he walks in the column while it carries him, then goes to it, from wherever it last sent him
+    // (review round 15: bound for his place in a halted column, a neighbour's elbow kept him from
+    // it, and so from his job, for good)
     if (carried) return;
-    if (!u.path.length) goTo(sim, u, t.x, t.y, 6000);
+    if (!u.path.length || Math.hypot(u.goalX - t.x, u.goalY - t.y) > 0.5) goTo(sim, u, t.x, t.y, 6000);
     return;
   }
   setAnim(u, "kneel");

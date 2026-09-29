@@ -5,6 +5,7 @@ import type { Sim } from "./sim";
 import type { Squad, Unit } from "./types";
 import { UF_POSTED } from "./types";
 import { goTo } from "./move";
+import { farFromJob } from "./tasks";
 import { THROW } from "./tuning";
 
 /** The man picked on the portrait strip, while he can still act for the squad you lead. */
@@ -53,6 +54,9 @@ export function cmdMove(sim: Sim, x: number, y: number): boolean {
   const L = actorOf(sim);
   if (!L) return false;
   if (L.task && L.task.kind !== "help") L.task = null;
+  // the squad walks as one: a man on his way to a job far off drops it and comes along, and one
+  // within reach of his job finishes it (review round 15: he walked on alone, into the cones)
+  if (!pickedOf(sim)) for (const u of sim.membersOf(sq)) if (farFromJob(u)) u.task = null;
   // a new walk cancels the squad's lock-on only if it was on something now out of sight
   return goTo(sim, L, x, y);
 }

@@ -42,10 +42,11 @@ export function finale(md: MapData, c: Campaign): Phase {
   const Z = zone(md, "finale");
   const R = c.results;
   const signal = R.signal?.flags.signal === true;
-  const bielAlert = blownTask(R.signal);
+  // the signal section was seen or heard: the Schupo from Plac Teatralny come early
+  const signalBlown = blownTask(R.signal);
   const lineCut = R.ghetto?.flags.lineCut === true;
   const postSilenced = R.ghetto?.flags.postSilenced === true;
-  // the Old Town section was seen: the Arbeitsamt is ready for the shooting
+  // the Old Town section was seen or heard: the Arbeitsamt is ready for the shooting
   const eastBlown = blownTask(R.oldtown);
   const truckDisabled = R.oldtown?.flags.truckDisabled === true;
   const exits = ["exit_east", "exit_tlomackie", "exit_south", "exit_west"].map((n) => zone(md, n));
@@ -250,7 +251,7 @@ export function finale(md: MapData, c: Campaign): Phase {
     once("r_west", lineCut ? 60 : 18, () => { if (!postSilenced) { sim.raiseAlarm(D_WEST, 12, DLUGA.n + 3); sim.message(lineCut ? "The wall police heard the shots at last." : "The police at the ghetto wall are coming!", "bad"); } });
     once("r_east", eastBlown ? 8 : 22, () => { sim.raiseAlarm(D_EAST, 200, 78); sim.message("Germans at the Arbeitsamt are shooting!", "bad"); });
     once("r_north", 35, () => { spawnGroup(sim, path(md, "reinf_north"), ["de_officer", "de_rifle", "de_rifle"], D_NORTH, "north"); sim.message("Up Nalewki: an SS officer and two men.", "bad"); });
-    once("r_south", bielAlert ? 40 : 100, () => { sim.raiseAlarm(D_SOUTH, BIEL.w + 6, 110); spawnGroup(sim, path(md, "reinf_south"), ["de_mp40", "de_mp40", "de_rifle"], D_SOUTH, "south"); sim.message("Schupo from Plac Teatralny!", "bad"); });
+    once("r_south", signalBlown ? 40 : 100, () => { sim.raiseAlarm(D_SOUTH, BIEL.w + 6, 110); spawnGroup(sim, path(md, "reinf_south"), ["de_mp40", "de_mp40", "de_rifle"], D_SOUTH, "south"); sim.message("Schupo from Plac Teatralny!", "bad"); });
     once("r_warn", LATE - 60, () => sim.message("Gendarmerie with dogs are on their way. Get out!", "bad"));
     once("r_late", LATE, () => {
       spawnGroup(sim, path(md, "reinf_south"), ["de_mp40", "de_rifle", "de_rifle", "de_mp40"], D_SOUTH, "late");
@@ -306,7 +307,7 @@ export function finale(md: MapData, c: Campaign): Phase {
         guard(sim, W - 9, 76.5, Math.PI + 0.3, { district: D_EAST, tag: "block" });
         guard(sim, W - 7, 84.5, Math.PI - 0.2, { district: D_EAST, tag: "block" });
       }
-      if (bielAlert) {
+      if (signalBlown) {
         guard(sim, BIEL.w + 1, 150, -Math.PI / 2, { district: D_SOUTH, tag: "south" });
         guard(sim, BIEL.e - 1, 156, -Math.PI / 2, { district: D_SOUTH, tag: "south", look: "de_mp40" });
       }

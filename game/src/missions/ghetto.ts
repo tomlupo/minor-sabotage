@@ -107,9 +107,8 @@ export function ghettoTask(md: MapData, c: Campaign): Phase {
       const cut = sim.state.vars.lineCut === true;
       const post = objectiveDone(sim, "post");
       return {
-        // what the task decided when it ended (the squad broken after the cut: fail), and by the
-        // line if it never did
-        outcome: sim.state.outcome ?? (cut && objectiveDone(sim, "cover") ? "success" : cut ? "partial" : "fail"),
+        // what the task decided when it ended: finish runs only once it has (flow.ts onEnd)
+        outcome: sim.state.outcome ?? "fail",
         silent: !sim.anyAlarm(),
         flags: { lineCut: cut, postSilenced: post },
         seconds: sim.state.time,

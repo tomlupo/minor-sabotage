@@ -24,14 +24,14 @@ export interface SoldierStatus {
 
 export interface TaskResult {
   outcome: "success" | "partial" | "fail";
-  /** The alarm never went up. */
+  /** Not blown: no alarm went up, and in a stealth task no German whistled and the squad was never loud. */
   silent: boolean;
   /** Task-specific facts the finale reads (e.g. lineCut, postSilenced, truckDisabled). */
   flags: Record<string, boolean>;
   seconds: number;
 }
 
-/** A stealth task blown: played, and seen (the stealth decision of 2026-09-29). A task not played is not blown. */
+/** A stealth task blown: played, and seen or loud (the stealth decision of 2026-09-29). A task not played is not blown. */
 export function blownTask(r: TaskResult | undefined): boolean {
   return !!r && r.seconds > 0 && !r.silent;
 }

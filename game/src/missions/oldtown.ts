@@ -7,7 +7,7 @@
 // truck's rotor arm while it unloads, unseen. The Arbeitsamt's gunfight is the finale's, where
 // it happened; its sentries stand at the gate here, and its post sends men if the alarm goes up.
 import type { Sim } from "../sim/sim";
-import type { PhaseOutcome, Unit, Vehicle } from "../sim/types";
+import type { Unit, Vehicle } from "../sim/types";
 import type { MapData } from "../content/mapdata";
 import { zone, path } from "../content/mapdata";
 import { cmdWork } from "../sim/commands";
@@ -21,11 +21,6 @@ const GATE_X = 211.5;
 /** Seconds the crew unloads: long enough that, once the Schupo patrol has gone by, the rotor arm
  *  can still be pulled unseen before they climb back in (the stealth decision of 2026-09-29). */
 const UNLOAD_S = 120;
-
-/** The task's result: the truck disabled is the job; the patrol let by unseen is half of it. */
-function verdict(sim: Sim): PhaseOutcome {
-  return objectiveDone(sim, "truck") ? "success" : objectiveDone(sim, "patrol") ? "partial" : "fail";
-}
 
 export function oldtownTask(md: MapData, c: Campaign): Phase {
   const Z = zone(md, "task_oldtown");
@@ -155,7 +150,8 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
       if ((objectiveDone(sim, "truck") || s.vars.truckGone === true) && (s.vars.patrolPassed === true || sim.anyAlarm())) {
         if (s.vars.patrolPassed !== true) setObjective(sim, "patrol", "failed");
         if (!isBlown(sim)) setObjective(sim, "quiet", "done");
-        s.outcome = verdict(sim);
+        // the truck disabled is the job; the patrol let by unseen is half of it
+        s.outcome = objectiveDone(sim, "truck") ? "success" : objectiveDone(sim, "patrol") ? "partial" : "fail";
         sim.emit({ t: "phase", outcome: s.outcome });
       } else if (squadsBroken(sim)) {
         s.outcome = "fail";
@@ -196,8 +192,8 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
       recordSoldiers(sim, cc);
       const truck = objectiveDone(sim, "truck");
       return {
-        // what the task decided when it ended (review round 14: the two disagreed)
-        outcome: sim.state.outcome ?? verdict(sim),
+        // what the task decided when it ended: finish runs only once it has (flow.ts onEnd)
+        outcome: sim.state.outcome ?? "fail",
         silent: !isBlown(sim),
         flags: { truckDisabled: truck },
         seconds: sim.state.time,
