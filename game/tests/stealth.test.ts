@@ -1,9 +1,8 @@
 // Stealth and fire tasks (decision of 2026-09-29; Tom: "if in reality some part of the mission
-// was stealth make map possible to do it"). Two players prove it. One looks ahead at what the
-// Germans will watch and plans each man's way outside every cone: a quiet way exists. The other is
-// a person at the screen, who sees only the cones and the patrols walking: he hides his man at a
-// corner, waits, and taps the job's ring. A change to the map or the guards that closes the way,
-// or leaves it only to a player who sees the future, fails here.
+// was stealth make map possible to do it"). A person at the screen proves it: he sees only the
+// cones and the patrols walking, hides his man at a corner, waits, and taps the job's ring. A change
+// to the map or the guards that closes the way, or leaves it only to a player who sees the future,
+// fails here.
 import { describe, expect, it } from "vitest";
 import { buildArsenalMap } from "../src/content/arsenal/map";
 import { gridFromMap } from "../src/content/mapdata";
@@ -11,11 +10,11 @@ import { Sim } from "../src/sim/sim";
 import { newCampaign, TASK_MODE, type Campaign } from "../src/missions/campaign";
 import { signalTask } from "../src/missions/signal";
 import { ghettoTask } from "../src/missions/ghetto";
-import { oldtownTask, UNLOAD_S } from "../src/missions/oldtown";
-import { cmdMove, cmdPick, cmdWork } from "../src/sim/commands";
+import { oldtownTask } from "../src/missions/oldtown";
+import { cmdFireAt, cmdMove, cmdPick, cmdThrow, cmdWork } from "../src/sim/commands";
 import { UF_POSTED } from "../src/sim/types";
 import type { Phase } from "../src/missions/types";
-import { planLeg, tapWhenClear, walkLeg, wait } from "./helpers/sneak";
+import { tapWhenClear, wait } from "./helpers/sneak";
 
 type Make = (md: ReturnType<typeof buildArsenalMap>, c: Campaign) => Phase;
 
@@ -32,100 +31,59 @@ function setup(make: Make, seed = 1234, c = newCampaign()) {
   return { sim, phase, sq, id };
 }
 
-const near = (x: number, y: number, r: number) => (cx: number, cy: number) => Math.hypot(cx + 0.5 - x, cy + 0.5 - y) <= r;
 const POSTS = [["tlomackie", "kuba"], ["bank", "kadlubek"], ["phone", "jur"]] as const;
 /** Where a person hides a man before he taps: the mouth of Tłomackie, the passage south of the truck. */
 const MOUTH = { x: 119, y: 131 }, PASSAGE = { x: 177, y: 95 };
-
-describe("a quiet way exists (a player who looks ahead)", () => {
-  for (const seed of [1234, 77]) {
-    it(`Sygnalizacja: each post's man by a way no German sees (seed ${seed})`, () => {
-      const { sim, phase, id } = setup(signalTask, seed);
-      for (const [post, who] of POSTS) {
-        const job = phase.interactables(sim).find((i) => i.id === post)!;
-        const man = id((t) => t === who);
-        const leg = planLeg(sim, man, near(job.x, job.y, 0.9), 4, 120);
-        expect(leg, `an unseen way for ${who} to ${post}`).not.toBeNull();
-        expect(walkLeg(sim, man, leg!), `${who} walked to ${post} unseen`).toBe(true);
-        job.act(sim);
-        expect(wait(sim, 4), `${who} set ${post} unseen`).toBe(true);
-        expect(sim.state.vars[`post_${post}`]).toBe(true);
-      }
-      expect(sim.state.outcome).toBe("success");
-      expect(sim.anyAlarm()).toBe(false);
-    }, 60_000);
-
-    it(`Stare Miasto: the rotor arm while the truck unloads, and back to the squad (seed ${seed})`, () => {
-      const { sim, phase, sq, id } = setup(oldtownTask, seed);
-      for (let k = 0; k < 240 && sim.state.vars.phase !== "unloading"; k++) wait(sim, 0.5);
-      expect(sim.state.vars.phase).toBe("unloading");
-      const hide = { x: sq.restX, y: sq.restY };
-      const arm = phase.interactables(sim).find((i) => i.id === "disable_truck")!;
-      const man = id((_t, role) => role === "bottles");
-      // pulled before the crew climbs back in, with 8 s to spare
-      const window = Number(sim.state.vars.unloadT) + UNLOAD_S - 8 - sim.state.time;
-      const leg = planLeg(sim, man, near(arm.x, arm.y, 0.9), 3.5, window);
-      expect(leg, "an unseen way to the rotor arm while the truck unloads").not.toBeNull();
-      expect(walkLeg(sim, man, leg!)).toBe(true);
-      arm.act(sim);
-      expect(wait(sim, 3)).toBe(true);
-      expect(sim.state.vars.truckDisabled).toBe(true);
-      const back = planLeg(sim, man, near(hide.x, hide.y, 2.5), 20, 120);
-      expect(back, "an unseen way back to the squad").not.toBeNull();
-      // a real way back from the truck, not from where he stood before it
-      expect(back!.cells.length).toBeGreaterThan(10);
-      expect(walkLeg(sim, man, back!)).toBe(true);
-      for (let k = 0; k < 400 && !sim.state.outcome; k++) wait(sim, 0.5);
-      expect(sim.state.outcome).toBe("success");
-      expect(sim.anyAlarm()).toBe(false);
-    }, 60_000);
+const quiet = (sim: Sim) => sim.state.objectives.find((o) => o.id === "quiet")?.status;
+/** The Germans look and listen elsewhere: for a test of who does what, not of being seen. */
+const blind = (sim: Sim) => { for (const u of sim.state.units) if (u.side === "de" && u.ai) u.ai.blind = true; };
+/** A spot `r` metres from (x, y) that a man can stand on and see from there. */
+function spotFrom(sim: Sim, x: number, y: number, r: number) {
+  for (let k = 0; k < 16; k++) {
+    const a = (k * Math.PI) / 8, sx = x + Math.cos(a) * r, sy = y + Math.sin(a) * r;
+    if (sim.grid.walkable(sx, sy) && sim.grid.los(x, y, sx, sy)) return { x: sx, y: sy };
   }
+  throw new Error(`no open spot ${r} m from ${x}, ${y}`);
+}
 
-  it("Stare Miasto: waiting for the Schupo patrol to go by first still leaves time for the rotor arm", () => {
-    const { sim, phase, id } = setup(oldtownTask);
-    const schupo = () => sim.state.units.filter((u) => u.tag.startsWith("schupo") && u.state === "ok" && !u.hidden);
-    for (let k = 0; k < 400 && !(sim.state.vars.patrolSpawned && schupo().every((u) => u.x < 170)); k++) wait(sim, 0.5);
-    expect(sim.state.vars.patrolSpawned).toBe(true);
-    expect(sim.state.vars.phase).toBe("unloading");
-    const arm = phase.interactables(sim).find((i) => i.id === "disable_truck")!;
-    const man = id((_t, role) => role === "bottles");
-    const window = Number(sim.state.vars.unloadT) + UNLOAD_S - 8 - sim.state.time;
-    const leg = planLeg(sim, man, near(arm.x, arm.y, 0.9), 3.5, window);
-    expect(leg, `an unseen way to the rotor arm in the ${window.toFixed(0)} s left`).not.toBeNull();
-    expect(walkLeg(sim, man, leg!)).toBe(true);
-    arm.act(sim);
-    expect(wait(sim, 3)).toBe(true);
-    expect(sim.state.vars.truckDisabled).toBe(true);
-  }, 60_000);
-});
-
-describe("a person can find it (only what is on the screen)", () => {
+describe("a person can do it unseen (only what is on the screen)", () => {
   for (const seed of [1234, 77, 5, 31]) {
     it(`Sygnalizacja: each man hidden at the mouth of Tłomackie, then his ring tapped when it is clear (seed ${seed})`, () => {
       // review round 13: a tap on Kuba's ring walked him past a Schupo at arm's length every time
       const { sim, phase, id } = setup(signalTask, seed);
       for (const [post, who] of POSTS) {
-        const ok = tapWhenClear(sim, id((t) => t === who), () => phase.interactables(sim).find((i) => i.id === post), () => sim.state.vars[`post_${post}`] === true, { hide: MOUTH });
+        const ok = tapWhenClear(sim, id((t) => t === who), () => phase.interactables(sim).find((i) => i.id === post), () => sim.state.vars[`post_${post}`] === true, MOUTH);
         expect(ok, `${who} set ${post} unseen`).toBe(true);
       }
       wait(sim, 1);
       expect(sim.state.outcome).toBe("success");
-      expect(sim.anyAlarm()).toBe(false);
+      expect(quiet(sim)).toBe("done");
     }, 60_000);
 
     it(`Stare Miasto: a man hidden in the passage, the rotor arm when it is clear, back in the passage (seed ${seed})`, () => {
       const { sim, phase, id } = setup(oldtownTask, seed);
       const man = id((_t, role) => role === "bottles");
       for (let k = 0; k < 240 && sim.state.vars.phase !== "unloading"; k++) wait(sim, 0.5);
-      const ok = tapWhenClear(sim, man, () => phase.interactables(sim).find((i) => i.id === "disable_truck"), () => sim.state.vars.truckDisabled === true, { hide: PASSAGE });
+      const ok = tapWhenClear(sim, man, () => phase.interactables(sim).find((i) => i.id === "disable_truck"), () => sim.state.vars.truckDisabled === true, PASSAGE);
       expect(ok, "the rotor arm pulled unseen").toBe(true);
       cmdMove(sim, PASSAGE.x, PASSAGE.y);
       for (let k = 0; k < 400 && !sim.state.outcome; k++) wait(sim, 0.5);
       wait(sim, 1);
       expect(sim.state.outcome).toBe("success");
-      expect(sim.anyAlarm()).toBe(false);
+      expect(quiet(sim)).toBe("done");
     }, 60_000);
   }
+
+  it("Stare Miasto: a person who lets the Schupo patrol go by first still has time for the rotor arm", () => {
+    // the crew unloads long enough for a player who waits for the patrol (oldtown.ts UNLOAD_S)
+    const { sim, phase, id } = setup(oldtownTask);
+    const schupo = () => sim.state.units.filter((u) => u.tag.startsWith("schupo") && u.state === "ok" && !u.hidden);
+    for (let k = 0; k < 400 && !(sim.state.vars.patrolSpawned && schupo().every((u) => u.x < 170)); k++) wait(sim, 0.5);
+    expect(sim.state.vars.patrolSpawned).toBe(true);
+    expect(sim.state.vars.phase).toBe("unloading");
+    const ok = tapWhenClear(sim, id((_t, role) => role === "bottles"), () => phase.interactables(sim).find((i) => i.id === "disable_truck"), () => sim.state.vars.truckDisabled === true, PASSAGE);
+    expect(ok, "the rotor arm pulled unseen after the patrol went by").toBe(true);
+  }, 60_000);
 });
 
 describe("blown, but you fight on", () => {
@@ -134,7 +92,7 @@ describe("blown, but you fight on", () => {
     const { sim, phase, id } = setup(signalTask);
     sim.raiseAlarm(1, 130, 130);
     // the alarm stays up; who wins the shooting that follows is not what this is about
-    for (const u of sim.state.units) if (u.side === "de" && u.ai) u.ai.blind = true;
+    blind(sim);
     for (const [post, who] of POSTS) {
       const job = phase.interactables(sim).find((i) => i.id === post)!;
       const man = sim.unit(id((t) => t === who))!;
@@ -146,7 +104,7 @@ describe("blown, but you fight on", () => {
     }
     wait(sim, 1);
     expect(sim.state.outcome).toBe("success");
-    expect(sim.state.objectives.find((o) => o.id === "quiet")?.status).toBe("failed");
+    expect(quiet(sim)).toBe("failed");
     const r = phase.finish(sim, newCampaign());
     expect(r).toMatchObject({ outcome: "success", silent: false });
   });
@@ -168,6 +126,68 @@ describe("blown, but you fight on", () => {
     expect(sim.state.outcome).toBe("success");
     expect(sim.state.objectives.map((o) => `${o.id}:${o.status}`)).toEqual(["truck:done", "patrol:failed", "quiet:failed"]);
   });
+
+  it("Sygnalizacja: a German who saw one of ours blows it, though he is silenced before his whistle ends", () => {
+    // review round 14: the pair shot mid-whistle raised no alarm, and the task read "unseen"
+    const { sim, phase, id } = setup(signalTask);
+    wait(sim, 10);
+    const g = sim.state.units.find((u) => u.tag === "patrol_a")!;
+    const kuba = sim.unit(id((t) => t === "kuba"))!;
+    const at = { x: g.x + Math.cos(g.dir) * 5, y: g.y + Math.sin(g.dir) * 5 };
+    expect(sim.grid.walkable(at.x, at.y) && sim.grid.los(g.x, g.y, at.x, at.y)).toBe(true);
+    Object.assign(kuba, { x: at.x, y: at.y, px: at.x, py: at.y, path: [] });
+    for (let n = 0; n < 150 && g.ai!.whistleT < 0; n++) wait(sim, 1 / 30);
+    expect(g.ai!.whistleT, "he began to whistle").toBeGreaterThan(0);
+    for (const u of sim.state.units) if (u.tag.startsWith("patrol_")) sim.kill(u, kuba.id, true);
+    blind(sim);
+    expect(wait(sim, 5), "nobody lived to raise the alarm").toBe(true);
+    expect(quiet(sim)).toBe("failed");
+    expect(phase.finish(sim, newCampaign())).toMatchObject({ silent: false });
+  });
+
+  it("Stare Miasto: a shot or a throw of ours blows it, though no German heard it", () => {
+    // the sections fired no shot on the day; a knife is silent
+    for (const how of ["shot", "throw"] as const) {
+      const { sim, phase, sq } = setup(oldtownTask);
+      blind(sim);
+      const L = sim.leaderOf(sq)!;
+      const at = spotFrom(sim, L.x, L.y, 8);
+      if (how === "shot") cmdFireAt(sim, at.x, at.y, 1);
+      else expect(cmdThrow(sim, at.x, at.y)).not.toBeNull();
+      let done = 0;
+      for (let n = 0; n < 90; n++) {
+        sim.state.paused = false;
+        sim.step();
+        for (const e of sim.drainEvents()) if (e.t === how) done++;
+      }
+      expect(done, `${how}: it happened`).toBeGreaterThan(0);
+      expect(sim.anyAlarm(), how).toBe(false);
+      expect(quiet(sim), how).toBe("failed");
+      expect(phase.finish(sim, newCampaign()), how).toMatchObject({ silent: false });
+    }
+  });
+
+  it("Stare Miasto: seen, the crew shot and the truck gone, the task failed, in the sim and in its record", () => {
+    // review round 14: the sim ended it "partial" and the record said "fail"
+    const { sim, phase } = setup(oldtownTask);
+    for (let k = 0; k < 240 && sim.state.vars.phase !== "unloading"; k++) wait(sim, 0.5);
+    sim.raiseAlarm(1, 200, 80);
+    for (const tag of ["w_a", "w_b"]) sim.kill(sim.state.units.find((u) => u.tag === tag)!, -1, false);
+    // who wins the fight is not the point: the Schupo who come are blinded as they come
+    for (let k = 0; k < 600 && !sim.state.outcome; k++) { blind(sim); wait(sim, 0.5); }
+    expect(sim.state.vars.truckGone).toBe(true);
+    expect(sim.state.outcome).toBe("fail");
+    expect(phase.finish(sim, newCampaign()).outcome).toBe("fail");
+  }, 60_000);
+
+  it("Stare Miasto: the patrol let by unseen and the truck gone, half done, in the sim and in its record", () => {
+    const { sim, phase } = setup(oldtownTask);
+    for (let k = 0; k < 600 && !sim.state.outcome; k++) wait(sim, 0.5);
+    expect(sim.state.vars.truckGone).toBe(true);
+    expect(sim.anyAlarm()).toBe(false);
+    expect(sim.state.outcome).toBe("partial");
+    expect(phase.finish(sim, newCampaign()).outcome).toBe("partial");
+  }, 60_000);
 });
 
 describe("stealth and fire", () => {
@@ -175,9 +195,9 @@ describe("stealth and fire", () => {
     expect(TASK_MODE).toEqual({ signal: "stealth", ghetto: "fire", oldtown: "stealth" });
     for (const [make, mode] of [[signalTask, "stealth"], [ghettoTask, "fire"], [oldtownTask, "stealth"]] as const) {
       const { sim } = setup(make);
-      const quiet = sim.state.objectives.find((o) => o.id === "quiet");
-      if (mode === "stealth") expect(quiet).toMatchObject({ text: "Stay unseen", primary: true });
-      else expect(quiet).toBeUndefined();
+      const q = sim.state.objectives.find((o) => o.id === "quiet");
+      if (mode === "stealth") expect(q).toMatchObject({ text: "Stay unseen", primary: true });
+      else expect(q).toBeUndefined();
     }
   });
 
@@ -221,9 +241,8 @@ describe("stealth and fire", () => {
     const c = newCampaign();
     [c.assign.signal, c.assign.oldtown] = [c.assign.oldtown, c.assign.signal];
     const { sim, phase } = setup(signalTask, 1234, c);
-    // the column walks in the open when the rings are tapped without a pick: the Germans look
-    // elsewhere here, since this is about who is given each job, not about being seen
-    for (const u of sim.state.units) if (u.side === "de" && u.ai) u.ai.blind = true;
+    // the column walks in the open when the rings are tapped without a pick
+    blind(sim);
     for (const [post] of POSTS) {
       phase.interactables(sim).find((i) => i.id === post)!.act(sim);
       for (let n = 0; n < 180 && sim.state.vars[`post_${post}`] !== true; n++) wait(sim, 0.5);
@@ -296,4 +315,139 @@ describe("stealth and fire", () => {
     // a pair, not two patrols: half a round apart they were 30 m and more
     expect(apart).toBeLessThan(8);
   }, 60_000);
+
+  it("Sygnalizacja's patrolman, back on his round after a glimpse, stops at a corner no longer than the pair does", () => {
+    // review round 14: the glimpse's own stop carried over to the next corner, 5 s rather than 1.5,
+    // and split the pair
+    const { sim, id } = setup(signalTask);
+    wait(sim, 10);
+    const g = sim.state.units.find((u) => u.tag === "patrol_a")!;
+    const kuba = sim.unit(id((t) => t === "kuba"))!;
+    const home = { x: kuba.x, y: kuba.y };
+    const at = { x: g.x + Math.cos(g.dir) * 11, y: g.y + Math.sin(g.dir) * 11 };
+    expect(sim.grid.walkable(at.x, at.y) && sim.grid.los(g.x, g.y, at.x, at.y)).toBe(true);
+    Object.assign(kuba, { x: at.x, y: at.y, px: at.x, py: at.y, path: [] });
+    for (let n = 0; n < 60 && g.ai!.mode !== "suspicious"; n++) wait(sim, 1 / 30);
+    expect(g.ai!.mode, "he glimpsed him").toBe("suspicious");
+    Object.assign(kuba, { x: home.x, y: home.y, px: home.x, py: home.y, path: [] });
+    let back = false, stood = 0, longest = 0;
+    for (let n = 0; n < 120 * 30; n++) {
+      wait(sim, 1 / 30);
+      if (g.ai!.mode === "patrol") back = true;
+      if (back && g.ai!.mode === "patrol" && !g.moving) longest = Math.max(longest, (stood += 1 / 30));
+      else stood = 0;
+    }
+    expect(back, "back on his round").toBe(true);
+    expect(sim.anyAlarm()).toBe(false);
+    expect(longest).toBeLessThan(1.6);
+  }, 60_000);
+});
+
+describe("a man handed a job gets there, whether the column goes with him or not", () => {
+  // review round 14: with the leader picked, a ring tapped for another man left him standing,
+  // waiting for a column that never came; and a ring tapped for one man sent the leader off his own
+  it("the leader picked and sent to a post, a ring tapped for another man: each gets to his own", () => {
+    const { sim, phase, sq } = setup(signalTask);
+    blind(sim);
+    const ring = (p: string) => phase.interactables(sim).find((i) => i.id === p)!;
+    const L = sim.leaderOf(sq)!;
+    cmdPick(sim, L.id);
+    ring("tlomackie").act(sim);
+    wait(sim, 2);
+    ring("bank").act(sim);
+    const g = sim.unit(L.id)!;
+    expect(Math.hypot(g.goalX - ring("tlomackie").x, g.goalY - ring("tlomackie").y), "the leader still bound for his own post").toBeLessThan(1);
+    for (let n = 0; n < 120 && !(sim.state.vars.post_bank === true && sim.state.vars.post_tlomackie === true); n++) wait(sim, 0.5);
+    expect(sim.state.vars.post_tlomackie).toBe(true);
+    expect(sim.state.vars.post_bank).toBe(true);
+  }, 60_000);
+
+  it("the leader at a job of his own, a ring tapped far from it: the leader keeps to his, the other man goes alone", () => {
+    const { sim, phase, sq } = setup(ghettoTask);
+    blind(sim);
+    const L = sim.leaderOf(sq)!;
+    const jobs = phase.interactables(sim).filter((i) => i.ready(sim));
+    const mine = jobs[0];
+    const far = jobs.reduce((a, j) => (Math.hypot(j.x - mine.x, j.y - mine.y) > Math.hypot(a.x - mine.x, a.y - mine.y) ? j : a));
+    expect(Math.hypot(far.x - mine.x, far.y - mine.y)).toBeGreaterThan(20);
+    // an errand of his own, and he is not picked
+    expect(cmdWork(sim, mine.x, mine.y, "errand", "errand", 30, (u) => (u === L ? 100 : 0))).toBe(L);
+    wait(sim, 1);
+    far.act(sim);
+    const man = sim.state.units.find((u) => u.task?.kind === "work" && u.id !== L.id)!;
+    const g = sim.unit(L.id)!;
+    expect(Math.hypot(g.goalX - mine.x, g.goalY - mine.y), "the leader still bound for his own job").toBeLessThan(1);
+    for (let n = 0; n < 120 && sim.unit(man.id)!.task; n++) wait(sim, 0.5);
+    expect(sim.unit(man.id)!.task, `${man.tag} did ${far.id}`).toBeNull();
+    expect(far.ready(sim)).toBe(false);
+  }, 60_000);
+
+  it("the leader at his post, a ring tapped for another man: the leader keeps his post", () => {
+    const { sim, phase, sq } = setup(signalTask);
+    blind(sim);
+    const ring = (p: string) => phase.interactables(sim).find((i) => i.id === p)!;
+    const L = sim.leaderOf(sq)!;
+    cmdPick(sim, L.id);
+    ring("tlomackie").act(sim);
+    for (let n = 0; n < 120 && sim.state.vars.post_tlomackie !== true; n++) wait(sim, 0.5);
+    expect(sim.unit(L.id)!.flags & UF_POSTED).not.toBe(0);
+    // let go without a tap on his tag (a tap takes him off his post)
+    sim.state.picked = -1;
+    const post = { x: sim.unit(L.id)!.x, y: sim.unit(L.id)!.y };
+    ring("bank").act(sim);
+    for (let n = 0; n < 120 && sim.state.vars.post_bank !== true; n++) wait(sim, 0.5);
+    expect(sim.state.vars.post_bank).toBe(true);
+    const g = sim.unit(L.id)!;
+    expect(g.flags & UF_POSTED, "still at his post").not.toBe(0);
+    expect(Math.hypot(g.x - post.x, g.y - post.y)).toBeLessThan(1);
+  }, 60_000);
+
+  it("the leader picked and at a job of his own, a job beside it tapped for another man: he walks there alone", () => {
+    // the column stays where it rested while its leader is picked, though his job is by the other
+    const { sim, sq } = setup(signalTask);
+    blind(sim);
+    const L = sim.leaderOf(sq)!;
+    cmdPick(sim, L.id);
+    const a = spotFrom(sim, L.x, L.y, 20);
+    expect(cmdWork(sim, a.x, a.y, "errand", "errand", 30)).toBe(L);
+    for (let n = 0; n < 40 && Math.hypot(sim.unit(L.id)!.x - a.x, sim.unit(L.id)!.y - a.y) > 1; n++) wait(sim, 0.5);
+    const b = spotFrom(sim, a.x, a.y, 4);
+    const man = cmdWork(sim, b.x, b.y, "test", "test", 1)!;
+    expect(man.id).not.toBe(L.id);
+    for (let n = 0; n < 60 && sim.unit(man.id)!.task; n++) wait(sim, 0.5);
+    expect(sim.unit(man.id)!.task, `${man.tag} did it`).toBeNull();
+  });
+
+  it("another man's job tapped again once the picked leader is done with his own: the man goes on, the leader stays", () => {
+    // cmdWork's "tapped again: the squad sets off again", but not a squad whose leader is picked
+    const { sim, sq } = setup(signalTask);
+    blind(sim);
+    const L = sim.leaderOf(sq)!;
+    cmdPick(sim, L.id);
+    const a = spotFrom(sim, L.x, L.y, 2);
+    expect(cmdWork(sim, a.x, a.y, "errand", "errand", 2)).toBe(L);
+    const b = spotFrom(sim, L.x, L.y, 30);
+    const man = cmdWork(sim, b.x, b.y, "test", "test", 1)!;
+    expect(man.id).not.toBe(L.id);
+    for (let n = 0; n < 20 && sim.unit(L.id)!.task; n++) wait(sim, 0.5);
+    expect(sim.unit(L.id)!.task, "the leader done with his own").toBeNull();
+    expect(sim.unit(man.id)!.task, "the other man still on his way").not.toBeNull();
+    const goal = { x: sim.unit(L.id)!.goalX, y: sim.unit(L.id)!.goalY };
+    expect(cmdWork(sim, b.x, b.y, "test", "test", 1)).toBe(sim.unit(man.id));
+    expect(Math.hypot(sim.unit(L.id)!.goalX - goal.x, sim.unit(L.id)!.goalY - goal.y), "the leader sent nowhere").toBeLessThan(0.01);
+  });
+
+  it("a man picked on the strip walks to his job himself, though it lies where the column rests", () => {
+    const { sim, sq } = setup(signalTask);
+    blind(sim);
+    const L = sim.leaderOf(sq)!;
+    const man = sim.membersOf(sq).find((u) => u !== L)!;
+    const away = spotFrom(sim, L.x, L.y, 12);
+    Object.assign(man, { x: away.x, y: away.y, px: away.x, py: away.y, path: [] });
+    cmdPick(sim, man.id);
+    const job = spotFrom(sim, L.x, L.y, 3);
+    expect(cmdWork(sim, job.x, job.y, "test", "test", 1)).toBe(sim.unit(man.id));
+    for (let n = 0; n < 60 && sim.unit(man.id)!.task; n++) wait(sim, 0.5);
+    expect(sim.unit(man.id)!.task).toBeNull();
+  });
 });

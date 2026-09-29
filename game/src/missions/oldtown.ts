@@ -7,7 +7,7 @@
 // truck's rotor arm while it unloads, unseen. The Arbeitsamt's gunfight is the finale's, where
 // it happened; its sentries stand at the gate here, and its post sends men if the alarm goes up.
 import type { Sim } from "../sim/sim";
-import type { Unit, Vehicle } from "../sim/types";
+import type { PhaseOutcome, Unit, Vehicle } from "../sim/types";
 import type { MapData } from "../content/mapdata";
 import { zone, path } from "../content/mapdata";
 import { cmdWork } from "../sim/commands";
@@ -15,12 +15,17 @@ import { goTo } from "../sim/move";
 import { DLUGA, W } from "../content/arsenal/map";
 import type { Campaign, TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
-import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, recordSoldiers, setObjective, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
+import { civilians, fieldFromCampaign, guard, objective, objectiveDone, patrol, isBlown, noteBlown, recordSoldiers, setObjective, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
 
 const GATE_X = 211.5;
 /** Seconds the crew unloads: long enough that, once the Schupo patrol has gone by, the rotor arm
  *  can still be pulled unseen before they climb back in (the stealth decision of 2026-09-29). */
-export const UNLOAD_S = 120;
+const UNLOAD_S = 120;
+
+/** The task's result: the truck disabled is the job; the patrol let by unseen is half of it. */
+function verdict(sim: Sim): PhaseOutcome {
+  return objectiveDone(sim, "truck") ? "success" : objectiveDone(sim, "patrol") ? "partial" : "fail";
+}
 
 export function oldtownTask(md: MapData, c: Campaign): Phase {
   const Z = zone(md, "task_oldtown");
@@ -61,7 +66,7 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
     tick(sim: Sim, dt: number) {
       const s = sim.state;
       if (s.outcome || taskTimeUp(sim)) return;
-      if (sim.anyAlarm()) setObjective(sim, "quiet", "failed");
+      if (isBlown(sim)) setObjective(sim, "quiet", "failed");
       const t = s.time;
       // the Wehrmacht truck comes, unloads, and leaves
       let truck = truckOf(sim);
@@ -149,8 +154,8 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
       // than go by, and the task ends with the truck (review round 13: it ran to the clock)
       if ((objectiveDone(sim, "truck") || s.vars.truckGone === true) && (s.vars.patrolPassed === true || sim.anyAlarm())) {
         if (s.vars.patrolPassed !== true) setObjective(sim, "patrol", "failed");
-        if (!sim.anyAlarm()) setObjective(sim, "quiet", "done");
-        s.outcome = objectiveDone(sim, "truck") ? "success" : "partial";
+        if (!isBlown(sim)) setObjective(sim, "quiet", "done");
+        s.outcome = verdict(sim);
         sim.emit({ t: "phase", outcome: s.outcome });
       } else if (squadsBroken(sim)) {
         s.outcome = "fail";
@@ -160,6 +165,7 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
     },
 
     onEvent(sim, e) {
+      noteBlown(sim, e);
       if (e.t === "work" && e.done && e.what === "disable_truck") {
         sim.state.vars.truckDisabled = true;
         const u = sim.unit(e.unit);
@@ -190,8 +196,9 @@ export function oldtownTask(md: MapData, c: Campaign): Phase {
       recordSoldiers(sim, cc);
       const truck = objectiveDone(sim, "truck");
       return {
-        outcome: truck ? "success" : sim.state.vars.patrolPassed === true ? "partial" : "fail",
-        silent: !sim.anyAlarm(),
+        // what the task decided when it ended (review round 14: the two disagreed)
+        outcome: sim.state.outcome ?? verdict(sim),
+        silent: !isBlown(sim),
         flags: { truckDisabled: truck },
         seconds: sim.state.time,
       };

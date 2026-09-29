@@ -7,7 +7,7 @@ import type { Squad, Unit, Vehicle } from "./types";
 import { F_COVER } from "./grid";
 import { gauss } from "./rng";
 import { goTo, setAnim } from "./move";
-import { outOfColumn } from "./tasks";
+import { atTask } from "./tasks";
 import { GERMAN_SPREAD, THROW, UNIT_RADIUS, WEAPONS, reach, spreadForRank } from "./tuning";
 
 interface Aim {
@@ -23,7 +23,7 @@ export function stepCombat(sim: Sim, dt: number): void {
   for (const u of s.units) {
     if (u.state !== "ok" || u.hidden || u.weapon === "none") continue;
     u.fireCd -= dt;
-    if (outOfColumn(u)) { u.aiming = false; continue; }
+    if (atTask(u)) { u.aiming = false; continue; }
     const aim = u.side === "pl" ? partisanAim(sim, u) : u.side === "de" ? guardAim(sim, u) : null;
     if (!aim) { u.aiming = false; u.burst = 0; continue; }
     u.aiming = true;

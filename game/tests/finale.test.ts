@@ -14,7 +14,7 @@ function setup(tasks: string) {
   const md = buildArsenalMap();
   const c = newCampaign();
   const has = (k: string) => tasks.split(",").includes(k);
-  c.results.signal = { outcome: "success", silent: true, flags: { signal: has("signal"), bielanskaAlert: false }, seconds: 0 };
+  c.results.signal = { outcome: "success", silent: !has("sigloud"), flags: { signal: has("signal") }, seconds: has("sigskip") ? 0 : 120 };
   c.results.ghetto = { outcome: "success", silent: true, flags: { lineCut: has("line"), postSilenced: has("post") }, seconds: 0 };
   c.results.oldtown = { outcome: "success", silent: !has("oldloud"), flags: { truckDisabled: has("truck") }, seconds: 120 };
   const sim = new Sim(gridFromMap(md), 99);
@@ -124,6 +124,20 @@ describe("finale", () => {
       expect(sim.state.vars.r_east, `${tasks}: not yet ${at - 1.5} s after the first shot`).not.toBe(true);
       step(sim, 3);
       expect(sim.state.vars.r_east, `${tasks}: by ${at + 1.5} s`).toBe(true);
+    }
+  });
+
+  it("the Schupo from Plac Teatralny come at 40 s rather than 100, past two sentries, when Sygnalizacja was blown", () => {
+    // the stealth decision of 2026-09-29; a task not played is not blown
+    for (const [tasks, blown] of [["signal,line,post,truck", false], ["signal,line,post,truck,sigloud", true], ["signal,line,post,truck,sigloud,sigskip", false]] as const) {
+      const { sim } = setup(tasks);
+      expect(sim.state.units.filter((u) => u.tag === "south" && u.state === "ok"), tasks).toHaveLength(blown ? 2 : 0);
+      // the first shot of the action
+      sim.state.vars.actionT = sim.state.time;
+      step(sim, 38.5);
+      expect(sim.state.vars.r_south, `${tasks}: not yet 38.5 s after the first shot`).not.toBe(true);
+      step(sim, 3);
+      expect(sim.state.vars.r_south === true, `${tasks}: by 41.5 s`).toBe(blown);
     }
   });
 

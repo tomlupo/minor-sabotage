@@ -31,6 +31,11 @@ export interface TaskResult {
   seconds: number;
 }
 
+/** A stealth task blown: played, and seen (the stealth decision of 2026-09-29). A task not played is not blown. */
+export function blownTask(r: TaskResult | undefined): boolean {
+  return !!r && r.seconds > 0 && !r.silent;
+}
+
 export interface FinaleResult {
   outcome: "success" | "partial" | "fail";
   rudy: "escaped" | "lost" | "killed";

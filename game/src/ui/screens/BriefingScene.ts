@@ -3,7 +3,7 @@
 import Phaser from "phaser";
 import type { Flow } from "../../game/flow";
 import { mapData } from "../../game/flow";
-import { TASKS, TASK_MODE, tasksLeft, fit, type TaskId } from "../../missions/campaign";
+import { TASKS, TASK_MODE, blownTask, tasksLeft, fit, type TaskId, type TaskResult } from "../../missions/campaign";
 import { SQUADS } from "../../content/arsenal/roster";
 import { PAL, SQUAD_COLOURS, hex, mix } from "../../art/palette";
 import { toCanvas } from "../../art/pixel";
@@ -77,7 +77,7 @@ export class BriefingScene extends Phaser.Scene {
       const info = INFO[t];
       const res = c.results[t];
       const x = plan.sx(info.at[0]) + L, y = plan.sy(info.at[1]) + T;
-      const col = res ? (res.outcome === "success" ? PAL.hud.hp_ok : res.outcome === "partial" ? PARTIAL : PAL.hud.hp_low) : PAL.hud.paper_ink;
+      const col = res ? this.outcomeColour(t, res) : PAL.hud.paper_ink;
       const ring = this.add.circle(x, y, 8, hex(PAL.hud.paper[1])).setStrokeStyle(t === this.sel ? 2 : 1, hex(t === this.sel ? PAL.shared.select_gold : col));
       ring.setInteractive({ useHandCursor: true }).on("pointerup", () => { this.sel = t; sound.ui("ui_tap"); this.draw(); });
       txt(this, x, y - 4, info.letter, { color: col, align: 0.5 });
@@ -104,8 +104,8 @@ export class BriefingScene extends Phaser.Scene {
       txt(this, cx + cw - 4, y + 3, SQUADS[sqi].name, { color: PAL.hud.paper_ink, align: 1, font: PXS });
       if (res) {
         const word = res.outcome === "success" ? "DONE" : res.outcome === "partial" ? "PART DONE" : "FAILED";
-        const blown = TASK_MODE[t] === "stealth" && res.seconds > 0 && !res.silent;
-        const col = res.outcome === "success" && !blown ? PAL.hud.hp_ok : res.outcome === "fail" ? PAL.hud.hp_low : PARTIAL;
+        const blown = TASK_MODE[t] === "stealth" && blownTask(res);
+        const col = this.outcomeColour(t, res);
         const how = TASK_MODE[t] === "fire" || res.seconds === 0 ? "" : blown ? ", blown" : ", unseen";
         txt(this, cx + 10, y + 14, `${word}${how}`, { font: PXS, color: col });
         txt(this, cx + 10, y + 24, this.effect(t), { font: PX, color: PAL.hud.paper_ink, wrap: cw - 16 });
@@ -145,9 +145,15 @@ export class BriefingScene extends Phaser.Scene {
     if (!allDone && !fit(c, c.assign[this.sel]).length) txt(this, cx, B - 70, "That squad has nobody left: give the task to another.", { font: PXS, face: "sans", color: PAL.hud.hp_low });
   }
 
+  /** A task's result in colour: success green, a stealth task blown or half done amber, a failure red. */
+  private outcomeColour(t: TaskId, r: TaskResult) {
+    const blown = TASK_MODE[t] === "stealth" && blownTask(r);
+    return r.outcome === "success" && !blown ? PAL.hud.hp_ok : r.outcome === "fail" ? PAL.hud.hp_low : PARTIAL;
+  }
+
   private effect(t: TaskId): string {
     const r = this.flow.campaign.results[t]!;
-    const blown = r.seconds > 0 && !r.silent;
+    const blown = blownTask(r);
     if (t === "signal") {
       const go = r.flags.signal ? "The finale has the go-code: you choose when." : "No signal: the van will come unannounced.";
       return blown ? `${go} The Schupo from Plac Teatralny will come early.` : go;

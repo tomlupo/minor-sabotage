@@ -122,8 +122,9 @@ export function goAlert(sim: Sim, u: Unit, x: number, y: number): void {
 function backToRoutine(sim: Sim, u: Unit): void {
   const ai = u.ai!;
   ai.meter = 0;
+  ai.wait = 0;
   setGlyph(sim, u, "none");
-  u.speed = ai.pace ?? SPEED.guardPatrol;
+  u.speed = SPEED.guardPatrol;
   if (ai.route && ai.route.length) {
     ai.mode = "patrol";
     const p = ai.route[ai.routeI % ai.route.length];

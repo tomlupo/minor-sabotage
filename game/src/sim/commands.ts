@@ -161,9 +161,12 @@ export function cmdWork(sim: Sim, x: number, y: number, what: string, ref: strin
     best.flags &= ~UF_POSTED;
   }
   // the squad goes with him (it moves as one) and he detaches for the last few metres; a man
-  // picked on the strip goes alone, and the squad stays
+  // picked on the strip goes alone, and the squad stays. So it does while its leader is picked, at
+  // a job of his own or at his post, and the man walks there alone (review round 14: a ring tapped
+  // for one man sent the picked leader 20 m off his own errand)
   const L = sim.leaderOf(sq);
-  if (L && L !== best && best.id !== sim.state.picked) {
+  const columnFree = !!L && sim.state.picked !== L.id && !L.task && !(L.flags & UF_POSTED);
+  if (columnFree && L !== best && best.id !== sim.state.picked) {
     const d = Math.hypot(x - L.x, y - L.y);
     if (d > 4) goTo(sim, L, x - ((x - L.x) / d) * 3, y - ((y - L.y) / d) * 3);
   }

@@ -9,13 +9,24 @@ import { KNIFE, THROW, WOUND } from "./tuning";
 /** A man with a job walks in the column until he is this close to it. */
 export const WORK_DETACH = 7;
 
-function isLeader(sim: Sim, u: Unit): boolean {
+/**
+ * Whether the column is carrying a man to his job: he walks in it while it is on its way there,
+ * and goes the last few metres alone. The leader and the man picked on the strip walk to a job
+ * themselves, and so does anyone whose column is not going there, its leader picked (the column
+ * keeps its rest point) or gone elsewhere (review round 14: he stood waiting for a column that
+ * never came, and it held him at his place in it).
+ */
+export function carriedToJob(sim: Sim, u: Unit): boolean {
+  const t = u.task;
+  if (t?.kind !== "work" || t.phase !== "approach" || u.id === sim.state.picked) return false;
+  if (Math.hypot(t.x - u.x, t.y - u.y) <= WORK_DETACH) return false;
   const sq = sim.squad(u.squad);
-  return !!sq && sim.leaderOf(sq) === u;
+  const L = sq && sim.leaderOf(sq);
+  return !!L && L !== u && sim.state.picked !== L.id && Math.hypot(L.goalX - t.x, L.goalY - t.y) <= WORK_DETACH;
 }
 
-/** Busy means out of the column: a job still far off does not take a man out of it. */
-export function outOfColumn(u: Unit): boolean {
+/** A man at his task does not fight; one still walking to a job far off does. */
+export function atTask(u: Unit): boolean {
   const t = u.task;
   if (!t) return false;
   if (t.kind === "work" && t.phase === "approach" && Math.hypot(t.x - u.x, t.y - u.y) > WORK_DETACH) return false;
@@ -131,10 +142,8 @@ function work(sim: Sim, u: Unit): void {
   const d = Math.hypot(t.x - u.x, t.y - u.y);
   // petrol burning on the spot: he waits at its edge, facing the job, until it goes out
   const f = sim.fireAt(t.x, t.y, 0.4);
-  // (the leader and the man picked on the strip walk to a job themselves; the column carries
-  // anyone else until it is close)
-  const ownWay = isLeader(sim, u) || u.id === sim.state.picked;
-  if (f && (t.phase === "work" || d <= WORK_DETACH || ownWay)) {
+  const carried = carriedToJob(sim, u);
+  if (f && !carried) {
     if (t.phase === "work") { t.phase = "approach"; setAnim(u, "idle"); }
     const a = Math.atan2(u.y - f.y, u.x - f.x);
     const wx = f.x + Math.cos(a) * (f.r * 0.8 + 1), wy = f.y + Math.sin(a) * (f.r * 0.8 + 1);
@@ -156,8 +165,8 @@ function work(sim: Sim, u: Unit): void {
       sim.emit({ t: "work", unit: u.id, what: t.what, done: false });
       return;
     }
-    // he walks in the column until the job is close, then goes to it
-    if (d > WORK_DETACH && !ownWay) return;
+    // he walks in the column while it carries him, then goes to it
+    if (carried) return;
     if (!u.path.length) goTo(sim, u, t.x, t.y, 6000);
     return;
   }

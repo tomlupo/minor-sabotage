@@ -6,7 +6,7 @@ import type { Squad, Unit } from "./types";
 import { UF_POSTED } from "./types";
 import type { Pt } from "./path";
 import { SPEED, SQUAD, UNIT_RADIUS } from "./tuning";
-import { outOfColumn } from "./tasks";
+import { carriedToJob } from "./tasks";
 import { F_VEH, F_WALK } from "./grid";
 
 const TRAIL_MAX = 80;
@@ -301,9 +301,10 @@ export function restSlots(sim: Sim, x: number, y: number, dir: number, n: number
   return out;
 }
 
-function busy(u: Unit): boolean {
-  // a man at his post holds it, and does not walk back into the column until he is sent
-  return outOfColumn(u) || (u.flags & UF_POSTED) !== 0;
+function busy(sim: Sim, u: Unit): boolean {
+  // a man with a task goes about it, unless the column is carrying him to his job; a man at his
+  // post holds it, and does not walk back into the column until he is sent
+  return (!!u.task && !carriedToJob(sim, u)) || (u.flags & UF_POSTED) !== 0;
 }
 
 export function stepSquads(sim: Sim, dt: number): void {
@@ -332,7 +333,7 @@ export function stepSquads(sim: Sim, dt: number): void {
     const slots = moving ? null : restSlots(sim, sq.restX, sq.restY, sq.restDir, followers.length);
     followers.forEach((u, k) => {
       // the man picked on the strip goes where he is sent, not back into the column
-      if (busy(u) || u.yieldUntil > s.time || u.id === s.picked) return;
+      if (busy(sim, u) || u.yieldUntil > s.time || u.id === s.picked) return;
       const target = moving ? trailPoint(sq, L, SQUAD.spacing * (k + 1)) : slots![k];
       const d = Math.hypot(target.x - u.x, target.y - u.y);
       if (d < (moving ? 0.35 : 0.25)) { if (!moving) u.path = []; return; }

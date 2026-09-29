@@ -74,15 +74,36 @@ describe("tasks", () => {
 describe("the operation's clock", () => {
   // the three-tasks decision: about five minutes each; a task always ends, even one that
   // cannot be won any more (a post nobody has anything left to silence)
+  // the task's record says what the clock decided (review round 14: Stare Miasto's said its own)
   const atLimit = (done: string[]) => {
-    const { sim } = setup(oldtownTask);
+    const { sim, phase, c } = setup(oldtownTask);
     for (const id of done) setObjective(sim, id, "done");
     sim.state.time = TASK_LIMIT - 1 / 60;
     sim.state.paused = false;
     sim.step();
     sim.step();
-    return sim.state.outcome;
+    return [sim.state.outcome, (phase.finish(sim, c) as TaskResult).outcome];
   };
-  it("ends a task still open when the van is due", () => expect(atLimit([])).toBe("fail"));
-  it("counts what was done by then", () => expect(atLimit(["truck"])).toBe("partial"));
+  it("ends a task still open when the van is due", () => expect(atLimit([])).toEqual(["fail", "fail"]));
+  it("counts what was done by then", () => expect(atLimit(["truck"])).toEqual(["partial", "partial"]));
+});
+
+describe("a task's record says what the task decided", () => {
+  // review round 14 found Stare Miasto's saying its own; the others did too: a squad broken after
+  // a post, or after the cut, failed on the screen and was recorded half done
+  const broken = (make: Parameters<typeof setup>[0], done: (sim: Sim) => void) => {
+    const { sim, phase, c } = setup(make);
+    done(sim);
+    for (const u of sim.state.units) if (u.side === "pl" && u.squad >= 0) sim.kill(u, -1, true);
+    sim.state.paused = false;
+    sim.step();
+    sim.step();
+    return [sim.state.outcome, (phase.finish(sim, c) as TaskResult).outcome];
+  };
+  it("Sygnalizacja: the squad broken after a post", () => {
+    expect(broken(signalTask, (sim) => { sim.state.vars.post_bank = true; setObjective(sim, "bank", "done"); })).toEqual(["fail", "fail"]);
+  });
+  it("Getto: the squad broken after the cut", () => {
+    expect(broken(ghettoTask, (sim) => { sim.state.vars.lineCut = true; setObjective(sim, "cut", "done"); })).toEqual(["fail", "fail"]);
+  });
 });

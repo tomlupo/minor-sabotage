@@ -13,7 +13,7 @@ import type { Campaign, TaskResult } from "./campaign";
 import type { Interactable, Phase } from "./types";
 import { UF_POSTED } from "../sim/types";
 import { SPEED } from "../sim/tuning";
-import { civilians, fieldFromCampaign, guard, objective, patrol, recordSoldiers, setObjective, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
+import { civilians, fieldFromCampaign, guard, objective, patrol, isBlown, noteBlown, recordSoldiers, setObjective, squadsBroken, taskClockBanner, taskTimeUp } from "./helpers";
 import { path } from "../content/mapdata";
 
 const POSTS = [
@@ -47,7 +47,7 @@ export function signalTask(md: MapData, c: Campaign): Phase {
       guard(sim, BIEL.e - 0.8, 151, Math.PI * 0.8, { tag: "bank_a" });
       guard(sim, BIEL.e - 0.8, 158, Math.PI * 0.8, { tag: "bank_b" });
       sim.addSpawner({ x: BIEL.e + 0.6, y: 154.5, ox: BIEL.e - 2, oy: 154.5, district: 1, interval: 9, left: -1, maxAlive: 2, tag: "bank_door", look: "de_rifle" });
-      // a patrol pair walking the pavements together, the second two paces behind. Half a round
+      // a patrol pair walking the pavements together. Half a round
       // apart, one of them was always on the north half of Bielańska, and a player watching the
       // cones never saw the way to the telephone clear (review round 13)
       const route = path(md, "patrol_signal");
@@ -57,7 +57,6 @@ export function signalTask(md: MapData, c: Campaign): Phase {
       const mid = { x: (BIEL.w + BIEL.e) / 2, y: (route[0].y + route[1].y) / 2 };
       const inner = route.map((p) => ({ x: p.x + Math.sign(mid.x - p.x) * 1.2, y: p.y + Math.sign(mid.y - p.y) * 1.2 }));
       const b = patrol(sim, inner, { start: 0, tag: "patrol_b" });
-      b.y = b.py = inner[0].y - 2;
       // and at his round's pace, so the pair stays a pair (the inner round is 10 m shorter)
       const round = (r: { x: number; y: number }[]) => r.reduce((a, p, i) => a + Math.hypot(r[(i + 1) % r.length].x - p.x, r[(i + 1) % r.length].y - p.y), 0);
       b.ai!.pace = SPEED.guardPatrol * (round(inner) / round(route));
@@ -81,9 +80,9 @@ export function signalTask(md: MapData, c: Campaign): Phase {
     tick(sim: Sim) {
       const s = sim.state;
       if (s.outcome || taskTimeUp(sim)) return;
-      if (sim.anyAlarm()) setObjective(sim, "quiet", "failed");
+      if (isBlown(sim)) setObjective(sim, "quiet", "failed");
       if (POSTS.every((p) => s.vars[`post_${p.id}`] === true)) {
-        if (!sim.anyAlarm()) setObjective(sim, "quiet", "done");
+        if (!isBlown(sim)) setObjective(sim, "quiet", "done");
         s.outcome = "success";
         sim.emit({ t: "phase", outcome: "success" });
         sim.message("The signal chain is set.", "good");
@@ -94,6 +93,7 @@ export function signalTask(md: MapData, c: Campaign): Phase {
     },
 
     onEvent(sim, e) {
+      noteBlown(sim, e);
       if (e.t === "work" && e.done && e.what.startsWith("post_")) {
         sim.state.vars[e.what] = true;
         setObjective(sim, e.what.slice(5), "done");
@@ -123,9 +123,11 @@ export function signalTask(md: MapData, c: Campaign): Phase {
       recordSoldiers(sim, cc);
       const done = POSTS.filter((p) => sim.state.vars[`post_${p.id}`] === true).length;
       return {
-        outcome: done === POSTS.length ? "success" : done > 0 ? "partial" : "fail",
-        silent: !sim.anyAlarm(),
-        flags: { signal: done === POSTS.length, bielanskaAlert: sim.anyAlarm() },
+        // what the task decided when it ended (review round 14: Stare Miasto's two disagreed, and
+        // so did this, the squad broken after a post), and by the posts if it never did
+        outcome: sim.state.outcome ?? (done === POSTS.length ? "success" : done > 0 ? "partial" : "fail"),
+        silent: !isBlown(sim),
+        flags: { signal: done === POSTS.length },
         seconds: sim.state.time,
       };
     },
