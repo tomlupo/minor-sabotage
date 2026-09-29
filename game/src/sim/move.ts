@@ -4,7 +4,6 @@
 import type { Sim } from "./sim";
 import type { Squad, Unit } from "./types";
 import { UF_POSTED } from "./types";
-import { toJob } from "./tasks";
 import type { Pt } from "./path";
 import { SPEED, SQUAD, UNIT_RADIUS } from "./tuning";
 import { F_VEH, F_WALK } from "./grid";
@@ -221,8 +220,13 @@ export function stepMovement(sim: Sim, dt: number): void {
   separate(sim);
 }
 
-/** His own men without a job make way for a man on his way to his, all but the leader, whom the
- *  squad forms up round (shoved, he would drag it after him). */
+/** On his way to his job, not yet at work on it. */
+export function toJob(u: Unit): boolean {
+  return u.task?.kind === "work" && u.task.phase === "approach";
+}
+
+/** Men of ours without a job make way for a man on his way to his, all but a squad's leader, whom
+ *  the squad forms up round (shoved, he would drag it after him). */
 function makesWay(sim: Sim, u: Unit): boolean {
   if (u.task || u.state !== "ok") return false;
   const sq = sim.squad(u.squad);
@@ -250,13 +254,11 @@ function separate(sim: Sim): void {
       // walking out of one would be pushed back in as fast as he walked)
       let wa = a.state !== "ok" ? 0 : a.moving ? 0.5 : 0.35;
       let wb = b.state !== "ok" ? 0 : b.moving ? 0.5 : 0.35;
-      // a man on his way to his job does not stand aside for his own men without one: they make
-      // way (round 17: a picked leader sent to a job and a man going back to his place in the
-      // column met head-on, and both stood for good)
-      if (a.squad === b.squad && a.squad >= 0) {
-        if (toJob(a) && makesWay(sim, b)) wa = 0;
-        else if (toJob(b) && makesWay(sim, a)) wb = 0;
-      }
+      // a man on his way to his job does not stand aside for men without one: they make way (round
+      // 17: a picked leader sent to a job and a man going back to his place in the column met
+      // head-on, and both stood for good)
+      if (toJob(a) && makesWay(sim, b)) wa = 0;
+      else if (toJob(b) && makesWay(sim, a)) wb = 0;
       const tot = wa + wb || 1;
       const ax = a.x - nx * push * (wa / tot) * 2, ay = a.y - ny * push * (wa / tot) * 2;
       const bx = b.x + nx * push * (wb / tot) * 2, by = b.y + ny * push * (wb / tot) * 2;

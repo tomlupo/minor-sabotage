@@ -315,8 +315,10 @@ export class HudScene extends Phaser.Scene {
       if (!this.g.holdWorld(p.x, p.y)) this.say("Nobody close enough to throw", "bad");
       return;
     }
-    if (!g.moved && held > 480) { this.g.holdWorld(p.x, p.y); return; }
-    if (!g.moved) this.g.tapWorld(p.x, p.y);
+    // a drag let go: the walk it led is judged now, once
+    if (g.moved) { this.g.dragEnded(); return; }
+    if (held > 480) { this.g.holdWorld(p.x, p.y); return; }
+    this.g.tapWorld(p.x, p.y);
   }
 
   // ------------------------------------------------------------------ events and text

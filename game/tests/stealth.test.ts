@@ -11,7 +11,7 @@ import { newCampaign, TASK_MODE, type Campaign } from "../src/missions/campaign"
 import { signalTask } from "../src/missions/signal";
 import { ghettoTask } from "../src/missions/ghetto";
 import { oldtownTask } from "../src/missions/oldtown";
-import { cmdFireAt, cmdMove, cmdPick, cmdTapEnemy, cmdThrow, cmdWork } from "../src/sim/commands";
+import { cmdFireAt, cmdMove, cmdPick, cmdTapEnemy, cmdThrow, cmdWork, judgeWalk } from "../src/sim/commands";
 import { UF_POSTED } from "../src/sim/types";
 import type { Phase } from "../src/missions/types";
 import { tapWhenClear, wait } from "./helpers/sneak";
@@ -44,6 +44,19 @@ function spotFrom(sim: Sim, x: number, y: number, r: number, from = 0) {
     if (sim.grid.walkable(sx, sy) && sim.grid.los(x, y, sx, sy)) return { x: sx, y: sy };
   }
   throw new Error(`no open spot ${r} m from ${x}, ${y}`);
+}
+
+/** A drag, as the HUD sends it: a walk toward the finger every 0.12 s, unjudged, then the walk it led
+ *  judged once when it is let go, from where it began (GameScene.dragEnded). */
+function drag(sim: Sim, to: { x: number; y: number }, steps = 10) {
+  const L = sim.leaderOf(sim.state.squads[sim.state.controlled])!;
+  const from = { x: L.x, y: L.y };
+  for (let k = 1; k <= steps; k++) {
+    cmdMove(sim, from.x + ((to.x - from.x) * k) / steps, from.y + ((to.y - from.y) * k) / steps, false);
+    wait(sim, 0.12);
+  }
+  const l = sim.unit(L.id)!;
+  judgeWalk(sim, from.x, from.y, l.goalX, l.goalY);
 }
 
 describe("a person can do it unseen (only what is on the screen)", () => {
@@ -517,7 +530,7 @@ describe("a man handed a job goes to it himself, and gets there", () => {
     expect(d0 - Math.hypot(m.x - a.x, m.y - a.y), `${x.tag} making for his own job`).toBeGreaterThan(4);
   });
 
-  it("a ring tapped, then a drag toward it or the street beside it: the man goes on with his job", () => {
+  it("a ring tapped, then a drag toward it, or the street beside it: the man goes on with his job", () => {
     // review round 16: a drag, a walk after another from under the finger, dropped the job at its
     // first touch
     const { sim, phase, sq, id } = setup(signalTask);
@@ -527,18 +540,29 @@ describe("a man handed a job goes to it himself, and gets there", () => {
     bank.act(sim);
     wait(sim, 1);
     const L = sim.leaderOf(sq)!;
-    // a drag from the leader toward the bank
-    for (let k = 0; k <= 10; k++) {
-      const l = sim.unit(L.id)!;
-      cmdMove(sim, l.x + (bank.x - l.x) * 0.05 * k, l.y + (bank.y - l.y) * 0.05 * k);
-      wait(sim, 0.1);
-    }
-    // and the street beside the bank
+    const ahead = Math.atan2(bank.y - L.y, bank.x - L.x);
+    drag(sim, { x: L.x + Math.cos(ahead) * 10, y: L.y + Math.sin(ahead) * 10 });
+    expect(sim.unit(kadlubek)!.task?.kind, "his job kept through the drag").toBe("work");
     const by = spotFrom(sim, bank.x, bank.y, 9);
     cmdMove(sim, by.x, by.y);
-    expect(sim.unit(kadlubek)!.task?.kind, "his job kept").toBe("work");
+    expect(sim.unit(kadlubek)!.task?.kind, "and the tap beside it").toBe("work");
     for (let n = 0; n < 120 && sim.state.vars.post_bank !== true; n++) wait(sim, 0.5);
     expect(sim.state.vars.post_bank).toBe(true);
+  }, 60_000);
+
+  it("a ring tapped, then a drag back: the man the squad was taking comes back with it when the finger lifts", () => {
+    // review round 18: judged touch by touch, a drag never called him back (each touch fell within
+    // 5 m of the leader, and moved where the squad was bound)
+    const { sim, phase, sq, id } = setup(signalTask);
+    blind(sim);
+    const kadlubek = id((t) => t === "kadlubek");
+    const bank = phase.interactables(sim).find((i) => i.id === "bank")!;
+    bank.act(sim);
+    wait(sim, 2);
+    const L = sim.leaderOf(sq)!;
+    const back = spotFrom(sim, L.x, L.y, 10, Math.atan2(L.y - bank.y, L.x - bank.x));
+    drag(sim, back);
+    expect(sim.unit(kadlubek)!.task, "his job dropped").toBeNull();
   }, 60_000);
 
   it("a ring tapped, then the street away from it: the man the squad was taking comes back with it", () => {
@@ -594,28 +618,75 @@ describe("a man handed a job goes to it himself, and gets there", () => {
     expect(sim.state.vars.post_bank).toBe(true);
   }, 60_000);
 
-  it("a ring tapped, the squad nudged aside, then walked back: he goes on, the squad no longer taking him", () => {
-    // review round 17: the squad's mark on his job was never cleared, and a later walk away called
-    // him back after the squad had been sent elsewhere
+  it("a ring tapped, a walk toward it, then a walk back: he comes back (a walk does not end the squad's going with him)", () => {
+    // review round 18: a walk toward the job moved where the squad was bound, and the walk back after
+    // it left him walking on alone
     const { sim, phase, sq, id } = setup(signalTask);
     blind(sim);
     const kadlubek = id((t) => t === "kadlubek");
     const bank = phase.interactables(sim).find((i) => i.id === "bank")!;
     bank.act(sim);
-    wait(sim, 1.5);
+    wait(sim, 1);
     const L = sim.leaderOf(sq)!;
     const ahead = Math.atan2(bank.y - L.y, bank.x - L.x);
-    // a nudge too short to judge: the squad goes there, not with him
-    const nudge = spotFrom(sim, L.x, L.y, 4.5, ahead + Math.PI / 2);
-    cmdMove(sim, nudge.x, nudge.y);
+    const on = spotFrom(sim, L.x, L.y, 6, ahead);
+    cmdMove(sim, on.x, on.y);
+    expect(sim.unit(kadlubek)!.task?.kind, "kept by the walk toward").toBe("work");
     wait(sim, 1.5);
     const l = sim.unit(L.id)!;
     const back = spotFrom(sim, l.x, l.y, 8, ahead + Math.PI);
     cmdMove(sim, back.x, back.y);
+    expect(sim.unit(kadlubek)!.task, "called back by the walk back").toBeNull();
+  });
+
+  it("a ring tapped, then another man's: the squad goes with the second, and a walk back leaves the first to his job", () => {
+    // the squad goes with one man at a time: sent with the second, it no longer goes with the first
+    const { sim, phase, sq, id } = setup(signalTask);
+    blind(sim);
+    const kadlubek = id((t) => t === "kadlubek"), jur = id((t) => t === "jur");
+    const ring = (p: string) => phase.interactables(sim).find((i) => i.id === p)!;
+    ring("bank").act(sim);
+    wait(sim, 1);
+    ring("phone").act(sim);
+    wait(sim, 1);
+    const L = sim.leaderOf(sq)!;
+    const phone = ring("phone");
+    const back = spotFrom(sim, L.x, L.y, 8, Math.atan2(L.y - phone.y, L.x - phone.x));
+    cmdMove(sim, back.x, back.y);
+    expect(sim.unit(jur)!.task, "the second called back").toBeNull();
+    expect(sim.unit(kadlubek)!.task?.kind, "the first left to his job").toBe("work");
+  });
+
+  it("a ring tapped, then another man picked and walked off: the man the squad is taking goes on", () => {
+    // a walk of a man picked on the strip is his own, not the squad's
+    const { sim, phase, id } = setup(signalTask);
+    blind(sim);
+    const kadlubek = id((t) => t === "kadlubek");
+    const bank = phase.interactables(sim).find((i) => i.id === "bank")!;
+    bank.act(sim);
+    wait(sim, 1);
+    const kuba = sim.unit(id((t) => t === "kuba"))!;
+    cmdPick(sim, kuba.id);
+    const off = spotFrom(sim, kuba.x, kuba.y, 8, Math.atan2(kuba.y - bank.y, kuba.x - bank.x));
+    cmdMove(sim, off.x, off.y);
     expect(sim.unit(kadlubek)!.task?.kind, "his job kept").toBe("work");
-    for (let n = 0; n < 120 && sim.state.vars.post_bank !== true; n++) wait(sim, 0.5);
-    expect(sim.state.vars.post_bank).toBe(true);
-  }, 60_000);
+  });
+
+  it("a ring tapped, then a job for the leader himself: the squad goes with the leader, and a walk back leaves the man to his job", () => {
+    // the squad goes with one at a time: its leader off to a job of his own, it no longer goes with the man
+    const { sim, phase, sq, id } = setup(signalTask);
+    blind(sim);
+    const kadlubek = id((t) => t === "kadlubek");
+    const bank = phase.interactables(sim).find((i) => i.id === "bank")!;
+    bank.act(sim);
+    wait(sim, 1);
+    const L = sim.leaderOf(sq)!;
+    const errand = spotFrom(sim, L.x, L.y, 3);
+    expect(cmdWork(sim, errand.x, errand.y, "errand", "errand", 30, (u) => (u === L ? 100 : 0))).toBe(L);
+    const back = spotFrom(sim, L.x, L.y, 8, Math.atan2(L.y - bank.y, L.x - bank.x));
+    cmdMove(sim, back.x, back.y);
+    expect(sim.unit(kadlubek)!.task?.kind, "his job kept").toBe("work");
+  });
 
   it("a man sent alone keeps his job when the squad walks away from it", () => {
     // cmdPick: he "works alone until his tag is tapped again" (review round 16: a walk of the squad

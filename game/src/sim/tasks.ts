@@ -3,22 +3,18 @@
 // wounded friend back on his feet.
 import type { Sim } from "./sim";
 import type { Unit } from "./types";
-import { goTo, setAnim } from "./move";
+import { goTo, setAnim, toJob } from "./move";
 import { KNIFE, THROW, WOUND } from "./tuning";
 
 /** Within this of his job a man walking to it is at it: he stops fighting, and a walk of the squad
- *  away from the job leaves him to it. */
-export const WORK_DETACH = 7;
-
-/** On his way to his job, not yet at work on it. */
-export function toJob(u: Unit): boolean {
-  return u.task?.kind === "work" && u.task.phase === "approach";
-}
+ *  leaves him to it. */
+const WORK_DETACH = 7;
 
 /** On his way to a job still far off. */
 export function farFromJob(u: Unit): boolean {
-  const t = u.task;
-  return t?.kind === "work" && t.phase === "approach" && Math.hypot(t.x - u.x, t.y - u.y) > WORK_DETACH;
+  if (!toJob(u)) return false;
+  const t = u.task as Extract<Unit["task"], { kind: "work" }>;
+  return Math.hypot(t.x - u.x, t.y - u.y) > WORK_DETACH;
 }
 
 /** A man at his task does not fight; one still walking to a job far off does. */

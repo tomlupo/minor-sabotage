@@ -5,7 +5,7 @@ import type { Sim } from "../sim/sim";
 import type { Unit } from "../sim/types";
 import type { MapData } from "../content/mapdata";
 import type { Phase, Interactable } from "../missions/types";
-import { actorOf, cmdMove, cmdTapEnemy, cmdHelp, cmdThrow, cmdFireAt } from "../sim/commands";
+import { actorOf, cmdMove, cmdTapEnemy, cmdHelp, cmdThrow, cmdFireAt, judgeWalk } from "../sim/commands";
 import { PAL, lightHex } from "../art/palette";
 import { allLooks } from "../content/arsenal/roster";
 import { WorldView } from "./world";
@@ -283,11 +283,25 @@ export class GameScene extends Phaser.Scene {
     return ok ? "move" : "none";
   }
 
+  /** Where the leader stood when the drag under way began: its walk is judged once it is let go. */
+  private dragFrom: { x: number; y: number } | null = null;
+
   /** Drag to lead: the squad walks toward the finger. */
   dragWorld(px: number, py: number) {
     if (this.mapView) return;
     const w = this.toWorld(px, py);
-    cmdMove(this.run.sim, w.x, w.y);
+    const L = actorOf(this.run.sim);
+    if (!this.dragFrom && L) this.dragFrom = { x: L.x, y: L.y };
+    cmdMove(this.run.sim, w.x, w.y, false);
+  }
+
+  /** A drag let go: the walk it led, from where it began to where the squad is bound, is judged
+   *  once (commands.ts judgeWalk; review round 18: judged touch by touch, it never called a man back). */
+  dragEnded() {
+    const from = this.dragFrom;
+    this.dragFrom = null;
+    const L = actorOf(this.run.sim);
+    if (from && L) judgeWalk(this.run.sim, from.x, from.y, L.goalX, L.goalY);
   }
 
   /** Hold on a spot: throw a grenade or a bottle there. */

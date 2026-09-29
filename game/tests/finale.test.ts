@@ -2,7 +2,7 @@
 // open the tailgate, the DKW backs up for Rudy and gets away. It checks the operation can be
 // won end to end, and that a van left alone gets away.
 import { describe, expect, it } from "vitest";
-import { buildArsenalMap } from "../src/content/arsenal/map";
+import { buildArsenalMap, DLUGA } from "../src/content/arsenal/map";
 import { gridFromMap, inZone, zone } from "../src/content/mapdata";
 import { Sim } from "../src/sim/sim";
 import { newCampaign } from "../src/missions/campaign";
@@ -146,6 +146,8 @@ describe("finale", () => {
     const { sim, md } = setup("signal,line,post,truck");
     const o = sim.state.objectives.find((q) => q.id === "stop")!;
     expect(o.x !== undefined && o.y !== undefined && inZone(zone(md, "bend"), o.x, o.y), "a place at the bend").toBe(true);
+    // on the north pavement: from where the camera looks, the south side's roofs hide the street's middle
+    expect(o.y! - DLUGA.n, "on the north pavement").toBeLessThan(DLUGA.walk);
   });
 
   it("without the signal the van comes on its own", () => {

@@ -50,29 +50,37 @@ function freePicked(sim: Sim, can: (u: Unit) => boolean = () => true): Unit | un
   return p && !p.task && can(p) ? p : undefined;
 }
 
-/** Walk the squad you lead to (x, y), or only the man picked on the strip. */
-export function cmdMove(sim: Sim, x: number, y: number): boolean {
+/** Walk the squad you lead to (x, y), or only the man picked on the strip. A tap's walk is judged at
+ *  once (judgeWalk); a drag's walks are not, and it is judged once it is let go (GameScene.dragEnded). */
+export function cmdMove(sim: Sim, x: number, y: number, judge = true): boolean {
   const sq = sim.controlledSquad;
   if (!sq) return false;
   const L = actorOf(sim);
   if (!L) return false;
   if (L.task && L.task.kind !== "help") L.task = null;
-  // a walk of the squad that does not take it toward a job it is bound for with a man calls him back,
-  // and he drops it (review round 15: the squad turned back and he walked on alone, into the cones;
-  // round 17: turned aside too). A man the squad is not bound for his job with carries on: sent alone,
-  // or the squad sent elsewhere since (round 17); so does one within reach of his job; and a walk
-  // ending near the leader, as a drag's first touches do, is not judged (round 16: a drag dropped
-  // the job at its first touch)
-  if (!pickedOf(sim) && Math.hypot(x - L.x, y - L.y) > 5) {
-    for (const u of sim.membersOf(sq)) {
-      const t = u.task;
-      if (t?.kind !== "work" || !farFromJob(u)) continue;
-      const bound = Math.hypot(L.goalX - t.x, L.goalY - t.y) <= 4.5;
-      if (bound && Math.hypot(x - t.x, y - t.y) > Math.hypot(L.x - t.x, L.y - t.y) - 3) u.task = null;
-    }
-  }
+  if (judge) judgeWalk(sim, L.x, L.y, x, y);
   // a new walk cancels the squad's lock-on only if it was on something now out of sight
   return goTo(sim, L, x, y);
+}
+
+/**
+ * A walk of the squad from (fx, fy) to (x, y) that does not go toward a job it was sent along to
+ * with a man (within 60 degrees of the way there) calls him back, and he drops it: back or aside
+ * (review round 15: the squad turned back and he walked on alone, into the cones; round 17: aside
+ * too). A man sent alone carries on, as does one within reach of his job, and a walk under 1.5 m is
+ * not judged. A drag is judged once, when it is let go (round 18: judged touch by touch, it never
+ * called a man back).
+ */
+export function judgeWalk(sim: Sim, fx: number, fy: number, x: number, y: number): void {
+  const sq = sim.controlledSquad;
+  const len = Math.hypot(x - fx, y - fy);
+  if (!sq || pickedOf(sim) || len < 1.5) return;
+  for (const u of sim.membersOf(sq)) {
+    const t = u.task;
+    if (t?.kind !== "work" || !t.escort || !farFromJob(u)) continue;
+    const jl = Math.hypot(t.x - fx, t.y - fy) || 1;
+    if (((x - fx) * (t.x - fx) + (y - fy) * (t.y - fy)) / (len * jl) <= 0.5) u.task = null;
+  }
 }
 
 /** The best knifer for a target: the closest unhurt trooper of the squad. */
@@ -184,7 +192,12 @@ export function cmdWork(sim: Sim, x: number, y: number, what: string, ref: strin
   // off his own errand)
   const L = sim.leaderOf(sq);
   const columnFree = !!L && sim.state.picked !== L.id && !L.task && !(L.flags & UF_POSTED);
-  if (L && columnFree && L !== best && best.id !== sim.state.picked) {
+  const escorted = !!L && columnFree && L !== best && best.id !== sim.state.picked;
+  // the squad sent along with this man, or its leader off to a job himself, goes with no other (the
+  // mark is set and cleared here only: review round 18, a walk that moved the leader lost it)
+  if (escorted || best === L) for (const u of sim.membersOf(sq)) if (u !== best && u.task?.kind === "work") u.task.escort = false;
+  if (best.task?.kind === "work") best.task.escort = escorted;
+  if (L && escorted) {
     const d = Math.hypot(x - L.x, y - L.y);
     if (d > 4) goTo(sim, L, x - ((x - L.x) / d) * 3, y - ((y - L.y) / d) * 3);
   }

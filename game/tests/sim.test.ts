@@ -710,9 +710,9 @@ describe("picking a man on the strip", () => {
     expect(Math.hypot(him.x - us[0].x, him.y - us[0].y)).toBeLessThan(4);
   });
 
-  describe("a walk of the squad, and a job it is bound for with a man", () => {
+  describe("a walk of the squad, and a job it was sent along to with a man", () => {
     // a job 23 m off in the open yard, a man sent to it with the squad (nobody picked), a second on
-    const bound = () => {
+    const sent = () => {
       const sim = new Sim(yard());
       const { us } = squadOf4(sim, 5, 20);
       run(sim, 0.5);
@@ -722,31 +722,56 @@ describe("picking a man on the strip", () => {
       return { sim, L: us[0], man };
     };
     it("a walk back calls him back, and he drops the job (review round 15: he walked on alone)", () => {
-      const { sim, L, man } = bound();
+      const { sim, L, man } = sent();
       cmdMove(sim, L.x - 8, L.y);
       expect(man.task).toBeNull();
     });
     it("a step aside calls him back too (round 17: it counted as a walk toward the job)", () => {
-      const { sim, L, man } = bound();
-      const d = Math.hypot(28 - L.x, 20 - L.y);
-      const aside = { x: L.x, y: L.y + 8 };
-      // truly aside: no nearer the job, and not 2 m farther either
-      const further = Math.hypot(28 - aside.x, 20 - aside.y) - d;
-      expect(further).toBeGreaterThan(-3);
-      expect(further).toBeLessThan(2);
-      cmdMove(sim, aside.x, aside.y);
+      const { sim, L, man } = sent();
+      cmdMove(sim, L.x, L.y + 8);
       expect(man.task).toBeNull();
     });
-    it("a walk toward the job leaves him to it", () => {
-      const { sim, L, man } = bound();
-      cmdMove(sim, L.x + 10, L.y);
+    it("a walk toward the job, long or short, leaves him to it", () => {
+      for (const step of [10, 2]) {
+        const { sim, L, man } = sent();
+        cmdMove(sim, L.x + step, L.y);
+        expect(man.task?.kind, `${step} m toward`).toBe("work");
+      }
+    });
+    it("a walk of a metre is not judged", () => {
+      const { sim, L, man } = sent();
+      cmdMove(sim, L.x - 1, L.y);
       expect(man.task?.kind).toBe("work");
     });
   });
 
+  it("a man walking to a job far off still fights; one at his job does not", () => {
+    // atTask (tasks.ts): a job far off does not take a man out of the fight
+    const sim = new Sim(yard());
+    const { us } = squadOf4(sim, 10, 20);
+    const g = sim.spawnUnit({ side: "de", look: "de_rifle", x: 13, y: 17, weapon: "rifle", ai: { mode: "alert", district: 1 } });
+    run(sim, 0.2);
+    const far = us[2], near = us[3];
+    // only these two can shoot: the first shot of another could end the fight before their turn
+    us[0].weapon = us[1].weapon = "none";
+    far.task = { kind: "work", what: "far", ref: "", x: 10, y: 37, t: 0, dur: 30, phase: "approach" };
+    near.task = { kind: "work", what: "near", ref: "", x: near.x, y: near.y, t: 0, dur: 30, phase: "work" };
+    cmdTapEnemy(sim, g.id, 0);
+    let farAimed = false, nearAimed = false;
+    for (let i = 0; i < 15; i++) {
+      sim.state.paused = false;
+      sim.step();
+      sim.drainEvents();
+      farAimed ||= far.aiming;
+      nearAimed ||= near.aiming;
+    }
+    expect(farAimed, "the man bound for a job far off").toBe(true);
+    expect(nearAimed, "the man at his job").toBe(false);
+  });
+
   it("a man on his way to his job gets past a squad-mate met head-on in a narrow way: his own men make way", () => {
     // round 17: a picked leader sent to a job and a man going back to his place in the column met
-    // head-on, and both stood for good
+    // head-on, and both stood for good (the leader first in the squad's order: separate's first branch)
     const G = new Grid(40, 5);
     G.flags.fill(F_SIGHT);
     for (let x = 1; x < 39; x++) G.flags[2 * 40 + x] = F_WALK; // a way a metre wide
@@ -763,6 +788,27 @@ describe("picking a man on the strip", () => {
       sim.state.paused = false;
       sim.step();
       done = sim.drainEvents().some((e) => e.t === "work" && e.done && e.unit === us[0].id);
+    }
+    expect(done).toBe(true);
+  });
+
+  it("a man later in the squad's order, on his way to his job, gets past one earlier met head-on", () => {
+    // separate's second branch: the man in the way comes first in the list of units
+    const G = new Grid(40, 5);
+    G.flags.fill(F_SIGHT);
+    for (let x = 1; x < 39; x++) G.flags[2 * 40 + x] = F_WALK;
+    const sim = new Sim(G);
+    const { us } = squadOf4(sim, 5, 2.5);
+    const put = (k: number, x: number) => Object.assign(us[k], { x, y: 2.5, px: x, py: 2.5, path: [] });
+    put(0, 3); put(3, 6); put(1, 20); put(2, 2);
+    // Anoda picked and sent to the far end; Alek goes back to his place by the leader
+    cmdPick(sim, us[3].id);
+    cmdWork(sim, 35.5, 2.5, "test_job", "", 1);
+    let done = false;
+    for (let i = 0; i < 30 * 30 && !done; i++) {
+      sim.state.paused = false;
+      sim.step();
+      done = sim.drainEvents().some((e) => e.t === "work" && e.done && e.unit === us[3].id);
     }
     expect(done).toBe(true);
   });
