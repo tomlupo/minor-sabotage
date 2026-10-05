@@ -88,17 +88,18 @@ describe("ground painter", () => {
     expect(rows[1] - rows[0]).toBe(Math.round((6 + GAUGE / 2) * 9) - Math.round((6 - GAUGE / 2) * 9));
   });
 
-  it("paints a 250 x 180 m map at 3000 x 1620 art px", () => {
-    const im = paintGround(demoMap(), 2);
-    expect([im.w, im.h]).toEqual([3000, 1620]);
-  });
-
+  // timed before the size test paints the same map, so it times the map's first paint, as it did
   it.runIf(judgesTime)("paints a 250 x 180 m map in under 400 ms", () => {
     paintGround(grid(40, 30, "road", [[0, 0, 40, 10, "walk"], [0, 20, 40, 30, "yard"], [10, 10, 20, 20, "square"]]), 1); // warm up
     const g = demoMap();
     const t0 = performance.now();
     paintGround(g, 2);
     expect(performance.now() - t0).toBeLessThan(400);
+  });
+
+  it("paints a 250 x 180 m map at 3000 x 1620 art px", () => {
+    const im = paintGround(demoMap(), 2);
+    expect([im.w, im.h]).toEqual([3000, 1620]);
   });
 });
 
