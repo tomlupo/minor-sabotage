@@ -11,6 +11,7 @@ import { buildFxSheet } from "../src/art/fx";
 import { PAL } from "../src/art/palette";
 import raw from "../../docs/art/palette.json";
 import { offPalette, opaqueCount } from "./helpers/palette-check";
+import { judgesTime } from "./helpers/timing";
 
 const ALL_KINDS: PropKind[] = [
   "lamp", "ad_column", "kiosk", "bench", "tree", "phone_pole", "phone_box", "sandbags", "barrier", "barrel",
@@ -90,8 +91,9 @@ function expectClean(label: string, im: PixelImage): void {
 describe("art: props, vehicles, effects", () => {
   // first, while the builders are cold, as they are at boot: every prop kind in each drawn state,
   // all 16 vehicle sheets, the effects sheet. A shared box can be busy, so the budget is held by
-  // the better of the cold build and an immediate second one; both are printed.
-  it("builds every prop, vehicle sheet and the effects sheet in about 300 ms", () => {
+  // the better of the cold build and an immediate second one; both are printed. Judged on our own
+  // boxes only (helpers/timing.ts).
+  it.runIf(judgesTime)("builds every prop, vehicle sheet and the effects sheet in about 300 ms", () => {
     const build = () => {
       const t0 = performance.now();
       for (const kind of ALL_KINDS) for (const st of PROP_STATES[kind]) buildProp(kind, st);
