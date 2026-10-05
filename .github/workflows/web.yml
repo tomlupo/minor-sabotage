@@ -1,11 +1,13 @@
 name: Web
 
-# Builds the WebAssembly version and publishes it to GitHub Pages.
-# The demo campaigns come from the Run/ submodule (OpenFodder/data) at its pinned commit.
+# Publishes the site to GitHub Pages:
+#   /            the TypeScript game (game/), tested and built with Vite
+#   /prototype/  the frozen C++ Open Fodder prototype, kept to compare feel (ADR-0001)
+# The prototype's demo campaigns come from the Run/ submodule (OpenFodder/data) at its pinned commit.
 
 on:
   push:
-    branches: [master, feat/iphone-web]
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -16,7 +18,32 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
-  build:
+  game:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: game
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: game/package-lock.json
+
+      - name: Test and build
+        run: |
+          npm ci
+          npx vitest run
+          npm run build
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: game
+          path: game/dist
+
+  prototype:
     runs-on: ubuntu-latest
     # Same image as Projects/emscripten/build_emscripten.sh, so a local build matches this one
     container: emscripten/emsdk:6.0.10
@@ -32,12 +59,31 @@ jobs:
           cmake --build build -j"$(nproc)"
           ls -l RunE
 
-      - uses: actions/upload-pages-artifact@v5
+      - uses: actions/upload-artifact@v7
         with:
+          name: prototype
           path: RunE
 
+  site:
+    needs: [game, prototype]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: game
+          path: site
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: prototype
+          path: site/prototype
+
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: site
+
   deploy:
-    needs: build
+    needs: site
     runs-on: ubuntu-latest
     permissions:
       pages: write

@@ -24,6 +24,8 @@ building fronts, long shadows, guard cones, and a silhouette when someone is beh
 | | value |
 |---|---|
 | Art pixel on an iPhone | 1.5 pt, so an iPhone 15 held sideways (852 × 393 pt) shows **568 × 262 art px** |
+| Art pixel on a PC | the same map in any window (Tom, 2026-09-28): the full-screen 1080p view, **480 × 270 art px**, fitted to the window. Full screen at 1080p, 125 % or 150 % that is 4 screen pixels to an art pixel; a window of another height gets art pixels a screen pixel wider or narrower by turns |
+| Art pixel on other dense screens | tablets and Macs (2× density or more): 1, 1.5, 2, 3… pt, the largest that still shows **480 × 240 art px** |
 | World scale | **12 art px per metre** across, **9 px per metre** into the screen (depth factor 0.75) |
 | Height | **7.5 px per metre** up. A storey is 3.2 m = **24 px** |
 | Ground tile | **2 m × 2 m = 24 × 18 px**. The screen holds about 23.7 × 14.5 tiles |
@@ -36,7 +38,15 @@ so that a tile is a whole number of pixels.
 
 A point on the ground at `(x, y)` metres and height `z` lands at
 `sx = x·12`, `sy = y·9 − z·7.5` (art px, before the camera offset). Everything is drawn at 1× in art
-pixels and scaled up by an integer or by 1.5 with nearest-neighbour sampling, never smoothed.
+pixels and scaled up with nearest-neighbour sampling, never smoothed: by a step in points on a
+phone or another dense screen, and on a PC by whatever fits the 1080p view to the window.
+
+**Text is the exception** (Tom, 2026-09-28: the pixel faces could not be read on a PC). Words are
+set in two bundled faces and drawn at the screen's own resolution, not in art pixels: the typewriter
+Courier Prime on the paper screens (intro, chapter card, briefing, decision, history note), and the
+condensed sans Barlow Semi Condensed in the HUD, on the street and on buttons. They keep the pixel
+faces' three sizes and line pitches (`game/src/ui/text.ts`). Lettering that is part of a picture,
+such as the logo and the shop signs, stays pixel.
 
 ## 3. Colour
 
@@ -137,6 +147,11 @@ door shut), and a raised alarm is a glyph over the guard's head, not a pose.
   the edge. Your route is dotted `select_gold` ending in a diamond, and the selected trooper has a
   gold ellipse. A trooper hidden behind a roof shows as a dotted outline, gold for yours and red
   for theirs.
+- **Jobs and places:** a job you can tap is a dashed chalk ring, its dashes marching while it is
+  on offer, and a place an open objective names is a still one; both carry a dark edge, so they
+  read on pale pavement. Whichever of them is off the screen gets a chalk arrow with a dark edge
+  on the screen's inner edge, clear of the HUD, pointing at it (Tom, 2026-09-28: "dont reealy
+  know where is it").
 - **Orders for squads you are not playing** are drawn in that squad's colour: a hold flag, a cover
   cone, and a dotted route that ends in a "waits for signal" mark.
 - **The HUD**, laid out as in the port: the roster at the top left, FIRE and GRENADE under the left
