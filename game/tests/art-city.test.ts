@@ -1,6 +1,6 @@
 // The city generators (src/art/city): image sizes per the contract in src/art/types.ts, full and
 // cut versions with the same bounds, only palette colours (style guide §3), determinism, and
-// the ground painter's speed on a demo-sized map.
+// the ground painter on a demo-sized map: its size everywhere, its speed off CI only.
 import { describe, expect, it } from "vitest";
 import { buildArsenal, type ArsenalSpec } from "../src/art/city/arsenal";
 import { buildBuilding, wallHeight } from "../src/art/city/buildings";
@@ -11,6 +11,7 @@ import type { PixelImage } from "../src/art/pixel";
 import { img } from "../src/art/pixel";
 import type { BuildingSpec, GroundGrid, GroundMat } from "../src/art/types";
 import { offPalette, opaqueCount } from "./helpers/palette-check";
+import { judgesTime } from "./helpers/timing";
 
 const LEGEND: GroundMat[] = ["road", "walk", "yard", "rail_ew", "rail_ns", "under", "square"];
 const M = Object.fromEntries(LEGEND.map((m, i) => [m, i])) as Record<GroundMat, number>;
@@ -87,14 +88,18 @@ describe("ground painter", () => {
     expect(rows[1] - rows[0]).toBe(Math.round((6 + GAUGE / 2) * 9) - Math.round((6 - GAUGE / 2) * 9));
   });
 
-  it("paints a 250 x 180 m map in under 400 ms", () => {
+  // timed before the size test paints the same map, so it times the map's first paint, as it did
+  it.runIf(judgesTime)("paints a 250 x 180 m map in under 400 ms", () => {
     paintGround(grid(40, 30, "road", [[0, 0, 40, 10, "walk"], [0, 20, 40, 30, "yard"], [10, 10, 20, 20, "square"]]), 1); // warm up
     const g = demoMap();
     const t0 = performance.now();
-    const im = paintGround(g, 2);
-    const ms = performance.now() - t0;
+    paintGround(g, 2);
+    expect(performance.now() - t0).toBeLessThan(400);
+  });
+
+  it("paints a 250 x 180 m map at 3000 x 1620 art px", () => {
+    const im = paintGround(demoMap(), 2);
     expect([im.w, im.h]).toEqual([3000, 1620]);
-    expect(ms).toBeLessThan(400);
   });
 });
 
